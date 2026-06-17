@@ -1,0 +1,2306 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>広告ナビ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
+<script src="shared-data.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Hiragino Sans',Meiryo,sans-serif}
+:root{--org:#e8650a;--org2:#ff8c2a;--dark:#333;--gray:#888;--light:#f8f8f8;--white:#fff;--border:#e0e0e0;--hdr:48px}
+body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:#f5f5f5}
+#header{display:flex;align-items:center;height:48px;background:#fff;border-bottom:3px solid var(--org);padding:0 12px;gap:10px;z-index:2500;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+#logo-wrap{display:flex;flex-direction:column;line-height:1;flex-shrink:0;margin-right:6px}
+#logo-company{font-size:9px;color:#aaa;letter-spacing:.5px}
+#logo-main{font-size:20px;font-weight:900;letter-spacing:-.5px}
+#logo-main .ko{color:var(--org)}
+#logo-main .ku{color:#333}
+#search-wrap{flex:1;display:flex;align-items:center;max-width:420px;border:2px solid var(--org);border-radius:4px;height:32px;overflow:hidden}
+#search-wrap input{flex:1;border:none;outline:none;padding:0 10px;font-size:13px;color:#333}
+#search-wrap button{background:var(--org);border:none;color:#fff;height:100%;padding:0 12px;cursor:pointer;font-size:14px;flex-shrink:0}
+#filter-icon{background:none;border:none;cursor:pointer;color:var(--org);font-size:18px;padding:4px;flex-shrink:0}
+.hdr-spacer{flex:1}
+.btn-member{background:none;border:none;color:var(--org);font-size:12px;cursor:pointer;white-space:nowrap;text-decoration:underline;padding:0 4px}
+.btn-login-hdr{border:1px solid var(--org);color:var(--org);background:#fff;border-radius:4px;padding:4px 14px;font-size:12px;cursor:pointer;white-space:nowrap;margin-left:4px}
+.btn-login-hdr:hover{background:var(--org);color:#fff}
+#hamburger{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;gap:4px;padding:4px;flex-shrink:0;margin-left:4px;transition:opacity .2s}
+#hamburger span{display:block;width:20px;height:2px;background:var(--org);border-radius:2px;transition:background .2s}
+#hamburger.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+#hamburger.disabled span{background:#aaa}
+#map{flex:1;z-index:0}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;display:flex;align-items:center;justify-content:center}
+.modal-box{background:#fff;border-radius:8px;padding:24px 22px;width:88%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-box p{font-size:13px;color:#444;line-height:1.7;margin-bottom:16px}
+.modal-box small{font-size:11px;color:#aaa}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+.btn-deny{background:#e0e0e0;color:#555;border:none;border-radius:4px;padding:8px 18px;font-size:13px;cursor:pointer}
+.btn-allow{background:var(--org);color:#fff;border:none;border-radius:4px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:0 6px 24px rgba(0,0,0,.22)!important;padding:0!important;overflow:hidden}
+.leaflet-popup-content{margin:0!important;width:290px!important}
+.pp-head{background:var(--org);color:#fff;padding:13px 16px;font-size:15px;font-weight:700;line-height:1.5}
+.pp-body{padding:14px 16px}
+.pp-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:7px}
+.pp-price{font-size:16px;font-weight:700;color:var(--org);margin:10px 0 12px}
+.btn-check{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:6px;padding:11px;font-size:15px;font-weight:700;cursor:pointer;text-align:center}
+.btn-check:hover{background:var(--org2)}
+#detail-panel{position:fixed;top:var(--hdr);left:0;right:0;bottom:0;background:#f0f0f0;z-index:2200;overflow:hidden;transform:translateY(100%);transition:transform .28s ease}
+#detail-panel.open{transform:translateY(0)}
+.dp-topbar{display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--org);padding:0 14px;height:44px;position:sticky;top:0;z-index:10;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.dp-back-btn{background:none;border:none;color:var(--org);font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;white-space:nowrap;flex-shrink:0}
+.dp-topbar-name{flex:1;font-size:20px;font-weight:900;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-page-body{display:flex;gap:10px;padding:10px;max-width:1100px;margin:0 auto;height:calc(100vh - 92px);overflow:hidden}
+.dp-left-col{flex:0 0 320px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.dp-right-col{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+   ┌─────────────────────────────────────────────────────┐
+   │  XXS  〜 479px   スマートフォン                     │
+   │  XS   480〜699px タブレット縦 / 大型スマホ          │
+   │  SM   700〜899px タブレット横                       │
+   │  MD   900〜1199px 標準デスクトップ / ノートPC       │
+   │  LG   1200〜1599px 大型デスクトップ                 │
+   │  XL   1600px+    超大型モニター / 4K                │
+   └─────────────────────────────────────────────────────┘
+============================================================ */
+
+/* ── LG: 大型デスクトップ (1200px〜1599px) ── */
+@media(min-width:1200px){
+  :root{--hdr:54px}
+
+  
+  #header{height:54px;padding:0 20px}
+  #logo-main{font-size:22px}
+  #search-wrap{max-width:540px;height:36px}
+  #search-wrap input{font-size:14px}
+  #fp-grid{grid-template-columns:1fr 1.8fr 1fr}
+  .tag{font-size:12px;padding:4px 10px}
+  .region-label{font-size:11px;padding:3px 10px}
+  .dp-page-body{max-width:1300px;height:calc(100vh - 98px)}
+  .dp-left-col{flex:0 0 360px}
+}
+
+/* ── XL: 超大型モニター / 4K (1600px+) ── */
+@media(min-width:1600px){
+  :root{--hdr:64px}
+  #header{height:64px;padding:0 32px;gap:16px}
+  #logo-main{font-size:28px}
+  #logo-company{font-size:11px}
+  #search-wrap{max-width:720px;height:44px}
+  #search-wrap input{font-size:16px}
+  #search-wrap button{font-size:17px;padding:0 18px}
+  #fp-grid{grid-template-columns:1fr 2fr 1fr}
+  .fp-header{padding:14px 20px}
+  .fp-header h3{font-size:16px}
+  .tag{font-size:13px;padding:5px 13px;border-radius:14px}
+  .region-label{font-size:12px;padding:3px 12px}
+  .btn-select-all{font-size:11px;padding:3px 10px}
+  .dp-page-body{max-width:1800px;padding:14px;height:calc(100vh - 116px)}
+  .dp-left-col{flex:0 0 440px}
+  .dp-topbar{height:52px}
+  .dp-topbar-name{font-size:16px}
+  .dp-back-btn{font-size:16px}
+  .list-item{padding:12px 16px}
+  .li-thumb{width:76px;height:62px}
+  .li-name{font-size:13px}
+  .li-meta{font-size:11px}
+  .li-price{font-size:12px}
+  #list-panel{width:340px}
+}
+
+/* ── SM以下: タブレット横〜スマホ（〜899px）共通 ── */
+@media(max-width:899px){
+  .dp-page-body{flex-direction:column;height:calc(100vh - var(--hdr));overflow-y:auto}
+  .dp-left-col{flex:unset;overflow-y:visible}
+  .dp-right-col{overflow-y:visible}
+  #fp-grid{display:block;height:calc(100% - 88px)}
+  .fp-tab-bar{display:flex;border-bottom:2px solid #f0f0f0;background:#fff;flex-shrink:0}
+  .fp-tab-btn{flex:1;padding:10px 4px;font-size:12px;border:none;background:transparent;cursor:pointer;color:#aaa;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:600;white-space:nowrap}
+  .fp-tab-btn.active{color:var(--org);border-bottom-color:var(--org);font-weight:700}
+  .fp-col{display:none;height:100%;overflow-y:auto;border-right:none!important}
+  .fp-col.active{display:block}
+  #area-grid{grid-template-columns:1fr 1fr 1fr!important}
+}
+
+/* ── SM: タブレット横 (700px〜899px) ── */
+@media(min-width:700px) and (max-width:899px){
+  #header{padding:0 10px}
+  #search-wrap{max-width:340px}
+  .tag{font-size:11px;padding:3px 9px}
+}
+
+/* ── XS: タブレット縦 / 大型スマホ (480px〜699px) ── */
+@media(max-width:699px){
+  :root{--hdr:44px}
+  #header{height:44px;padding:0 8px;gap:6px}
+  #logo-main{font-size:17px}
+  #logo-company{font-size:8px}
+  #search-wrap{height:30px}
+  .btn-member{display:none}
+  .btn-login-hdr{padding:3px 10px;font-size:11px}
+  .tag{font-size:10px;padding:2px 8px}
+  #area-grid{grid-template-columns:1fr 1fr!important}
+  .fp-tab-btn{font-size:11px;padding:9px 4px}
+}
+
+/* ── XXS: スマートフォン (〜479px) ── */
+@media(max-width:479px){
+  #header{padding:0 6px;gap:4px}
+  #logo-company{display:none}
+  #logo-main{font-size:15px}
+  #search-wrap{height:28px}
+  #search-wrap input{font-size:12px;padding:0 7px}
+  #search-wrap button{padding:0 9px;font-size:13px}
+  .btn-login-hdr{display:none}
+  .tag{font-size:10px;padding:2px 6px}
+  #area-grid{grid-template-columns:1fr 1fr!important}
+  .fp-tab-btn{font-size:10px;padding:8px 2px}
+  .region-label{font-size:9px;padding:2px 6px}
+  .dp-page-body{padding:6px}
+  #list-panel{width:100%}
+}
+.dp-img-wrap{position:relative;width:100%;flex:1;min-height:180px;background:#d8d0c8;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:48px;border-radius:8px;cursor:pointer}
+#photo-viewer{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:none;align-items:center;justify-content:center}
+#photo-viewer.open{display:flex}
+#photo-viewer .pv-close{position:absolute;top:14px;right:18px;background:none;border:none;color:#fff;font-size:30px;cursor:pointer;line-height:1;z-index:1}
+#photo-viewer .pv-img{max-width:90vw;max-height:82vh;object-fit:contain;border-radius:6px;display:block}
+#photo-viewer .pv-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);border:none;color:#fff;font-size:22px;cursor:pointer;padding:14px 16px;border-radius:6px}
+#photo-viewer .pv-prev{left:12px}
+#photo-viewer .pv-next{right:12px}
+#photo-viewer .pv-counter{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);color:#fff;font-size:12px;background:rgba(0,0,0,.4);padding:3px 12px;border-radius:10px}
+.dp-data-card{background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8}
+.dp-data-head{background:#f7f7f7;padding:10px 16px;font-size:16px;font-weight:700;color:#444;border-bottom:1px solid #e8e8e8}
+.dp-body{padding:12px 14px}
+.dp-breadcrumb{font-size:14px;color:#aaa;margin-bottom:4px}
+.dp-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-name{font-size:21px;font-weight:900;color:#333;line-height:1.3;display:flex;align-items:center;gap:4px}
+.dp-name .loc-icon{color:var(--org);font-size:18px}
+.fav-btn{background:none;border:none;font-size:26px;cursor:pointer;line-height:1;padding:0}
+.dp-card{border:1px solid #e8e8e8;border-radius:6px;margin-bottom:10px;overflow:hidden}
+.dp-card-head{display:flex;align-items:center;justify-content:space-between;background:#f7f7f7;padding:10px 16px;font-size:16px;font-weight:700;color:#444;border-bottom:1px solid #e8e8e8}
+.btn-data-check{background:var(--org);color:#fff;border:none;border-radius:12px;padding:5px 14px;font-size:13px;cursor:pointer;font-weight:600}
+.dp-card-body{padding:10px 16px;font-size:16px;color:#555;line-height:1.8}
+.dp-card-body .row{display:flex;align-items:flex-start;gap:6px}
+.plan-list{list-style:none}
+.plan-list li{padding:8px 16px;border-bottom:1px solid #f2f2f2;font-size:16px;color:#333;display:flex;align-items:center;gap:6px}
+.plan-list li:last-child{border-bottom:none}
+.plan-badge{background:var(--org);color:#fff;border-radius:3px;font-size:13px;padding:2px 8px;font-weight:700;flex-shrink:0}
+.memo-wrap{padding:10px 14px 12px;border-top:1px solid #f0f0f0}
+.memo-wrap textarea{width:100%;border:1px solid #ddd;border-radius:4px;padding:8px 10px;font-size:15px;resize:vertical;min-height:60px;outline:none;font-family:inherit}
+.memo-wrap textarea:focus{border-color:var(--org)}
+.btn-memo{margin-top:6px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:14px;cursor:pointer}
+.dp-street{display:flex;align-items:center;justify-content:center;gap:6px;margin:2px 0;border:1px solid #ddd;border-radius:4px;padding:9px;font-size:15px;color:#555;cursor:pointer;background:#fafafa}
+.dp-street:hover{background:#fff5ef;border-color:var(--org);color:var(--org)}
+.dp-footer{display:flex;gap:10px;padding:10px 0 0;border-top:1px solid #eee;background:transparent}
+.btn-dl{flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:13px;font-size:15px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px}
+.btn-inq{flex:1;background:var(--org);color:#fff;border:none;border-radius:4px;padding:13px;font-size:15px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px}
+.btn-inq:hover{background:var(--org2)}
+#filter-panel{position:fixed;top:var(--hdr);left:0;right:0;bottom:0;background:#fff;z-index:2000;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .2s ease}
+#filter-panel.open{opacity:1;pointer-events:all}
+#fp-grid{display:grid;grid-template-columns:1fr 1.6fr 1fr;height:calc(100% - 44px);overflow:hidden}
+.fp-col{overflow:hidden}
+.fp-tab-bar{display:none}
+.fp-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--org)}
+.fp-header h3{font-size:13px;font-weight:700;color:#333}
+.fp-close{background:none;border:none;font-size:18px;cursor:pointer;color:#aaa}
+.fp-sec{padding:10px 14px;border-bottom:1px solid #f0f0f0}
+.fp-sec h4{font-size:11px;color:var(--org);font-weight:700;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{padding:3px 9px;border-radius:12px;border:1px solid #ddd;font-size:11px;cursor:pointer;color:#666;transition:all .15s;background:#fff}
+.tag.on{background:var(--org);color:#fff;border-color:var(--org)}
+.dual-range-wrap{position:relative;height:36px;margin:4px 0 2px}
+.dual-range-track{position:absolute;top:50%;left:8px;right:8px;height:4px;background:#e0e0e0;border-radius:2px;transform:translateY(-50%)}
+.dual-range-fill{position:absolute;height:4px;background:var(--org);border-radius:2px}
+.dual-range-wrap input[type=range]{position:absolute;width:calc(100% - 0px);top:50%;transform:translateY(-50%);left:0;appearance:none;-webkit-appearance:none;background:transparent;pointer-events:none;margin:0;padding:0;height:36px}
+.dual-range-wrap input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--org);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;pointer-events:all}
+.dual-range-wrap input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--org);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;pointer-events:all}
+.region-block{margin-bottom:8px}
+.region-head{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.region-label{font-size:10px;font-weight:700;color:#fff;background:var(--org);display:inline-block;padding:2px 8px;border-radius:10px}
+.btn-select-all{background:none;border:1px solid var(--org);color:var(--org);border-radius:10px;padding:2px 8px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap;line-height:1.4}
+.btn-select-all:hover{background:var(--org);color:#fff}
+.fp-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.range-edge-labels{display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:2px}
+.btn-apply{display:block;width:calc(100% - 28px);margin:12px 14px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;font-weight:700;cursor:pointer}
+#hist-wrap{position:fixed;left:0;top:var(--hdr);width:260px;height:calc(100vh - var(--hdr));z-index:1800;transform:translateX(-100%);transition:transform .18s ease;overflow:visible}
+#hist-wrap.open{transform:translateX(0)}
+#hist-tab{position:absolute;right:-44px;top:0;background:var(--org);color:#fff;writing-mode:vertical-rl;width:44px;height:44px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:0 10px 10px 0;cursor:pointer;font-size:17px;font-weight:700;box-shadow:2px 0 8px rgba(0,0,0,.18);user-select:none;letter-spacing:2px;line-height:1.4}
+#hist-panel{width:100%;height:100%;background:#fff;box-shadow:4px 0 20px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden}
+.leaflet-top.leaflet-left{top:calc(var(--hdr) + 7px) !important;left:3px !important}
+.hist-header{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:var(--org);color:#fff;padding:0 14px;height:44px;font-size:14px;font-weight:700}
+.hist-header button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0}
+#hist-items{flex:1;overflow-y:auto;padding:8px}
+.hist-item{display:flex;align-items:center;justify-content:space-between;background:#f8f8f8;border-radius:6px;margin-bottom:5px;padding:8px 10px;cursor:pointer;border:1px solid #eee;gap:6px}
+.hist-item:hover{background:#fff3eb}
+.hist-kw{flex:1;font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-del{background:none;border:none;color:#bbb;font-size:14px;cursor:pointer;flex-shrink:0;padding:0}
+.hist-del:hover{color:#e74c3c}
+#hist-clear{flex-shrink:0;margin:8px;background:#f0f0f0;color:#888;border:none;border-radius:4px;padding:9px;font-size:12px;cursor:pointer;font-weight:700}
+#hist-clear:hover{background:#fee2e2;color:#c0392b}
+#suggest-box{position:fixed;background:#fff;border:1px solid #e0e0e0;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);z-index:3500;min-width:220px;max-width:360px;max-height:260px;overflow-y:auto;display:none}
+.sug-item{padding:10px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f4f4f4}
+.sug-item:last-child{border-bottom:none}
+.sug-item:hover,.sug-item.sug-active{background:#fff3eb}
+.sug-label{font-size:10px;color:#bbb;flex-shrink:0}
+#hdc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:4500;display:none;align-items:center;justify-content:center}
+#hdc-overlay.open{display:flex}
+.hdc-box{background:#fff;border-radius:14px;padding:28px 22px 20px;max-width:300px;width:88%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.hdc-box h3{margin:0 0 8px;font-size:16px}
+.hdc-box p{font-size:12px;color:#aaa;margin:0 0 20px}
+.hdc-btns{display:flex;gap:10px;justify-content:center}
+.hdc-btns button{flex:1;padding:10px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
+.hdc-no{background:#f0f0f0;color:#555}
+.hdc-yes{background:#ef4444;color:#fff}
+#list-panel{position:fixed;left:0;top:var(--hdr);width:300px;height:calc(100vh - var(--hdr));background:#f0f0f0;box-shadow:4px 0 20px rgba(0,0,0,.18);z-index:1999;transform:translateX(-100%);transition:transform .28s ease;display:flex;flex-direction:column;overflow:hidden}
+#list-panel.open{transform:translateX(0)}
+.lp-header{flex-shrink:0;display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--org);padding:0 14px;height:44px;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.lp-close{background:none;border:none;color:var(--org);font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;white-space:nowrap;flex-shrink:0}
+.lp-count-num{flex:1;font-size:17px;font-weight:900;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-count-label{display:none}
+.lp-header-left{display:contents}
+#lp-items{flex:1;overflow-y:auto;padding:8px}
+.list-item{display:flex;gap:10px;padding:12px;background:#fff;border-radius:8px;margin-bottom:6px;border:1px solid #e8e8e8;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.list-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.1);border-color:var(--org)}
+.li-thumb{width:72px;height:60px;background:#e8e0d8;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden}
+.li-body{flex:1;min-width:0}
+.li-name{font-size:14px;font-weight:700;color:#333;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-meta{font-size:12px;color:#888;line-height:1.8}
+.li-price{font-size:14px;font-weight:700;color:var(--org);margin-top:3px}
+#menu-drawer{position:fixed;right:0;top:var(--hdr);width:240px;height:calc(100vh - var(--hdr));background:#fff;z-index:9000;box-shadow:-4px 0 20px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .28s ease;overflow-y:auto}
+#menu-drawer.open{transform:translateX(0)}
+#menu-drawer.disabled{pointer-events:none;filter:brightness(0.6) grayscale(0.4)}
+#hamburger span{transition:transform .25s ease,opacity .25s ease}
+#hamburger.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+#hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+#hamburger.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.menu-head{background:var(--org);color:#fff;padding:16px 14px;display:flex;align-items:center;justify-content:space-between}
+.menu-head span{font-size:15px;font-weight:700}
+.menu-x{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1}
+.menu-row{display:flex;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid #f3f3f3;cursor:pointer;font-size:13px;color:#333;transition:background .15s}
+.menu-row:hover{background:#fff8f4}
+.menu-row .mi{font-size:18px;width:24px;text-align:center}
+.menu-foot{padding:16px;font-size:11px;color:#ccc}
+.m-overlay{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:7000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.m-box{background:#fff;border-radius:8px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;padding:22px 20px;box-shadow:0 8px 32px rgba(0,0,0,.2);box-sizing:border-box}
+.m-box h3{font-size:15px;font-weight:900;color:#333;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--org)}
+.m-close-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btn-m-close{background:#eee;color:#555;border:none;border-radius:4px;padding:8px 16px;cursor:pointer;font-size:12px;white-space:nowrap}
+.btn-m-primary{display:inline-flex;align-items:center;justify-content:center;background:var(--org);color:#fff;border:none;border-radius:4px;padding:8px 18px;text-decoration:none;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.fg{margin-bottom:11px}
+.fg label{font-size:12px;color:#666;display:block;margin-bottom:4px;font-weight:600}
+.fg label .req{color:var(--org);font-size:10px;margin-left:2px}
+.fi{width:100%;border:1px solid #ddd;border-radius:4px;padding:8px 10px;font-size:13px;outline:none;font-family:inherit}
+.fi:focus{border-color:var(--org)}
+.btn-org{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px}
+.btn-org:hover{background:var(--org2)}
+/* パスワード表示切替ボタン（👁）共通スタイル */
+.pw-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1}
+/* フォームフィールドエラーメッセージ共通スタイル */
+.input-err{font-size:11px;color:#e74c3c;margin-top:3px;display:none}
+/* 6桁認証コード入力フィールド共通スタイル */
+.code-input{letter-spacing:4px;font-size:18px;text-align:center}
+.two-col{display:flex;gap:10px}
+.two-col .fg{flex:1}
+.chart-title{font-size:15px;color:#888;margin-bottom:6px;font-weight:600}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:90px;padding-bottom:18px;border-bottom:1px solid #eee;margin-bottom:8px;position:relative}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%}
+.bar-inner{width:100%;background:var(--org);border-radius:2px 2px 0 0;transition:height .5s;margin-top:auto}
+.bar-inner.hi{background:#2196F3}
+.bar-xlbl{font-size:12px;color:#aaa;position:absolute;bottom:2px;width:100%;text-align:center}
+.pie-row{display:flex;gap:10px;margin-top:8px;align-items:flex-start;flex-wrap:wrap}
+.pie-section{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0}
+.pie-section canvas{flex-shrink:0}
+.pie-sec-info{display:flex;flex-direction:column;justify-content:center;min-width:0}
+.pie-sec-title{font-size:15px;color:#888;font-weight:600;margin-bottom:6px}
+.pie-legend{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px 10px}
+.pie-leg-item{display:flex;align-items:center;gap:5px;font-size:13px;color:#555;white-space:nowrap}
+.pie-leg-item span{display:inline-block;width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.auth-note{font-size:11px;color:#aaa;margin-bottom:14px;background:#fff8f4;padding:8px 10px;border-radius:4px;border-left:3px solid var(--org)}
+.auth-switch{text-align:center;margin-top:10px;font-size:12px;color:#aaa}
+.auth-switch a{color:var(--org);cursor:pointer;text-decoration:underline}
+.ad-table{width:100%;border-collapse:collapse;font-size:16px;margin-top:10px}
+.ad-table th{background:#f7f7f7;padding:12px 14px;text-align:left;border-bottom:1px solid #e8e8e8;color:#666;font-weight:700}
+.ad-table td{padding:13px 14px;border-bottom:1px solid #f2f2f2;color:#333}
+.ad-table td.price{font-weight:700;color:var(--org)}
+.inq-type-row{display:flex;gap:8px;margin-bottom:12px}
+.inq-type-btn{flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;background:#fff;color:#555;transition:all .15s;font-family:inherit}
+.inq-type-btn.on{background:var(--org);color:#fff;border-color:var(--org);font-weight:700}
+/* お問い合わせ履歴 */
+.inq-hist-item{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.inq-hist-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);border-color:var(--org)}
+.inq-hist-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.inq-hist-signage{font-size:13px;font-weight:700;color:#333;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inq-hist-date{font-size:11px;color:#aaa;flex-shrink:0}
+.inq-hist-bottom{display:flex;align-items:center;gap:8px}
+.inq-hist-cat{font-size:11px;color:#666;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inq-status-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;flex-shrink:0}
+.inq-status-badge.new{background:#dbeafe;color:#1e40af}
+.inq-status-badge.read{background:#fef3c7;color:#92400e}
+.inq-status-badge.replied{background:#d1fae5;color:#065f46}
+.inq-detail-row{display:flex;align-items:flex-start;gap:6px;font-size:13px;color:#555;line-height:1.8;padding:4px 0;border-bottom:1px solid #f5f5f5}
+.inq-detail-row:last-child{border-bottom:none}
+.inq-detail-label{font-weight:600;color:#888;flex-shrink:0;min-width:90px}
+.inq-detail-val{flex:1;word-break:break-all}
+.inq-empty{text-align:center;color:#bbb;font-size:13px;padding:40px 20px}
+.leaflet-control-zoom-in,.leaflet-control-zoom-out{width:20px!important;height:20px!important;line-height:20px!important;font-size:14px!important;background:#1e293b!important;color:#fff!important;border-color:#334155!important}
+.leaflet-control-zoom-in:hover,.leaflet-control-zoom-out:hover{background:#334155!important;color:#fff!important}
+.leaflet-bar{box-shadow:0 1px 4px rgba(0,0,0,.3)!important}
+.leaflet-control-locate{background:#1e293b!important;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.4);cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #334155!important;transition:background .2s;color:#fff!important}
+.leaflet-control-locate:hover{background:#334155!important;color:#fff!important}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.leaflet-control-locate.locating{animation:pulse 1s infinite}
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:rgba(50,50,50,.92);color:#fff;padding:9px 20px;border-radius:20px;font-size:12px;z-index:9999;transition:all .3s;opacity:0;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+/* 施設レイヤー：トグルボタン */
+.leaflet-control-facility{background:#1e293b!important;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.4);cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #334155!important;transition:background .2s;text-decoration:none;color:#fff!important}
+.leaflet-control-facility:hover{background:#334155!important;color:#fff!important}
+.leaflet-control-facility.active{background:#e8650a!important;color:#fff!important}
+/* 施設選択パネル */
+#facility-panel{position:absolute;bottom:44px;left:6px;z-index:800;background:#fff;border-radius:8px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.25);display:none;min-width:170px}
+#facility-panel.show{display:block}
+#facility-panel .fp-title{font-size:11px;font-weight:700;color:#555;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+#facility-panel .fp-all{font-size:10px;color:var(--org);cursor:pointer;font-weight:700}
+.fc-btn{display:flex;align-items:center;gap:6px;width:100%;background:#f5f5f5;border:1.5px solid #e0e0e0;border-radius:5px;padding:5px 8px;font-size:12px;cursor:pointer;margin-bottom:4px;transition:all .15s;text-align:left}
+.fc-btn:last-of-type{margin-bottom:0}
+.fc-btn.on{background:#e8f4fd;border-color:var(--org);color:#222;font-weight:600}
+.fc-btn .fc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* 施設レイヤー：ローディング表示 */
+#facility-loading{position:absolute;bottom:36px;left:6px;z-index:800;background:rgba(255,255,255,.9);border-radius:4px;padding:4px 8px;font-size:11px;color:#666;display:none}
+/* ズームレベル表示 */
+#zoom-badge{position:absolute;bottom:6px;left:6px;z-index:800;background:rgba(255,255,255,.88);border-radius:4px;padding:3px 7px;font-size:11px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,.2);pointer-events:none;line-height:1.5}
+#zoom-badge.ready{color:#2e7d32;font-weight:700}
+@keyframes kn-tap-pop{0%,100%{transform:translateY(0) scale(1)}45%{transform:translateY(-4px) scale(1.08)}}
+.kn-tap-badge{display:inline-block;background:#e8650a;color:#fff;font-size:10px;font-weight:800;border-radius:20px;padding:3px 10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);letter-spacing:.4px;line-height:1.4;margin-bottom:4px;animation:kn-tap-pop 1.8s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div id="header">
+  <div id="logo-wrap" onclick="showTop()" style="cursor:pointer">
+    <span id="logo-company">テンフィールズファクトリー</span>
+    <div id="logo-main"><span class="ko">広</span><span class="ku">告</span><span class="ko">ナビ</span></div>
+  </div>
+  <div id="search-wrap">
+    <input type="text" id="q" placeholder="検索" onkeydown="handleSuggestKey(event)" oninput="updateSuggest()" onfocus="updateSuggest()" onblur="setTimeout(hideSuggest,180)">
+    <button onclick="doSearch()">🔍</button>
+  </div>
+  <button id="filter-icon" onclick="toggleFilter()" title="絞り込み" style="display:flex;align-items:center;justify-content:center;height:20px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 3h18l-7 7v10l-4-2V10L3 3z" fill="var(--org)" stroke="var(--org)" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div class="hdr-spacer"></div>
+  <button class="btn-member" onclick="showAuth('register')">会員登録はこちらから</button>
+  <button id="hdr-auth-btn" class="btn-login-hdr" onclick="showAuth('login')">ログイン</button>
+  <button id="hamburger" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+</div>
+
+<div id="map"></div>
+<!-- 施設選択パネル -->
+<div id="facility-panel">
+  <div class="fp-title">
+    <span>📍 周辺施設の表示</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="fp-all" onclick="toggleAllFacilities()">全て選択</span>
+      <button onclick="minimizeFacilityPanel()" style="background:none;border:none;cursor:pointer;color:#aaa;font-size:15px;line-height:1;padding:0" title="閉じる">✕</button>
+    </div>
+  </div>
+  <button class="fc-btn" data-fcat="shop"     onclick="toggleFacilityCat(this)"><span class="fc-dot" style="background:#e65100"></span>コンビニ・スーパー・モール</button>
+  <button class="fc-btn" data-fcat="food"     onclick="toggleFacilityCat(this)"><span class="fc-dot" style="background:#c62828"></span>飲食店</button>
+  <button class="fc-btn" data-fcat="station"  onclick="toggleFacilityCat(this)"><span class="fc-dot" style="background:#0277bd"></span>駅</button>
+  <button class="fc-btn" data-fcat="hospital" onclick="toggleFacilityCat(this)"><span class="fc-dot" style="background:#ad1457"></span>病院・クリニック</button>
+  <button class="fc-btn" data-fcat="lodging"  onclick="toggleFacilityCat(this)"><span class="fc-dot" style="background:#558b2f"></span>宿泊施設</button>
+  <div style="margin-top:6px;color:#aaa;font-size:10px">※OSMデータのため古い場合があります</div>
+</div>
+<div id="facility-loading">🔍 施設データ取得中...</div>
+<div id="zoom-badge">ズーム: —</div>
+
+
+<div id="detail-panel">
+  <div class="dp-topbar">
+    <button class="dp-back-btn" onclick="closeDetail()">◀ 戻る</button>
+    <div class="dp-topbar-name" id="dp-nm">サイネージ名</div>
+    <button class="fav-btn" id="fav-btn" onclick="toggleFav()">🤍</button>
+  </div>
+  <div class="dp-page-body">
+    <div class="dp-left-col">
+      <div class="dp-img-wrap" id="dp-img" onclick="openPV(0)">🏢</div>
+      <div id="dp-photo-strip" style="display:none;flex-wrap:wrap;gap:4px;padding:0 2px;margin-top:4px"></div>
+      <div class="dp-breadcrumb" id="dp-bc" style="padding:0 2px">名古屋 / 女性</div>
+      <div class="dp-data-card" style="flex-shrink:0">
+        <div class="dp-data-head">📊 通行者・交通量データ</div>
+        <div style="padding:8px 12px">
+          <div class="chart-title">1日の通行者数（時間別 / 先月比）</div>
+          <div class="bar-chart" id="inline-bc"></div>
+          <div class="pie-row">
+            <div class="pie-section">
+              <canvas id="inline-pg" width="70" height="70"></canvas>
+              <div class="pie-sec-info">
+                <div class="pie-sec-title">男女比</div>
+                <div class="pie-legend">
+                  <div class="pie-leg-item"><span style="background:#e8650a"></span>男性</div>
+                  <div class="pie-leg-item"><span style="background:#2196F3"></span>女性</div>
+                </div>
+              </div>
+            </div>
+            <div class="pie-section">
+              <canvas id="inline-pa" width="70" height="70"></canvas>
+              <div class="pie-sec-info">
+                <div class="pie-sec-title">年代別</div>
+                <div class="pie-legend">
+                  <div class="pie-leg-item"><span style="background:#ff6384"></span>10代</div>
+                  <div class="pie-leg-item"><span style="background:#ff9f40"></span>20代</div>
+                  <div class="pie-leg-item"><span style="background:#36a2eb"></span>30代</div>
+                  <div class="pie-leg-item"><span style="background:#4bc0c0"></span>40代</div>
+                  <div class="pie-leg-item"><span style="background:#9966ff"></span>50代以上</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dp-right-col">
+      <div style="flex:1;overflow-y:auto;min-height:0">
+        <div class="dp-card" style="margin-bottom:6px">
+          <div class="dp-card-head">サイネージ詳細情報</div>
+          <div style="display:flex;gap:0;min-width:0">
+            <div class="dp-card-body" id="dp-info" style="word-break:break-all;flex:1;min-width:0"></div>
+            <div class="memo-wrap" id="memo-wrap" style="display:none;flex:0 0 220px;border-top:none;border-left:1px solid #f0f0f0">
+              <textarea id="memo-ta" placeholder="メモを入力..." style="min-height:80px"></textarea>
+              <button class="btn-memo" onclick="saveMemo()">メモを保存</button>
+            </div>
+          </div>
+        </div>
+        <div class="dp-data-card" style="margin-bottom:6px">
+          <div class="dp-data-head">💰 広告出稿データ</div>
+          <div style="padding:8px 12px">
+            <table class="ad-table" id="inline-ad-table">
+              <thead><tr><th>プラン</th><th>掲載期間</th><th>回数/O-A</th><th>料金</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p style="font-size:10px;color:#bbb;margin-top:8px">※表示価格は税別です</p>
+          </div>
+        </div>
+      </div>
+      <div style="flex:0 0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        <div style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:2px">アクション</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-dl" style="flex:1" onclick="openStreetView()">🚗 ストリートビュー</button>
+          <button class="btn-dl" style="flex:1" onclick="dlDoc()">📄 資料ダウンロード</button>
+          <button class="btn-inq" style="flex:1" onclick="showInq()">✉ お問い合わせ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="photo-viewer" onclick="closePV(event)">
+  <button class="pv-close" onclick="closePV()">✕</button>
+  <button class="pv-nav pv-prev" id="pv-prev" onclick="pvNav(-1,event)">❮</button>
+  <img class="pv-img" id="pv-img" src="" alt="">
+  <div class="pv-counter" id="pv-counter"></div>
+  <button class="pv-nav pv-next" id="pv-next" onclick="pvNav(1,event)">❯</button>
+</div>
+
+<div id="filter-panel">
+  <div class="fp-header"><h3>🔍 絞り込み検索</h3><button class="fp-close" onclick="toggleFilter()">✕</button></div>
+  <div class="fp-tab-bar">
+    <button class="fp-tab-btn active" onclick="fpTab(0)">ターゲット・設置場所</button>
+    <button class="fp-tab-btn" onclick="fpTab(1)">エリア</button>
+    <button class="fp-tab-btn" onclick="fpTab(2)">条件・検索</button>
+  </div>
+  <div id="fp-grid">
+
+    <!-- 左列：ターゲット・設置場所 -->
+    <div class="fp-col active" style="border-right:1px solid #f0f0f0;padding:10px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+      <div>
+        <div class="fp-sec-head"><h4 style="margin-bottom:0;font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px">ターゲット</h4><button class="btn-select-all" onclick="selectAll(document.getElementById('t-target'))">すべて選択</button></div>
+        <div class="tags" id="t-target" style="margin-top:6px">
+          <span class="tag" onclick="tt(this)">10代</span><span class="tag" onclick="tt(this)">20代</span>
+          <span class="tag" onclick="tt(this)">30代</span><span class="tag" onclick="tt(this)">40代</span>
+          <span class="tag" onclick="tt(this)">50代</span><span class="tag" onclick="tt(this)">60代</span>
+          <span class="tag" onclick="tt(this)">70代</span><span class="tag" onclick="tt(this)">女性</span>
+          <span class="tag" onclick="tt(this)">男性</span>
+        </div>
+      </div>
+      <div>
+        <div class="fp-sec-head"><h4 style="margin-bottom:0;font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px">設置場所</h4><button class="btn-select-all" onclick="selectAll(document.getElementById('t-place'))">すべて選択</button></div>
+        <div class="tags" id="t-place" style="margin-top:6px">
+          <span class="tag" onclick="tt(this)">カラオケ</span><span class="tag" onclick="tt(this)">廊外</span>
+          <span class="tag" onclick="tt(this)">サロン</span><span class="tag" onclick="tt(this)">駅</span>
+          <span class="tag" onclick="tt(this)">飲食店</span><span class="tag" onclick="tt(this)">学校</span>
+          <span class="tag" onclick="tt(this)">ビル・オフィス</span><span class="tag" onclick="tt(this)">商業施設</span>
+          <span class="tag" onclick="tt(this)">病院・薬局</span><span class="tag" onclick="tt(this)">宿泊施設</span>
+          <span class="tag" onclick="tt(this)">スポーツ施設</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中央列：エリア -->
+    <div class="fp-col" style="border-right:1px solid #f0f0f0;padding:10px 12px;overflow:hidden">
+      <div class="fp-sec-head" style="margin-bottom:8px"><h4 style="margin-bottom:0;font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px">エリア</h4><button class="btn-select-all" onclick="selectAllArea(this)">全都道府県を選択</button></div>
+      <div id="area-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px">
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">北海道</div></div><div class="tags"><span class="tag" onclick="tt(this)">北海道</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">東北</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">青森県</span><span class="tag" onclick="tt(this)">岩手県</span><span class="tag" onclick="tt(this)">宮城県</span><span class="tag" onclick="tt(this)">秋田県</span><span class="tag" onclick="tt(this)">山形県</span><span class="tag" onclick="tt(this)">福島県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">関東</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">茨城県</span><span class="tag" onclick="tt(this)">栃木県</span><span class="tag" onclick="tt(this)">群馬県</span><span class="tag" onclick="tt(this)">埼玉県</span><span class="tag" onclick="tt(this)">千葉県</span><span class="tag" onclick="tt(this)">東京都</span><span class="tag" onclick="tt(this)">神奈川県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">中部</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">新潟県</span><span class="tag" onclick="tt(this)">富山県</span><span class="tag" onclick="tt(this)">石川県</span><span class="tag" onclick="tt(this)">福井県</span><span class="tag" onclick="tt(this)">山梨県</span><span class="tag" onclick="tt(this)">長野県</span><span class="tag" onclick="tt(this)">岐阜県</span><span class="tag" onclick="tt(this)">静岡県</span><span class="tag" onclick="tt(this)">愛知県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">近畿</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">三重県</span><span class="tag" onclick="tt(this)">滋賀県</span><span class="tag" onclick="tt(this)">京都府</span><span class="tag" onclick="tt(this)">大阪府</span><span class="tag" onclick="tt(this)">兵庫県</span><span class="tag" onclick="tt(this)">奈良県</span><span class="tag" onclick="tt(this)">和歌山県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">中国</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">鳥取県</span><span class="tag" onclick="tt(this)">島根県</span><span class="tag" onclick="tt(this)">岡山県</span><span class="tag" onclick="tt(this)">広島県</span><span class="tag" onclick="tt(this)">山口県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">四国</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">徳島県</span><span class="tag" onclick="tt(this)">香川県</span><span class="tag" onclick="tt(this)">愛媛県</span><span class="tag" onclick="tt(this)">高知県</span></div></div>
+        <div class="region-block" style="margin-bottom:0"><div class="region-head"><div class="region-label">九州・沖縄</div><button class="btn-select-all" onclick="selectAll(this.closest('.region-block').querySelector('.tags'))">すべて選択</button></div><div class="tags"><span class="tag" onclick="tt(this)">福岡県</span><span class="tag" onclick="tt(this)">佐賀県</span><span class="tag" onclick="tt(this)">長崎県</span><span class="tag" onclick="tt(this)">熊本県</span><span class="tag" onclick="tt(this)">大分県</span><span class="tag" onclick="tt(this)">宮崎県</span><span class="tag" onclick="tt(this)">鹿児島県</span><span class="tag" onclick="tt(this)">沖縄県</span></div></div>
+      </div>
+    </div>
+
+    <!-- 右列：数値条件・ボタン -->
+    <div class="fp-col" style="padding:10px 12px;display:flex;flex-direction:column;gap:10px">
+      <div>
+        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">通行者数</h4>
+        <div class="range-val-display" id="ped-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
+        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="ped-fill" style="left:0%;width:100%"></div></div><input type="range" id="ped-lo" min="0" max="10" value="0" step="1"><input type="range" id="ped-hi" min="0" max="10" value="10" step="1"></div>
+        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
+      </div>
+      <div>
+        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">交通量</h4>
+        <div class="range-val-display" id="trf-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
+        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="trf-fill" style="left:0%;width:100%"></div></div><input type="range" id="trf-lo" min="0" max="10" value="0" step="1"><input type="range" id="trf-hi" min="0" max="10" value="10" step="1"></div>
+        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
+      </div>
+      <div>
+        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">予算</h4>
+        <div class="range-val-display" id="bgt-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
+        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="bgt-fill" style="left:0%;width:100%"></div></div><input type="range" id="bgt-lo" min="0" max="10" value="0" step="1"><input type="range" id="bgt-hi" min="0" max="10" value="10" step="1"></div>
+        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto">
+        <button id="btn-all-toggle" onclick="toggleSelectAll()" style="width:100%;background:#fff;color:var(--org);border:1px solid var(--org);border-radius:4px;padding:9px 6px;font-size:11px;font-weight:700;cursor:pointer">デフォルトに戻す</button>
+        <button class="btn-apply" style="margin:0;width:100%;font-size:11px;padding:9px 6px" onclick="applyFilter()">この条件で検索</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="hist-wrap">
+  <div id="hist-panel">
+    <div class="hist-header">
+      <span>🕐 検索履歴</span>
+    </div>
+    <div id="hist-items"></div>
+    <button id="hist-clear" onclick="confirmClearHistory()">🗑️ 履歴を全て削除</button>
+  </div>
+  <div id="hist-tab" onclick="toggleHistPanel()" title="検索履歴">🕐</div>
+</div>
+
+<div id="suggest-box"></div>
+<div id="hdc-overlay">
+  <div class="hdc-box">
+    <h3 id="hdc-title"></h3>
+    <p id="hdc-msg"></p>
+    <div class="hdc-btns">
+      <button class="hdc-no" onclick="closeHdc()">いいえ</button>
+      <button class="hdc-yes" id="hdc-yes">はい</button>
+    </div>
+  </div>
+</div>
+
+<div id="list-panel">
+  <div class="lp-header">
+    <button class="lp-close" onclick="closeList()">◀ 閉じる</button>
+    <span class="lp-count-num" id="lp-count">0件</span>
+  </div>
+  <div id="lp-items"></div>
+</div>
+
+<div id="menu-drawer">
+  <div class="menu-head"><span>メニュー</span></div>
+  <div class="menu-row" onclick="gotoTop()"><span class="mi">📍</span>MAPトップ</div>
+  <div class="menu-row" onclick="showFavList()"><span class="mi">❤️</span>お気に入り登録一覧</div>
+  <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
+  <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
+  <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
+  <div class="menu-foot">広告ナビ © テンフィールズファクトリー</div>
+</div>
+
+<div id="mc"></div>
+<div id="toast"></div>
+
+<script>
+// ===== DATA =====
+const DEFAULT_SG = window.getKokokunaviDefaultSG();
+// 管理者画面で保存したデータを読み込む（なければデフォルト使用）
+function loadSG() {
+  try {
+    const saved = localStorage.getItem('kokoknavi_sg');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const defMap = {};
+        DEFAULT_SG.forEach(d => { defMap[d.id] = d; });
+        parsed.forEach(s => {
+          if (!s.yomi && defMap[s.id] && defMap[s.id].yomi) s.yomi = defMap[s.id].yomi;
+        });
+        return parsed;
+      }
+    }
+  } catch(e) {}
+  return DEFAULT_SG;
+}
+
+// normalizePlan は shared-data.js で定義
+
+let SG = loadSG().map(s => ({
+  ...s,
+  plans: (s.plans || []).map(normalizePlan)
+}));
+
+
+// ===== リアルタイム同期（管理者画面 ↔ 広告ナビ） =====
+// 管理者画面で保存されたタイムスタンプを保持し、変更検知に使用
+let _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
+
+/**
+ * localStorageからSGデータを再読み込みしてマップ・詳細パネルを更新する。
+ * @param {boolean} showToast - 更新完了トーストを表示するか
+ * 管理者画面での変更を反映する唯一の更新ルート。storage イベント・
+ * visibilitychange イベントの両方からここを呼ぶことで処理を一元化している。
+ */
+function _reloadSgFromStorage(showToast){
+  const saved = localStorage.getItem('kokoknavi_sg');
+  if(!saved) return;
+  try{
+    const parsed = JSON.parse(saved);
+    if(Array.isArray(parsed) && parsed.length > 0){
+      SG = parsed.map(s => ({ ...s, plans: (s.plans || []).map(normalizePlan) }));
+      preloadMediaCache(SG, function(){
+        if(map) putMarkers(SG);
+        // 詳細パネルが開いていれば現在表示中のサイネージも即時更新
+        if(cur && $('detail-panel').classList.contains('open')){
+          const updated = SG.find(x => x.id === cur.id);
+          if(updated) openDetail(updated.id);
+        }
+      });
+      if(showToast) toast('管理者画面の変更を反映しました');
+    }
+  }catch(e){}
+}
+
+// 同一ブラウザの別タブ（管理者画面）でデータが保存されたとき、
+// storage イベントで検知してリアルタイムに反映する
+window.addEventListener('storage', function(e) {
+  if(e.key === 'kokoknavi_sg'){
+    _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
+    _reloadSgFromStorage(true); // _reloadSgFromStorage に処理を一元化
+  }
+});
+
+// タブを非表示→再表示したとき（別タブ作業後の戻り）も変更を反映する
+// storage イベントはタブが非アクティブ中に発火しないケースがあるため補完
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState !== 'visible') return;
+  const ts = localStorage.getItem('kokoknavi_sg_ts') || '0';
+  if(ts === _sgTs) return; // タイムスタンプが同じなら変更なし → スキップ
+  _sgTs = ts;
+  _reloadSgFromStorage(true);
+});
+
+// ===== メール認証（EmailJS） =====
+// EJ_PUBLIC_KEY / EJ_SVC / EJ_TPL_AUTH は shared-data.js で定義
+emailjs.init({publicKey:EJ_PUBLIC_KEY});
+
+// 認証コードの一時保存領域 {code: 6桁コード, expiry: 有効期限ms, email, pw, type}
+let authCode=null;
+
+/** ランダムな6桁の数字コードを生成する */
+function genCode(){return String(Math.floor(100000+Math.random()*900000));}
+async function resendAuthCode(){
+  if(!authCode||!authCode.email||!authCode.pw){toast("情報が見つかりません。最初からやり直してください");showAuth('register');return;}
+  var _cd=_checkSendCooldown('kn_cd_auth',60);
+  if(!_cd.ok){toast("再送信は"+_cd.remaining+"秒後にお試しください");return;}
+  const code=genCode();
+  authCode={code,expiry:Date.now()+5*60*1000,email:authCode.email,pw:authCode.pw};
+  try{
+    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:authCode.email,code});
+    document.getElementById('a-code').value='';
+    toast("確認コードを再送信しました");
+  }catch(e){
+    const msg=_errMsg(e);
+    toast("送信失敗："+msg);
+  }
+}
+async function sendAuthCode(){
+  const email=($('a-id')?.value||'').trim();
+  const pw=$('a-pw')?.value||'';
+  const pw2=$('a-pw2')?.value||'';
+  if(!email||!pw||!pw2){toast("すべての項目を入力してください");return;}
+  var _cd=_checkSendCooldown('kn_cd_auth',60);
+  if(!_cd.ok){toast("送信は"+_cd.remaining+"秒後にお試しください");return;}
+  if(pw!==pw2){toast("パスワードが一致しません");return;}
+  if(pw.length<6){toast("パスワードは6文字以上にしてください");return;}
+  const accs=getAccounts();
+  const emailKey=_emailKey(email);
+  if(accs[emailKey]){toast("このメールアドレスはすでに登録されています");return;}
+  const code=genCode();
+  authCode={code,expiry:Date.now()+5*60*1000,email,pw};
+  const btn=document.getElementById('btn-send-code');
+  if(btn){btn.disabled=true;btn.textContent='送信中...';}
+  try{
+    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:email,code});
+    document.getElementById('auth-step1').style.display='none';
+    document.getElementById('auth-step2').style.display='block';
+    toast("確認コードを送信しました");
+  }catch(e){
+    console.error('EmailJS error:',e);
+    const msg=_errMsg(e);
+    toast("送信失敗："+msg);
+    if(btn){btn.disabled=false;btn.textContent='確認コードを送信';}
+  }
+}
+
+// ===== グローバル変数 =====
+let map,           // Leafletマップインスタンス
+    markers=[],    // 現在マップに表示中のマーカー配列
+    clusterGroup=null, // Leaflet.markerclusterグループ
+    cur=null,      // 現在詳細パネルで表示中のサイネージオブジェクト
+    loggedIn=false,// ログイン状態フラグ
+    uName="",      // ログイン中ユーザーのメールアドレスキー
+    facilityLayer=null,   // 商業施設レイヤー（LayerGroup）
+    _facilityOn=false,    // 施設パネル表示中フラグ
+    _facilityTimer=null,  // moveend デバウンス用タイマー
+    _facilityCats=new Set(), // 現在ONになっているカテゴリのSet
+    _facilityCache=[],       // 取得済み施設データのキャッシュ
+    _facilityCacheBounds=null, // キャッシュ済みデータの取得範囲
+    _facilityCacheCats=null;   // キャッシュ済みデータのカテゴリSet文字列
+
+// ===== 認証ヘルパー =====
+// hashPw / verifyPw は shared-data.js で定義（Argon2id使用）
+
+/** localStorageからアカウント情報（メール→ハッシュ）を取得する */
+function getAccounts(){try{return JSON.parse(localStorage.getItem('kokoknavi_accounts')||'{}');}catch(e){return{};}}
+
+/** アカウント情報をlocalStorageに保存する */
+function saveAccounts(a){localStorage.setItem('kokoknavi_accounts',JSON.stringify(a));}
+
+/** sessionStorageからログインセッションを復元する（ページリロード時） */
+function restoreSession(){try{const s=JSON.parse(sessionStorage.getItem('kokoknavi_session')||'null');if(s&&s.key){loggedIn=true;uName=s.key;updateAuthBtn();}}catch(e){}}
+
+/** メールアドレスを小文字に正規化してストレージキーとして使用する */
+function _emailKey(email){return email.toLowerCase().trim();}
+
+/** ログイン成功時にsessionStorageへセッションを保存し状態を更新する */
+async function startSession(email){const key=_emailKey(email);sessionStorage.setItem('kokoknavi_session',JSON.stringify({key}));loggedIn=true;uName=key;updateAuthBtn();}
+
+/** ログアウト時にセッションをクリアする */
+function endSession(){sessionStorage.removeItem('kokoknavi_session');loggedIn=false;uName='';}
+
+// お気に入りIDのSet。localStorageから起動時に読み込む
+let favs=(()=>{try{return new Set(JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]'));}catch(e){return new Set();}})();
+
+// ===== デュアルレンジスライダー =====
+// 絞り込みフィルターの「歩行者通行量 / 車通行量 / 予算」に使う範囲指定UI。
+// 2本のinput[type=range]を重ね、lower/upper の値で塗りつぶし幅を制御する。
+const RC={
+  ped:{steps:['下限なし','1万人','2万人','3万人','4万人','5万人','6万人','7万人','8万人','9万人','上限なし']},
+  trf:{steps:['下限なし','3,000台','1万台','2万台','3万台','3.5万台','4万台','4.5万台','5万台','6万台','上限なし']},
+  bgt:{steps:['下限なし','30万円','40万円','50万円','60万円','70万円','80万円','90万円','100万円','120万円','上限なし']}
+};
+
+/**
+ * レンジスライダーの表示を更新する（塗りつぶし位置・ラベルテキスト）。
+ * lo > hi になった場合は互いを入れ替えて逆転を防ぐ。
+ * @param {string} key - 'ped' / 'trf' / 'bgt' のいずれか
+ */
+function updateRange(key){
+  const lo=document.getElementById(key+'-lo'),hi=document.getElementById(key+'-hi');
+  const fill=document.getElementById(key+'-fill'),disp=document.getElementById(key+'-disp');
+  let lv=parseInt(lo.value),hv=parseInt(hi.value);
+  if(hv<=lv){hi.value=lv+1;hv=lv+1;}if(lv>=hv){lo.value=hv-1;lv=hv-1;}
+  const pct=100/10;fill.style.left=(lv*pct)+'%';fill.style.width=((hv-lv)*pct)+'%';
+  disp.textContent=(lv===0?'下限なし':RC[key].steps[lv])+' 〜 '+(hv===10?'上限なし':RC[key].steps[hv]);
+}
+
+/** 3つのレンジスライダーにイベントリスナーを設定し初期表示を行う（ページロード時に1回呼ぶ） */
+function initRanges(){
+  ['ped','trf','bgt'].forEach(k=>{
+    const lo=document.getElementById(k+'-lo'),hi=document.getElementById(k+'-hi');
+    lo.addEventListener('input',()=>updateRange(k));hi.addEventListener('input',()=>updateRange(k));updateRange(k);
+  });
+}
+
+// ===== MAP 初期化 =====
+// Leaflet.js を使って地図を初期化する。
+// ・国土地理院タイルのみを使用（minZoom:5 / noWrap:true でデータ無し領域を隠す）
+// ・maxBounds + maxBoundsViscosity:1.0 で日本範囲外への移動を完全にブロック
+// ・markerClusterGroup でピンをまとめ表示し、カバレッジ円は非表示に設定
+// ・地図クリックで「検索結果リスト・履歴パネル・メニュー」を全て閉じる
+function initMap(lat,lng){
+  if(map){map.setView([lat,lng],13);return;}
+  map=L.map('map',{worldCopyJump:false,maxBounds:[[22,120],[50,156]],maxBoundsViscosity:1.0,minZoom:5}).setView([lat,lng],13);
+  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
+    attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',
+    maxZoom:18,minZoom:5,noWrap:true
+  }).addTo(map);
+  clusterGroup=L.markerClusterGroup({
+    maxClusterRadius:60,
+    showCoverageOnHover:false,
+    iconCreateFunction:function(cluster){
+      const c=cluster.getChildCount();
+      return L.divIcon({
+        html:`<div style="display:flex;flex-direction:column;align-items:center;width:110px">
+          <span class="kn-tap-badge">TAP してチェック！</span>
+          <div style="position:relative;width:110px">
+            <img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>
+            <div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">${c}</div>
+          </div>
+        </div>`,
+        iconSize:[110,142],iconAnchor:[55,142],className:''
+      });
+    }
+  });
+  map.addLayer(clusterGroup);
+  putMarkers(SG);
+  addLocateControl();
+  addFacilityControl();
+  facilityLayer=L.markerClusterGroup({
+    maxClusterRadius:40,
+    disableClusteringAtZoom:16,
+    spiderfyOnMaxZoom:true,
+    showCoverageOnHover:false,
+    iconCreateFunction:function(cluster){
+      return L.divIcon({
+        html:`<div style="width:28px;height:28px;border-radius:50%;background:#1e293b;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:bold">${cluster.getChildCount()}</div>`,
+        iconSize:[28,28],iconAnchor:[14,14],className:''
+      });
+    }
+  }).addTo(map);
+  function _updateZoomBadge(){
+    const z=map.getZoom();
+    const el=document.getElementById('zoom-badge');
+    if(!el)return;
+    if(z>=14){
+      el.textContent='ズーム: '+z+' ✅ 施設表示OK';
+      el.className='ready';
+    }else{
+      el.textContent='ズーム: '+z+'　（施設表示は14以上）';
+      el.className='';
+    }
+  }
+  map.on('moveend zoomend',function(){
+    _updateZoomBadge();
+    if(!_facilityOn)return;
+    clearTimeout(_facilityTimer);
+    _facilityTimer=setTimeout(function(){
+      if(_needsRefetch()){
+        fetchFacilities();
+      } else {
+        _renderVisibleFacilities();
+      }
+    },150);
+  });
+  _updateZoomBadge();
+  map.on('click',function(){if(_histOpen)toggleHistPanel();if(mOpen)toggleMenu();closeList();});
+}
+// ===== 商業施設レイヤー =====
+// 🏪ボタンで ON/OFF。Overpass API（OSMデータ）でコンビニ・スーパー・モールを取得し表示。
+// ズームレベル14未満では取得しない（データ量が多すぎるため）。
+// 【最適化】取得データはキャッシュし、画面範囲内の施設のみマーカーを描画。
+// 地図移動時はキャッシュから再描画し、キャッシュ範囲外に出たときだけ再取得。
+
+// 施設種別の定義（OSMタグ → 表示ラベル・色・絵文字）
+// OSMタグ → 表示設定（emoji・ラベル・色・カテゴリキー）
+const FACILITY_TYPES={
+  convenience:      {emoji:'🏪', label:'コンビニ',         color:'#e65100', cat:'shop'},
+  supermarket:      {emoji:'🛒', label:'スーパー',         color:'#e65100', cat:'shop'},
+  mall:             {emoji:'🏬', label:'モール',           color:'#e65100', cat:'shop'},
+  department_store: {emoji:'🏬', label:'百貨店',           color:'#e65100', cat:'shop'},
+  restaurant:       {emoji:'🍽️', label:'レストラン',       color:'#c62828', cat:'food'},
+  fast_food:        {emoji:'🍔', label:'ファストフード',     color:'#c62828', cat:'food'},
+  cafe:             {emoji:'☕', label:'カフェ',            color:'#c62828', cat:'food'},
+  bar:              {emoji:'🍺', label:'バー・居酒屋',      color:'#c62828', cat:'food'},
+  station:          {emoji:'🚉', label:'駅',               color:'#0277bd', cat:'station'},
+  hospital:         {emoji:'🏥', label:'病院',             color:'#ad1457', cat:'hospital'},
+  clinic:           {emoji:'🏥', label:'クリニック',        color:'#ad1457', cat:'hospital'},
+  doctors:          {emoji:'🏥', label:'診療所',           color:'#ad1457', cat:'hospital'},
+  hotel:            {emoji:'🏨', label:'ホテル',           color:'#558b2f', cat:'lodging'},
+  hostel:           {emoji:'🏨', label:'ホステル',         color:'#558b2f', cat:'lodging'},
+  guest_house:      {emoji:'🏠', label:'ゲストハウス',     color:'#558b2f', cat:'lodging'},
+  motel:            {emoji:'🏨', label:'モーテル',         color:'#558b2f', cat:'lodging'},
+};
+
+function _needsRefetch(){
+  if(!_facilityCacheBounds) return true;
+  const catsKey=[..._facilityCats].sort().join(',');
+  if(catsKey!==_facilityCacheCats) return true;
+  const vb=map.getBounds();
+  return !_facilityCacheBounds.contains(vb);
+}
+
+function _getExpandedBounds(factor){
+  const b=map.getBounds();
+  const latSpan=b.getNorth()-b.getSouth();
+  const lngSpan=b.getEast()-b.getWest();
+  const latPad=latSpan*factor;
+  const lngPad=lngSpan*factor;
+  return L.latLngBounds(
+    [b.getSouth()-latPad,b.getWest()-lngPad],
+    [b.getNorth()+latPad,b.getEast()+lngPad]
+  );
+}
+
+function _renderVisibleFacilities(){
+  if(!facilityLayer||!_facilityCache.length) return;
+  facilityLayer.clearLayers();
+  const viewBounds=_getExpandedBounds(0.1);
+  let count=0;
+  _facilityCache.forEach(function(el){
+    const lat=el.lat||(el.center&&el.center.lat);
+    const lng=el.lon||(el.center&&el.center.lon);
+    if(!lat||!lng) return;
+    if(!viewBounds.contains([lat,lng])) return;
+    const tags=el.tags||{};
+    const facilityKey=tags.shop||tags.amenity||tags.railway||tags.tourism;
+    const ft=FACILITY_TYPES[facilityKey];
+    if(!ft||!_facilityCats.has(ft.cat)) return;
+    const name=(el.tags&&(el.tags.name||el.tags['name:ja']))||ft.label;
+    const icon=L.divIcon({
+      html:'<div style="width:22px;height:22px;border-radius:50%;background:'+ft.color+';border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:11px">'+ft.emoji+'</div>',
+      iconSize:[22,22],iconAnchor:[11,11],className:''
+    });
+    const m=L.marker([lat,lng],{icon:icon,zIndexOffset:-100});
+    m.bindPopup('<div style="font-size:12px;min-width:100px"><b>'+ft.emoji+' '+name+'</b><br><span style="color:#888;font-size:11px">'+ft.label+'</span></div>',{maxWidth:180});
+    facilityLayer.addLayer(m);
+    count++;
+  });
+}
+
+function addFacilityControl(){
+  const FC=L.Control.extend({options:{position:'topleft'},onAdd(){
+    const container=L.DomUtil.create('div','leaflet-bar leaflet-control');
+    const btn=L.DomUtil.create('a','leaflet-control-facility',container);
+    btn.id='btn-facility';btn.title='周辺施設を表示';btn.innerHTML='🏪';btn.href='#';
+    btn.style.cssText='width:20px;height:20px;line-height:20px;font-size:13px;display:flex;align-items:center;justify-content:center;';
+    btn.onclick=(e)=>{e.preventDefault();toggleFacilityPanel();};
+    L.DomEvent.disableClickPropagation(container);return container;
+  }});
+  new FC().addTo(map);
+}
+
+function toggleFacilityPanel(){
+  const btn=document.getElementById('btn-facility');
+  const panel=document.getElementById('facility-panel');
+  if(!_facilityOn){
+    // OFF → ON：パネルを表示して施設を取得
+    _facilityOn=true;
+    if(btn)btn.classList.add('active');
+    if(panel)panel.classList.add('show');
+    fetchFacilities();
+  } else if(panel&&!panel.classList.contains('show')){
+    // ミニマイズ中 → パネルを再表示するだけ（施設はそのまま）
+    panel.classList.add('show');
+  } else {
+    // ON（パネル表示中） → 全てOFF
+    _facilityOn=false;
+    if(btn)btn.classList.remove('active');
+    if(panel)panel.classList.remove('show');
+    _facilityCats.clear();
+    document.querySelectorAll('.fc-btn').forEach(b=>b.classList.remove('on'));
+    if(facilityLayer)facilityLayer.clearLayers();
+    _facilityCache=[];
+    _facilityCacheBounds=null;
+    _facilityCacheCats=null;
+  }
+}
+// ✕ボタン専用：パネルを非表示にするだけ（MAP上の施設ピンはそのまま維持）
+function minimizeFacilityPanel(){
+  const panel=document.getElementById('facility-panel');
+  if(panel)panel.classList.remove('show');
+}
+
+// 各カテゴリボタンのON/OFF切り替え
+function toggleFacilityCat(btn){
+  const cat=btn.dataset.fcat;
+  if(_facilityCats.has(cat)){
+    _facilityCats.delete(cat);
+    btn.classList.remove('on');
+  }else{
+    _facilityCats.add(cat);
+    btn.classList.add('on');
+  }
+  fetchFacilities();
+}
+
+// 「全て切替」ボタン：全部ONまたは全部OFF
+function toggleAllFacilities(){
+  const btns=document.querySelectorAll('.fc-btn');
+  const allOn=btns.length===_facilityCats.size;
+  _facilityCats.clear();
+  if(!allOn){btns.forEach(b=>{_facilityCats.add(b.dataset.fcat);b.classList.add('on');});}
+  else{btns.forEach(b=>b.classList.remove('on'));}
+  fetchFacilities();
+}
+
+// カテゴリキー → Overpass クエリ行の対応表
+const FACILITY_QUERIES={
+  shop:[
+    'node["shop"="convenience"]',
+    'node["shop"="supermarket"]',
+    'node["shop"="mall"]',
+    'node["shop"="department_store"]',
+    'way["shop"="mall"]',
+    'way["shop"="department_store"]',
+    'way["shop"="supermarket"]',
+  ],
+  food:[
+    'node["amenity"="restaurant"]',
+    'node["amenity"="fast_food"]',
+    'node["amenity"="cafe"]',
+    'node["amenity"="bar"]',
+  ],
+  station:[
+    'node["railway"="station"]',
+  ],
+  hospital:[
+    'node["amenity"="hospital"]',
+    'way["amenity"="hospital"]',
+    'node["amenity"="clinic"]',
+    'node["amenity"="doctors"]',
+  ],
+  lodging:[
+    'node["tourism"="hotel"]',
+    'way["tourism"="hotel"]',
+    'node["tourism"="hostel"]',
+    'node["tourism"="guest_house"]',
+    'node["tourism"="motel"]',
+  ],
+};
+
+// Overpass API ミラーサーバー一覧（不安定な場合に順番に試す）
+const OVERPASS_ENDPOINTS=[
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
+];
+
+// 指定エンドポイントに POST して失敗したら次のエンドポイントを試す
+function _fetchOverpass(query,endpoints,cb){
+  if(!endpoints.length){cb(null);return;}
+  const [url,...rest]=endpoints;
+  const _ac=new AbortController();setTimeout(()=>_ac.abort(),18000);
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query),signal:_ac.signal})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(data=>cb(data))
+    .catch(()=>{
+      // 失敗したら次のサーバーへ
+      toast('サーバー切替中... ('+url.replace('https://','').split('/')[0]+')');
+      _fetchOverpass(query,rest,cb);
+    });
+}
+
+// Overpass API で選択中カテゴリの施設を取得（結果はキャッシュする）
+function fetchFacilities(){
+  if(!map||!_facilityOn)return;
+  if(_facilityCats.size===0){
+    if(facilityLayer)facilityLayer.clearLayers();
+    _facilityCache=[];
+    _facilityCacheBounds=null;
+    _facilityCacheCats=null;
+    return;
+  }
+  const zoom=map.getZoom();
+  if(zoom<14){
+    toast('施設表示はズームレベル14以上で利用できます');
+    return;
+  }
+  const eb=_getExpandedBounds(0.4);
+  const bbox=eb.getSouth()+','+eb.getWest()+','+eb.getNorth()+','+eb.getEast();
+  const lines=[..._facilityCats].flatMap(cat=>FACILITY_QUERIES[cat]||[]).join(';\n    ');
+  const query=`[out:json][timeout:18][bbox:${bbox}];(\n    ${lines};\n  );out center 500;`;
+  const loading=document.getElementById('facility-loading');
+  if(loading)loading.style.display='block';
+  _fetchOverpass(query,[...OVERPASS_ENDPOINTS],function(data){
+    if(loading)loading.style.display='none';
+    if(!data){toast('施設データの取得に失敗しました（全サーバー応答なし）');return;}
+    // キャッシュを更新
+    _facilityCache=data.elements||[];
+    _facilityCacheBounds=eb;
+    _facilityCacheCats=[..._facilityCats].sort().join(',');
+    // ビューポート内の施設のみ描画
+    _renderVisibleFacilities();
+  });
+}
+
+// renderFacilities は _renderVisibleFacilities に統合（後方互換のためエイリアスを残す）
+function renderFacilities(elements){
+  _facilityCache=elements;
+  _renderVisibleFacilities();
+}
+
+let _locMarker=null;
+
+function addLocateControl(){
+  const LC=L.Control.extend({options:{position:'topleft'},onAdd(){
+    const container=L.DomUtil.create('div','leaflet-bar leaflet-control');
+    const btn=L.DomUtil.create('a','leaflet-control-locate',container);
+    btn.title='現在地へ移動';btn.innerHTML='📍';btn.href='#';
+    btn.style.cssText='width:20px;height:20px;line-height:20px;font-size:13px;display:flex;align-items:center;justify-content:center;';
+    btn.onclick=(e)=>{
+      e.preventDefault();
+      btn.classList.add('locating');btn.innerHTML='⏳';
+      navigator.geolocation?.getCurrentPosition(
+        p=>{
+          const latlng=[p.coords.latitude,p.coords.longitude];
+          map.setView(latlng,16);
+          if(_locMarker)map.removeLayer(_locMarker);
+          _locMarker=L.marker(latlng,{icon:L.divIcon({
+            html:'<div style="width:16px;height:16px;border-radius:50%;background:#1976d2;border:3px solid #fff;box-shadow:0 0 0 2px #1976d2,0 2px 6px rgba(0,0,0,.4)"></div>',
+            iconSize:[16,16],iconAnchor:[8,8],className:''
+          }),zIndexOffset:1000}).addTo(map);
+          _locMarker.bindPopup('<div style="font-size:12px;font-weight:700;color:#1976d2">📍 現在地</div>',{closeButton:false}).openPopup();
+          btn.classList.remove('locating');btn.innerHTML='📍';
+          toast("現在地に移動しました");
+        },
+        ()=>{btn.classList.remove('locating');btn.innerHTML='📍';toast("現在地を取得できませんでした");}
+      );
+    };
+    L.DomEvent.disableClickPropagation(container);return container;
+  }});
+  new LC().addTo(map);
+}
+// 純粋な数値（整数・小数）なら㎡を付与、それ以外はそのまま返す
+function fmtSize(v){if(!v)return'—';return /^\d+(\.\d+)?$/.test(v.trim())?v.trim()+'㎡':v;}
+// ===== マーカー管理 =====
+// pinIcon は shared-data.js で定義（shared-data.js の pinIcon() を参照）
+/**
+ * SG（サイネージ）リストを受け取り、地図上のピンを全て差し替える。
+ * クラスターグループ使用時は clearLayers() で一括削除してから再追加。
+ * 各ピンをクリックすると cur にそのサイネージをセットし、フィルター開放中なら閉じる。
+ */
+function putMarkers(list){
+  if(clusterGroup){clusterGroup.clearLayers();}else{markers.forEach(m=>map.removeLayer(m));}
+  markers=[];
+  list.forEach(s=>{
+    const m=L.marker([s.lat,s.lng],{icon:pinIcon(s)});
+    m._sgId=s.id;
+    m.bindPopup(popupHtml(s),{maxWidth:300,className:''});
+    m.on('click',()=>{cur=s;if(fpOpen)closeFilter();});
+    markers.push(m);
+    if(clusterGroup)clusterGroup.addLayer(m);else m.addTo(map);
+  });
+}
+/**
+ * 検索結果リストのアイテムをタップしたときの動作。
+ * 詳細パネルは開かず、地図上の対応ピンにフォーカスしてポップアップを表示する。
+ * クラスター内に埋もれている場合は zoomToShowLayer() でクラスターを解除してから開く。
+ */
+function focusPin(id){
+  const s=SG.find(x=>x.id===id);if(!s)return;
+  cur=s;
+  closeList();
+  if(_histOpen)toggleHistPanel();
+  const m=markers.find(mk=>mk._sgId===id);
+  if(!m)return;
+  if(clusterGroup){
+    clusterGroup.zoomToShowLayer(m,function(){m.openPopup();});
+  }else{
+    map.setView([s.lat,s.lng],15);
+    m.openPopup();
+  }
+}
+/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・通行量・料金・詳細ボタン）*/
+function popupHtml(s){
+  const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
+  return `<div>
+    <div class="pp-head">📍 ${s.name}</div>
+    <div class="pp-body">
+      <div class="pp-row">🏠 ${(s.addr||'').slice(0,18)}…</div>
+      <div class="pp-row">👟 ${s.ped||'—'}</div>
+      <div class="pp-row">🚗 ${s.trf||'—'}</div>
+      <div class="pp-price">${price}〜</div>
+      <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
+    </div>
+  </div>`;
+}
+
+// ===== 初期化（window.onload） =====
+// クッキーに保存した位置情報許可状態（kn_loc_perm）を確認し、
+// ・'allow' → 現在地を取得して地図を初期化
+// ・'deny'  → 東京（35.67, 139.65）にフォールバック
+// ・未設定  → ブラウザに位置情報を要求し、結果をクッキーに記録
+// initRanges() でレンジスライダーを初期化し、preloadMediaCache() で写真・資料をIDBからロード
+// _setCookie / _getCookie は shared-data.js で定義
+window.onload=()=>{
+  restoreSession();
+  preloadMediaCache(SG,function(){});
+  var locPerm=_getCookie('kn_loc_perm');
+  var _geoOpts={timeout:8000,maximumAge:300000};
+  var _geoFallback=function(){initMap(35.6762,139.6503);};
+  if(locPerm==='allow'){
+    if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>initMap(p.coords.latitude,p.coords.longitude),_geoFallback,_geoOpts);}
+    else _geoFallback();
+  }else if(locPerm==='deny'){
+    _geoFallback();
+  }else{
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        p=>{_setCookie('kn_loc_perm','allow',365);initMap(p.coords.latitude,p.coords.longitude);},
+        function(){_setCookie('kn_loc_perm','deny',365);_geoFallback();},
+        _geoOpts
+      );
+    }else _geoFallback();
+  }
+  initRanges();
+};
+
+// ===== 詳細パネル =====
+// openDetail(id): SG配列からidで物件を探し、詳細パネルを開く。
+//   ・写真・ステータス・スペック情報を DOM に反映
+//   ・チャート（棒グラフ・円グラフ）と広告プラン表を setTimeout(60ms) で描画
+//   ・ログイン中ならメモ欄を表示、未ログインなら非表示
+//   ・フィルター・リスト・履歴パネルが開いていれば全て閉じてから開く
+function openDetail(id){
+  if(fpOpen)closeFilter();
+  closeList();
+  if(_histOpen)toggleHistPanel();
+  const s=SG.find(x=>x.id===id);if(!s)return;cur=s;
+  $('dp-bc').textContent=(s.area||'')+' / '+(s.target||'');
+  $('dp-nm').textContent=s.name;
+  $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
+  const photos=s.photos||[];
+  const mainPhoto=photos.find(p=>p.isMain)||photos[0];
+  const mainUrl=mainPhoto?photoCache[mainPhoto.id]||'':'';
+  if(mainUrl){$('dp-img').innerHTML=`<img src="${mainUrl}" style="width:100%;height:100%;object-fit:cover;">`;$('dp-img').style.background='#e8e0d4';}else{$('dp-img').textContent=s.e||'🏢';$('dp-img').style.background='#e8e0d4';}
+  const strip=$('dp-photo-strip');
+  if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
+  const _st=s.status||'';
+  const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
+  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div><div class="row">👟 歩行者通行量　<span>${s.ped||'—'}</span></div><div class="row">🚗 車通行量　<span>${s.trf||'—'}</span></div>`;
+  $('memo-wrap').style.display=loggedIn?'flex':'none';$('memo-wrap').style.flexDirection='column';
+  $('memo-ta').value=loggedIn?(getMemos()[s.id]||''):'';
+  setTimeout(()=>{
+    const vals=[3,2,5,18,45,62,72,68,75,82,70,45],hrs=['0','2','4','6','8','10','12','14','16','18','20','22'];
+    const bc=$('inline-bc');
+    if(bc)bc.innerHTML=vals.map((v,i)=>`<div class="bar-col" style="position:relative"><div class="bar-inner${i===9?' hi':''}" style="height:${v}%"></div><span class="bar-xlbl">${hrs[i]}</span></div>`).join('');
+    pie('inline-pg',[55,45],['#e8650a','#2196F3']);
+    pie('inline-pa',[15,30,25,18,12],['#ff6384','#ff9f40','#36a2eb','#4bc0c0','#9966ff']);
+    const tbl=$('inline-ad-table');
+    if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>1ヶ月</td><td>1万回</td><td class="price">${p.p}</td></tr>`).join('');}
+  },60);
+  $('detail-panel').classList.add('open');
+  document.querySelectorAll('.dp-left-col,.dp-right-col,.dp-page-body').forEach(el=>el.scrollTop=0);
+  if(mOpen) toggleMenu();
+  map.setView([s.lat,s.lng],15);
+}
+function closeDetail(){$('detail-panel').classList.remove('open');}
+function showTop(){
+  closeDetail();
+  closeList();
+  if(fpOpen) toggleFilter();
+  if(mOpen) toggleMenu();
+  if(_histOpen){_histOpen=false;$('hist-wrap').classList.remove('open');}
+}
+function toggleFav(){
+  if(!loggedIn){toast("お気に入り登録にはログインが必要です");showAuth('login');return;}
+  if(!cur)return;
+  favs.has(cur.id)?favs.delete(cur.id):favs.add(cur.id);
+  $('fav-btn').textContent=favs.has(cur.id)?'❤️':'🤍';
+  toast(favs.has(cur.id)?'お気に入りに追加しました':'お気に入りを解除しました');
+  try{localStorage.setItem('kokoknavi_favs',JSON.stringify([...favs]));}catch(e){}
+  putMarkers(SG);
+}
+function _encMemo(s){try{return btoa(encodeURIComponent(s));}catch(e){return s;}}
+function _decMemo(s){try{return decodeURIComponent(atob(s));}catch(e){return s;}}
+function getMemos(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('kokoknavi_memos')||'{}');
+    const out={};for(const k in raw)out[k]=_decMemo(raw[k]);return out;
+  }catch(e){return{};}
+}
+function saveMemo(){
+  if(!cur)return;
+  const val=$('memo-ta').value;
+  let raw={};try{raw=JSON.parse(localStorage.getItem('kokoknavi_memos')||'{}');}catch(e){}
+  if(val.trim()){raw[cur.id]=_encMemo(val);}else{delete raw[cur.id];}
+  localStorage.setItem('kokoknavi_memos',JSON.stringify(raw));
+  toast("メモを保存しました");
+}
+// ===== フォトビューア =====
+// 詳細パネルのサムネイルをタップすると openPV(idx) でフルスクリーン表示。
+// pvNav(dir) で前後スライド、closePV(e) でオーバーレイ部分タップにより閉じる。
+let pvIdx=0,pvPhotos=[];
+function openPV(idx){
+  pvPhotos=(cur&&cur.photos)||[];
+  if(!pvPhotos.length)return;
+  pvIdx=idx;showPVSlide();
+  $('photo-viewer').classList.add('open');
+}
+function showPVSlide(){
+  $('pv-img').src=photoCache[pvPhotos[pvIdx].id]||'';
+  const multi=pvPhotos.length>1;
+  $('pv-prev').style.display=multi?'block':'none';
+  $('pv-next').style.display=multi?'block':'none';
+  $('pv-counter').textContent=multi?(pvIdx+1)+' / '+pvPhotos.length:'';
+}
+function pvNav(dir,e){if(e)e.stopPropagation();pvIdx=(pvIdx+dir+pvPhotos.length)%pvPhotos.length;showPVSlide();}
+function closePV(e){if(e&&e.target!==$('photo-viewer'))return;$('photo-viewer').classList.remove('open');}
+
+// ===== アクション（詳細パネル右下ボタン群） =====
+// openStreetView : Google マップのストリートビューURLをモーダルで案内
+// dlDoc          : 資料（PDF等）をダウンロード。未ログインなら login 画面へ誘導。
+//                  複数資料ある場合はリスト選択モーダルを表示。
+function openStreetView(){
+  if(!cur)return;
+  openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a href="https://www.google.com/maps?layer=c&cbll=${cur.lat},${cur.lng}" target="_blank" class="btn-m-primary">🌐 Google マップで開く</a></div>`,null,true,false);
+}
+function dlDoc(){
+  if(!loggedIn){toast("資料ダウンロードにはログインが必要です");showAuth('login');return;}
+  if(!cur)return;
+  const docs=cur.docs||[];
+  if(!docs.length){toast("この物件の資料はまだ登録されていません");return;}
+  // 注意書きHTML（件数問わず常に表示）
+  const notice=`<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#795548;line-height:1.7">
+    <div style="font-weight:700;margin-bottom:4px">⚠️ ダウンロードに関する注意事項</div>
+    <ul style="margin:0;padding-left:16px">
+      <li>本資料はお客様への情報提供を目的としております。</li>
+      <li>内容の無断転用・転載・第三者への提供はご遠慮ください。</li>
+      <li>掲載情報は予告なく変更される場合があります。</li>
+    </ul>
+  </div>`;
+  const items=docs.map(d=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
+    <span style="font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${d.name}</span>
+    <button onclick="(function(){var u=docCache['${d.id}']||'';if(!u){toast('データが見つかりません');return;}var a=document.createElement('a');a.href=u;a.download='${d.name.replace(/'/g,"\\'")}';a.click();toast('ダウンロードを開始しました');})()" style="flex-shrink:0;margin-left:10px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700">⬇ DL</button>
+  </div>`).join('');
+  openModal(`<h3 style="margin-bottom:8px">📄 資料ダウンロード</h3><p style="font-size:12px;color:#888;margin-bottom:12px">${cur.name}</p>${notice}${items}`,null,false,true);
+}
+function pie(id,data,colors){
+  const c=$(id);if(!c)return;
+  const ctx=c.getContext('2d'),cx=c.width/2,cy=c.height/2,r=c.width/2-3,tot=data.reduce((a,b)=>a+b,0);
+  let a=-Math.PI/2;
+  data.forEach((v,i)=>{const s=2*Math.PI*v/tot;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,a,a+s);ctx.closePath();ctx.fillStyle=colors[i];ctx.fill();a+=s;});
+}
+function clearFilter(){
+  document.querySelectorAll('#filter-panel .tag.on').forEach(t=>t.classList.remove('on'));
+  ['ped','trf','bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
+  const areaAllBtn=document.querySelector('#filter-panel .btn-select-all[onclick*="selectAllArea"]');
+  if(areaAllBtn)areaAllBtn.textContent='全都道府県を選択';
+  document.querySelectorAll('#area-grid .btn-select-all').forEach(b=>b.textContent='すべて選択');
+  const allToggle=$('btn-all-toggle');
+  if(allToggle){allToggle.textContent='デフォルトに戻す';allToggle.style.color='var(--org)';allToggle.style.borderColor='var(--org)';}
+  putMarkers(SG);
+  toast("フィルター条件をクリアしました");
+}
+// ===== 検索履歴 =====
+// localStorage('kokoknavi_hist') に最大30件のキーワードを保存・表示。
+// 削除は1件削除（confirmDeleteHistory）と全件削除（confirmClearHistory）の2種。
+// 各履歴アイテムをクリックすると runHistSearch() が doSearch() に渡す。
+let _histOpen=false;
+function getHistory(){try{return JSON.parse(localStorage.getItem('kokoknavi_hist')||'[]');}catch(e){return[];}}
+function saveHistory(kw){
+  let h=getHistory().filter(k=>typeof k==='string'?k!==kw:true);
+  h.unshift(kw);
+  if(h.length>30)h=h.slice(0,30);
+  try{localStorage.setItem('kokoknavi_hist',JSON.stringify(h));}catch(e){}
+  renderHistory();
+}
+function saveFilterHistory(tags){
+  if(!tags||!tags.length)return;
+  const label=tags.slice(0,3).join('・')+(tags.length>3?'…他'+(tags.length-3)+'件':'');
+  const item={type:'filter',label,tags,ts:Date.now()};
+  const tagsSorted=JSON.stringify([...tags].sort());
+  let h=getHistory().filter(k=>typeof k==='string'||(k.type!=='filter'||JSON.stringify([...k.tags].sort())!==tagsSorted));
+  h.unshift(item);
+  if(h.length>30)h=h.slice(0,30);
+  try{localStorage.setItem('kokoknavi_hist',JSON.stringify(h));}catch(e){}
+  renderHistory();
+}
+function renderHistory(){
+  const h=getHistory();
+  const el=$('hist-items');
+  if(!el)return;
+  if(!h.length){el.innerHTML='<div style="text-align:center;color:#bbb;font-size:12px;padding:20px">履歴はありません</div>';return;}
+  el.innerHTML=h.map((item,i)=>{
+    if(typeof item==='string'){
+      const kw=item;
+      return `<div class="hist-item" onclick="runHistSearch('${kw.replace(/'/g,"\\'")}')"><span class="hist-kw">🔍 ${kw}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})">✕</button></div>`;
+    }else if(item&&item.type==='filter'){
+      return `<div class="hist-item" onclick="runFilterFromHistory(${i})"><span class="hist-kw"><span style="font-size:10px;background:var(--org);color:#fff;border-radius:3px;padding:1px 5px;margin-right:5px;flex-shrink:0">絞込</span>${item.label}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})">✕</button></div>`;
+    }
+    return '';
+  }).join('');
+}
+function runHistSearch(kw){
+  $('q').value=kw;doSearch();
+}
+function runFilterFromHistory(idx){
+  const h=getHistory();
+  const item=h[idx];
+  if(!item||item.type!=='filter')return;
+  if(_histOpen)toggleHistPanel();
+  document.querySelectorAll('#filter-panel .tag.on').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#filter-panel .tag').forEach(t=>{
+    if(item.tags.includes(t.textContent))t.classList.add('on');
+  });
+  applyFilter();
+}
+function closeHdc(){document.getElementById('hdc-overlay').classList.remove('open');}
+function confirmDeleteHistory(i){
+  const h=getHistory();
+  const item=h[i];
+  const label=typeof item==='string'?item:(item&&item.label?item.label:'この履歴');
+  document.getElementById('hdc-title').textContent='本当に削除しますか？';
+  document.getElementById('hdc-msg').textContent='「'+label+'」を履歴から削除します。';
+  document.getElementById('hdc-yes').onclick=function(){
+    closeHdc();
+    const h2=getHistory();h2.splice(i,1);
+    try{localStorage.setItem('kokoknavi_hist',JSON.stringify(h2));}catch(e){}
+    renderHistory();
+  };
+  document.getElementById('hdc-overlay').classList.add('open');
+}
+function confirmClearHistory(){
+  const h=getHistory();
+  if(!h.length)return;
+  document.getElementById('hdc-title').textContent='本当に削除しますか？';
+  document.getElementById('hdc-msg').textContent='検索履歴を全て（'+h.length+'件）削除します。';
+  document.getElementById('hdc-yes').onclick=function(){
+    closeHdc();
+    try{localStorage.removeItem('kokoknavi_hist');}catch(e){}
+    renderHistory();
+  };
+  document.getElementById('hdc-overlay').classList.add('open');
+}
+// ===== 検索（サジェスト・キーワード検索） =====
+// updateSuggest() : 入力中にリアルタイムでサジェストドロップダウンを更新。
+//   履歴マッチ（🕐）と物件名マッチ（🔍）を最大5件ずつ表示。
+// handleSuggestKey() : ↑↓キーで候補選択、Enterで確定、Escで閉じる。
+// doSearch() : 入力ワードを正規化（全角→半角・ひら↔カタ・ローマ字→ひらがな変換）して
+//   name / yomi / area / place / addr を横断検索し showList() でリストパネルに表示。
+// _nrmS()       : 文字列を半角小文字ひらがなに正規化する共通ヘルパー
+// _romajiToHira(): ローマ字→ひらがな変換（例："osaka" → "おさか"）
+// _queryForms() : ローマ字入力の場合はひらがな変換版も含む検索バリエーション配列を返す
+let _sugIdx=-1;
+function updateSuggest(){
+  const q=($('q').value||'').trim();
+  const box=document.getElementById('suggest-box');
+  if(!q){hideSuggest();return;}
+  const nqs=_queryForms(q);
+  const hist=getHistory().filter(k=>typeof k==='string'&&nqs.some(nq=>_nrmS(k).includes(nq))&&k!==q).slice(0,5);
+  const names=SG.filter(s=>nqs.some(nq=>_nrmS(s.name).includes(nq)||_nrmS(s.yomi||'').includes(nq))).map(s=>s.name).slice(0,5);
+  const items=[
+    ...hist.map(k=>`<div class="sug-item" onmousedown="pickSuggest('${k.replace(/'/g,"\\'")}')"><span>🕐</span><span style="flex:1">${k}</span><span class="sug-label">履歴</span></div>`),
+    ...names.map(n=>`<div class="sug-item" onmousedown="pickSuggest('${n.replace(/'/g,"\\'")}')"><span>🔍</span><span style="flex:1">${n}</span><span class="sug-label">スポット</span></div>`)
+  ];
+  if(!items.length){hideSuggest();return;}
+  box.innerHTML=items.join('');
+  _sugIdx=-1;
+  positionSuggest();
+  box.style.display='block';
+}
+function positionSuggest(){
+  const inp=document.getElementById('q');
+  const r=inp.getBoundingClientRect();
+  const box=document.getElementById('suggest-box');
+  box.style.top=(r.bottom+4)+'px';
+  box.style.left=r.left+'px';
+  box.style.width=r.width+'px';
+}
+function hideSuggest(){
+  const box=document.getElementById('suggest-box');
+  if(box)box.style.display='none';
+  _sugIdx=-1;
+}
+function pickSuggest(kw){
+  hideSuggest();
+  $('q').value=kw;
+  doSearch();
+}
+function handleSuggestKey(e){
+  const box=document.getElementById('suggest-box');
+  const items=box?box.querySelectorAll('.sug-item'):[];
+  if(box&&box.style.display!=='none'&&items.length){
+    if(e.key==='ArrowDown'){e.preventDefault();_sugIdx=Math.min(_sugIdx+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('sug-active',i===_sugIdx));return;}
+    if(e.key==='ArrowUp'){e.preventDefault();_sugIdx=Math.max(_sugIdx-1,0);items.forEach((el,i)=>el.classList.toggle('sug-active',i===_sugIdx));return;}
+    if(e.key==='Enter'&&_sugIdx>=0){items[_sugIdx].dispatchEvent(new MouseEvent('mousedown'));return;}
+    if(e.key==='Escape'){hideSuggest();return;}
+  }
+  if(e.key==='Enter')doSearch();
+}
+function toggleHistPanel(){
+  _histOpen=!_histOpen;
+  $('hist-wrap').classList.toggle('open',_histOpen);
+  if(_histOpen){closeList();closeFilter();renderHistory();$('hist-items').scrollTop=0;}
+}
+// _nrmS / _romajiToHira / _queryForms は shared-data.js で定義
+function doSearch(){
+  const raw=$('q').value.trim();if(!raw){closeList();return;}
+  // 詳細画面が開いていたら確認ポップアップを表示
+  if($('detail-panel').classList.contains('open')){
+    openModal(`<h3 style="margin-bottom:12px">🔍 検索結果を表示</h3>
+      <p style="font-size:13px;color:#555;margin-bottom:16px">詳細画面を閉じて検索結果を閲覧しますか？</p>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeModal()" style="flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">いいえ</button>
+        <button onclick="closeModal();_doSearchExec('${raw.replace(/'/g,"\\'")}')" style="flex:1;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">表示する</button>
+      </div>`,null,true);
+    return;
+  }
+  _doSearchExec(raw);
+}
+const REGION_MAP=[
+  {name:'北海道',yomi:'ほっかいどう',prefs:['北海道']},
+  {name:'東北',yomi:'とうほく',prefs:['青森県','岩手県','宮城県','秋田県','山形県','福島県']},
+  {name:'関東',yomi:'かんとう',prefs:['茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県']},
+  {name:'中部',yomi:'ちゅうぶ',prefs:['新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県']},
+  {name:'近畿',yomi:'きんき',prefs:['三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県']},
+  {name:'関西',yomi:'かんさい',prefs:['三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県']},
+  {name:'中国',yomi:'ちゅうごく',prefs:['鳥取県','島根県','岡山県','広島県','山口県']},
+  {name:'四国',yomi:'しこく',prefs:['徳島県','香川県','愛媛県','高知県']},
+  {name:'九州',yomi:'きゅうしゅう',prefs:['福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県']},
+  {name:'沖縄',yomi:'おきなわ',prefs:['沖縄県']}
+];
+// 都道府県バウンディングボックス [minLat, maxLat, minLng, maxLng]
+const PREF_BOUNDS={
+  '北海道':[41.35,45.55,139.35,145.85],
+  '青森県':[40.2,41.55,139.4,141.7],
+  '岩手県':[38.7,40.45,140.6,142.1],
+  '宮城県':[37.75,38.95,140.2,141.7],
+  '秋田県':[38.9,40.5,139.7,141.15],
+  '山形県':[37.7,39.0,139.5,140.9],
+  '福島県':[36.75,37.95,138.85,141.05],
+  '茨城県':[35.7,36.95,139.7,140.85],
+  '栃木県':[36.2,37.15,139.35,140.35],
+  '群馬県':[36.15,37.0,138.4,139.7],
+  '埼玉県':[35.75,36.3,138.7,139.9],
+  '千葉県':[34.9,35.95,139.75,140.9],
+  '東京都':[35.5,35.9,138.9,139.95],
+  '神奈川県':[35.1,35.7,138.9,139.85],
+  '新潟県':[36.75,38.6,137.6,139.6],
+  '富山県':[36.4,37.0,136.75,137.8],
+  '石川県':[36.1,37.85,136.25,137.35],
+  '福井県':[35.4,36.3,135.55,136.75],
+  '山梨県':[35.15,35.9,138.35,139.25],
+  '長野県':[35.2,37.0,137.35,138.85],
+  '岐阜県':[35.1,36.45,136.2,137.75],
+  '静岡県':[34.6,35.5,137.5,139.15],
+  '愛知県':[34.55,35.45,136.65,137.85],
+  '三重県':[33.75,35.25,135.85,136.85],
+  '滋賀県':[34.8,35.7,135.75,136.5],
+  '京都府':[34.7,35.8,134.85,135.9],
+  '大阪府':[34.3,35.0,135.1,135.85],
+  '兵庫県':[34.15,35.65,134.2,135.5],
+  '奈良県':[33.85,34.75,135.65,136.25],
+  '和歌山県':[33.4,34.35,135.2,136.0],
+  '鳥取県':[35.0,35.6,133.2,134.5],
+  '島根県':[34.2,35.55,131.65,133.45],
+  '岡山県':[34.5,35.35,133.2,134.5],
+  '広島県':[34.05,35.25,132.15,133.45],
+  '山口県':[33.7,34.75,130.7,132.25],
+  '徳島県':[33.5,34.2,133.65,134.85],
+  '香川県':[34.05,34.55,133.5,134.5],
+  '愛媛県':[32.85,34.25,132.0,133.75],
+  '高知県':[32.7,33.9,132.55,134.45],
+  '福岡県':[33.0,34.25,130.0,131.25],
+  '佐賀県':[32.9,33.65,129.7,130.65],
+  '長崎県':[32.0,34.55,128.6,130.45],
+  '熊本県':[32.05,33.2,130.05,131.35],
+  '大分県':[32.7,33.65,130.75,132.1],
+  '宮崎県':[31.35,32.85,130.65,131.9],
+  '鹿児島県':[27.05,32.25,128.4,131.35],
+  '沖縄県':[24.0,27.1,122.9,131.35]
+};
+function _inPrefBounds(lat,lng,pref){
+  var b=PREF_BOUNDS[pref];
+  if(!b||lat==null||lng==null)return false;
+  return lat>=b[0]&&lat<=b[1]&&lng>=b[2]&&lng<=b[3];
+}
+function _doSearchExec(raw){
+  saveHistory(raw);
+  if(_histOpen)toggleHistPanel();
+  closeDetail();
+  const qs=_queryForms(raw);
+  const hit=str=>qs.some(q=>_nrmS(str).includes(q));
+  const regionPrefs=[];
+  REGION_MAP.forEach(r=>{
+    const rn=_nrmS(r.name),ry=_nrmS(r.yomi);
+    if(qs.some(q=>q.includes(rn)||rn.includes(q)||q.includes(ry)||ry.includes(q))){
+      r.prefs.forEach(p=>{if(!regionPrefs.includes(p))regionPrefs.push(p);});
+    }
+  });
+  const res=SG.filter(s=>hit(s.name)||hit(s.yomi)||hit(s.area)||hit(s.place)||hit(s.addr)||
+    (regionPrefs.length&&regionPrefs.some(p=>
+      (s.area||'').includes(p)||(s.addr||'').includes(p)||_inPrefBounds(s.lat,s.lng,p)
+    )));
+  showList(res,`"${raw}" の検索結果`);
+}
+// ===== 絞り込みフィルター =====
+// toggleFilter() : フィルターパネルを開閉。開く時は履歴・リスト・詳細・メニューを退避して閉じ、
+//                  外側クリックで自動閉鎖するイベントリスナーを登録。
+// closeFilter()  : フィルターを閉じ、退避していたパネルを復元。
+// tt(el)         : 個別タグのON/OFFトグル。ボタン全選択状態テキストも同期。
+// selectAll()    : 「すべて選択」ボタン。2件以上選択中なら全解除、それ以外は全選択。
+// selectAllArea(): 都道府県全選択ボタン専用版（area-grid 配下の全タグを操作）。
+// applyFilter()  : 選択中タグに合致するSGを絞り込み putMarkers() + showList() で反映。
+// clearFilter()  : 全タグ・スライダーをリセットして全件表示に戻す。
+// toggleSelectAll(): 「デフォルトに戻す」ボタン → clearFilter() を呼び出す。
+let fpOpen=false,_listWasOpen=false,_detailWasOpen=false,_menuWasOpen=false;
+function toggleFilter(){
+  fpOpen=!fpOpen;
+  $('filter-panel').classList.toggle('open',fpOpen);
+  if(fpOpen){
+    if(_histOpen){_histOpen=false;$('hist-wrap').classList.remove('open');}
+    _listWasOpen=false;
+    $('list-panel').classList.remove('open');
+    // メニュー経由でフィルターを開いた場合は詳細画面を復元しない
+    _menuWasOpen=mOpen;
+    _detailWasOpen=!mOpen&&$('detail-panel').classList.contains('open');
+    if($('detail-panel').classList.contains('open'))$('detail-panel').classList.remove('open');
+    if(mOpen){mOpen=false;$('menu-drawer').classList.remove('open');$('hamburger').classList.remove('open');}
+    $('hist-wrap').style.display='none';
+    $('header').style.pointerEvents='auto';
+    setTimeout(()=>document.addEventListener('click',_filterOutsideClick),0);
+  }else{
+    if(_listWasOpen)$('list-panel').classList.add('open');
+    if(_detailWasOpen)$('detail-panel').classList.add('open');
+    if(_menuWasOpen){mOpen=true;$('menu-drawer').classList.add('open');$('hamburger').classList.add('open');}
+    $('hist-wrap').style.display='';
+    $('header').style.pointerEvents='';
+    document.removeEventListener('click',_filterOutsideClick);
+  }
+}
+function _filterOutsideClick(e){
+  if(!$('filter-panel').contains(e.target)&&e.target.id!=='filter-icon'&&!$('filter-icon').contains(e.target))closeFilter();
+}
+function closeFilter(){
+  fpOpen=false;
+  $('filter-panel').classList.remove('open');
+  $('hist-wrap').style.display='';
+  if(_listWasOpen)$('list-panel').classList.add('open');
+  if(_detailWasOpen)$('detail-panel').classList.add('open');
+  $('header').style.pointerEvents='';
+  document.removeEventListener('click',_filterOutsideClick);
+}
+function _syncBtn(tagsEl){
+  const btn=tagsEl.closest('.region-block')?.querySelector('.btn-select-all')
+    ||tagsEl.parentElement?.querySelector('.btn-select-all');
+  if(!btn)return;
+  const sel=tagsEl.querySelectorAll('.tag.on').length;
+  btn.textContent=sel>=2?'選択を解除':'すべて選択';
+}
+function _syncAreaAllBtn(){
+  const btn=document.querySelector('#filter-panel .btn-select-all[onclick*="selectAllArea"]');
+  if(!btn)return;
+  const sel=document.getElementById('area-grid').querySelectorAll('.tag.on').length;
+  btn.textContent=sel>=2?'選択を解除':'全都道府県を選択';
+}
+function tt(el){
+  el.classList.toggle('on');
+  const tagsEl=el.closest('.tags');
+  if(tagsEl)_syncBtn(tagsEl);
+  if(el.closest('#area-grid'))_syncAreaAllBtn();
+}
+function selectAll(tagsEl){
+  if(!tagsEl)return;
+  const tags=tagsEl.querySelectorAll('.tag');
+  const sel=[...tags].filter(t=>t.classList.contains('on')).length;
+  if(sel>=2){tags.forEach(t=>t.classList.remove('on'));}
+  else{tags.forEach(t=>t.classList.add('on'));}
+  _syncBtn(tagsEl);
+  if(tagsEl.closest('#area-grid'))_syncAreaAllBtn();
+}
+function fpTab(idx){
+  document.querySelectorAll('.fp-col').forEach((c,i)=>c.classList.toggle('active',i===idx));
+  document.querySelectorAll('.fp-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+}
+function selectAllArea(btn){
+  const tags=[...document.getElementById('area-grid').querySelectorAll('.tag')];
+  const sel=tags.filter(t=>t.classList.contains('on')).length;
+  if(sel>=2){tags.forEach(t=>t.classList.remove('on'));btn.textContent='全都道府県を選択';}
+  else{tags.forEach(t=>t.classList.add('on'));btn.textContent='選択を解除';}
+  document.querySelectorAll('#area-grid .tags').forEach(t=>_syncBtn(t));
+}
+function toggleSelectAll(){
+  const btn=document.getElementById('btn-all-toggle');
+  clearFilter();
+  btn.textContent='デフォルトに戻す';btn.style.color='var(--org)';btn.style.borderColor='var(--org)';
+}
+function applyFilter(){
+  const active=[...$('filter-panel').querySelectorAll('.tag.on')].map(t=>t.textContent);
+  closeFilter();
+  if(active.length)saveFilterHistory(active);
+  const res=active.length?SG.filter(s=>active.some(t=>
+    (s.area||'').includes(t)||
+    (s.target||'').includes(t)||
+    (s.place||'').includes(t)||
+    (s.name||'').includes(t)||
+    (s.addr||'').includes(t)
+  )):SG;
+  putMarkers(res);
+  showList(res,"フィルタリング結果");
+}
+// ===== リストパネル =====
+// showList(items, label) : 検索結果・フィルター結果を受け取り、リストパネルに件数とアイテムを描画。
+//   各アイテムのサムネイル画像は photoCache から取得し、なければ絵文字（s.e）を表示。
+//   アイテムをタップすると openDetail(id) で詳細パネルを開く。
+// closeList() : リストパネルを閉じるだけのシンプルな関数。
+function showList(items,label){
+  $('lp-count').textContent=label+'  '+items.length+'件';
+  $('lp-items').innerHTML=items.map(s=>{
+    const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
+    const mpUrl=mp?photoCache[mp.id]||'':'';
+    const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:(s.e||'🏢');
+    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}<br>👟 ${s.ped||'—'}<br>🚗 ${s.trf||'—'}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
+  }).join('');
+  $('list-panel').classList.add('open');
+  $('lp-items').scrollTop=0;
+}
+function closeList(){$('list-panel').classList.remove('open');}
+// ===== メニュー（ハンバーガードロワー） =====
+// toggleMenu() : 詳細パネルが開いている間は開かない（誤操作防止）。
+//   フィルターが開いていれば同時に閉じる。
+// gotoTop()    : 全パネルを閉じ、全物件を地図に再描画してクラスター全体にフィット。
+// showFavList(): お気に入り一覧を showList() に渡す。未ログインなら login 画面へ。
+let mOpen=false;
+function toggleMenu(){
+  // モーダル（ポップアップ）表示中はメニューを開かない
+  if(!mOpen && $('mc').innerHTML!=='') return;
+  mOpen=!mOpen;
+  $('menu-drawer').classList.toggle('open',mOpen);
+  $('hamburger').classList.toggle('open',mOpen);
+  // フィルターが開いていてもメニューはそのまま上から表示（closeFilterしない）
+}
+function gotoTop(){
+  toggleMenu();closeDetail();closeList();putMarkers(SG);
+  try{const b=clusterGroup.getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40]});}
+  catch(e){map.setView([35.6762,139.6503],6);}
+}
+function showFavList(){toggleMenu();if(!loggedIn){showAuth('login');return;}showList(SG.filter(s=>favs.has(s.id)),"お気に入り一覧");}
+function showAccSettings(){
+  toggleMenu();if(!loggedIn){showAuth('login');return;}
+  openModal(`<h3>👤 アカウント設定</h3><p style="font-size:12px;color:#aaa;margin-bottom:14px">ようこそ！</p>
+    <div class="fg"><label>メールアドレス</label><input class="fi" value="（保護済み）" disabled style="color:#aaa;background:#f8f8f8"></div>
+    <p style="font-size:12px;font-weight:700;color:#555;margin:14px 0 8px">パスワード変更</p>
+    <div class="fg"><label>現在のパスワード<span class="req">必須</span></label>
+      <div style="position:relative">
+        <input class="fi" id="acc-cur-pw" type="password" placeholder="現在のパスワード" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('acc-new-pw').focus()}">
+        <button type="button" onclick="togglePw('acc-cur-pw',this)" class="pw-toggle">👁</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>新しいパスワード<span class="req">必須</span></label>
+      <div style="position:relative">
+        <input class="fi" id="acc-new-pw" type="password" placeholder="新しいパスワード（6文字以上）" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('acc-new-pw2').focus()}">
+        <button type="button" onclick="togglePw('acc-new-pw',this)" class="pw-toggle">👁</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>新しいパスワード（確認）<span class="req">必須</span></label>
+      <div style="position:relative">
+        <input class="fi" id="acc-new-pw2" type="password" placeholder="もう一度入力" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();saveAccSettings()}">
+        <button type="button" onclick="togglePw('acc-new-pw2',this)" class="pw-toggle">👁</button>
+      </div>
+    </div>
+    <button class="btn-org" style="margin-top:14px;width:100%" onclick="saveAccSettings()">保存する</button>
+    <button onclick="closeModal();setTimeout(confirmLogout,100)" style="display:block;width:100%;background:#f0f0f0;color:#666;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px">ログアウト</button>
+    <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
+    <button onclick="closeModal();setTimeout(confirmDeleteAccount,100)" style="display:block;width:100%;background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;border-radius:4px;padding:10px;font-size:13px;cursor:pointer">アカウントを削除する</button>`,null,false,true);
+}
+async function saveAccSettings(){
+  const curPw=$('acc-cur-pw')?.value||'';
+  const newPw=$('acc-new-pw')?.value||'';
+  const newPw2=$('acc-new-pw2')?.value||'';
+  if(!curPw){toast("現在のパスワードを入力してください");return;}
+  if(!newPw||!newPw2){toast("新しいパスワードを入力してください");return;}
+  if(newPw.length<6){toast("新しいパスワードは6文字以上にしてください");return;}
+  if(newPw!==newPw2){toast("新しいパスワードが一致しません");return;}
+  const accs=getAccounts();
+  if(!accs[uName]){toast("アカウント情報が見つかりません");return;}
+  const ok=await verifyPw(curPw,accs[uName]);
+  if(!ok){toast("現在のパスワードが違います");return;}
+  if(await verifyPw(newPw,accs[uName])){toast("現在と同じパスワードは使用できません");return;}
+  accs[uName]=await hashPw(newPw);
+  saveAccounts(accs);
+  closeModal();
+  toast("パスワードを変更しました");
+}
+function logout(){endSession();updateAuthBtn();toast("ログアウトしました");}
+// togglePw は shared-data.js で定義
+function validateRegEmail(){
+  const el=$('a-id');if(!el)return;
+  const valid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim());
+  const err=$('a-email-err');
+  if(err)err.style.display=(el.value.trim()&&!valid)?'block':'none';
+}
+function confirmDeleteAccount(){
+  openModal(`<h3 style="color:#c0392b">⚠️ アカウント削除</h3>
+    <p style="font-size:13px;color:#555;margin:12px 0 4px">アカウントを削除すると、お気に入りなどのデータもすべて削除されます。</p>
+    <p style="font-size:12px;color:#e74c3c;margin-bottom:16px;font-weight:700">この操作は元に戻せません。</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">キャンセル</button>
+      <button onclick="deleteAccount();closeModal()" style="flex:1;background:#c0392b;color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">削除する</button>
+    </div>`,null,true);
+}
+function deleteAccount(){
+  const accs=getAccounts();
+  if(uName&&accs[uName]){delete accs[uName];saveAccounts(accs);}
+  localStorage.removeItem('kokoknavi_favs');
+  endSession();updateAuthBtn();
+  toast("アカウントを削除しました");
+}
+function confirmLogout(){
+  openModal(`<h3>ログアウト</h3>
+    <p style="font-size:13px;color:#555;margin:12px 0 16px">ログアウトしますか？</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal()" style="flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">いいえ</button>
+      <button onclick="logout();closeModal()" style="flex:1;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">はい</button>
+    </div>`,null,true);
+}
+function showResetPw(){
+  openModal(`<h3>🔑 パスワードリセット</h3>
+    <div id="reset-step1">
+      <p style="font-size:12px;color:#555;margin-bottom:12px">登録済みのメールアドレスに確認コードを送信します。</p>
+      <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
+        <input class="fi" id="r-email" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();sendResetCode()}">
+      </div>
+      <button id="btn-send-reset" class="btn-org" style="margin-top:14px;width:100%" onclick="sendResetCode()">確認コードを送信</button>
+    </div>
+    <div id="reset-step2" style="display:none">
+      <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📧 メールに送られた6桁のコードを入力してください（有効期限：5分）</p>
+      <div class="fg"><label>認証コード<span class="req">必須</span></label>
+        <input class="fi code-input" id="r-code" type="text" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('r-pw').focus()}">
+      </div>
+      <div class="fg" style="margin-top:10px"><label>新しいパスワード<span class="req">必須</span></label>
+        <div style="position:relative">
+          <input class="fi" id="r-pw" type="password" placeholder="新しいパスワード（6文字以上）" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('r-pw2').focus()}">
+          <button type="button" onclick="togglePw('r-pw',this)" class="pw-toggle">👁</button>
+        </div>
+      </div>
+      <div class="fg" style="margin-top:10px"><label>新しいパスワード（確認）<span class="req">必須</span></label>
+        <div style="position:relative">
+          <input class="fi" id="r-pw2" type="password" placeholder="もう一度入力" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();doResetPw()}">
+          <button type="button" onclick="togglePw('r-pw2',this)" class="pw-toggle">👁</button>
+        </div>
+      </div>
+      <button class="btn-org" style="margin-top:14px;width:100%" onclick="doResetPw()">パスワードを変更</button>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">届かない場合は <a style="color:var(--org);cursor:pointer" onclick="resendResetCode()">再送信</a></div>
+    </div>
+    <div class="auth-switch">ログインに戻る場合は <a onclick="closeModal();showAuth('login')">こちら</a></div>`);
+}
+async function resendResetCode(){
+  if(!authCode||!authCode.email||authCode.type!=='reset'){toast("情報が見つかりません。最初からやり直してください");showResetPw();return;}
+  var _cd=_checkSendCooldown('kn_cd_reset',60);
+  if(!_cd.ok){toast("再送信は"+_cd.remaining+"秒後にお試しください");return;}
+  const code=genCode();
+  authCode={code,expiry:Date.now()+5*60*1000,email:authCode.email,type:'reset'};
+  try{
+    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:authCode.email,code});
+    document.getElementById('r-code').value='';
+    toast("確認コードを再送信しました");
+  }catch(e){
+    toast("送信失敗："+_errMsg(e));
+  }
+}
+async function sendResetCode(){
+  const email=($('r-email')?.value||'').trim();
+  if(!email){toast("メールアドレスを入力してください");return;}
+  var _cd=_checkSendCooldown('kn_cd_reset',60);
+  if(!_cd.ok){toast("送信は"+_cd.remaining+"秒後にお試しください");return;}
+  const accs=getAccounts();
+  const emailKey=_emailKey(email);
+  if(!accs[emailKey]){toast("このメールアドレスは登録されていません");return;}
+  const code=genCode();
+  authCode={code,expiry:Date.now()+5*60*1000,email,type:'reset'};
+  const btn=document.getElementById('btn-send-reset');
+  if(btn){btn.disabled=true;btn.textContent='送信中...';}
+  try{
+    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:email,code});
+    document.getElementById('reset-step1').style.display='none';
+    document.getElementById('reset-step2').style.display='block';
+    toast("確認コードを送信しました");
+  }catch(e){
+    const msg=_errMsg(e);
+    toast("送信失敗："+msg);
+    if(btn){btn.disabled=false;btn.textContent='確認コードを送信';}
+  }
+}
+async function doResetPw(){
+  const entered=($('r-code')?.value||'').trim();
+  const pw=$('r-pw')?.value||'';
+  const pw2=$('r-pw2')?.value||'';
+  if(!entered){toast("認証コードを入力してください");return;}
+  if(!pw||!pw2){toast("新しいパスワードを入力してください");return;}
+  if(pw!==pw2){toast("パスワードが一致しません");return;}
+  if(pw.length<6){toast("パスワードは6文字以上にしてください");return;}
+  if(!authCode||authCode.type!=='reset'){toast("コードが見つかりません。再送信してください");return;}
+  if(Date.now()>authCode.expiry){toast("コードの有効期限が切れました。再送信してください");authCode=null;showResetPw();return;}
+  if(entered!==authCode.code){toast("認証コードが違います");return;}
+  const accs=getAccounts();
+  const emailKey=_emailKey(authCode.email);
+  if(accs[emailKey]&&await verifyPw(pw,accs[emailKey])){toast("現在と同じパスワードは使用できません");return;}
+  accs[emailKey]=await hashPw(pw);
+  saveAccounts(accs);
+  closeModal();authCode=null;
+  toast("パスワードを変更しました");
+  setTimeout(()=>showAuth('login'),800);
+}
+// ===== 認証フロー =====
+// showAuth(mode) : 'login' または 'register' を受け取りモーダルを表示。
+//   login    → メール＋パスワード入力 → doAuth('login') で Argon2id 照合
+//   register → メール＋PW入力 → sendAuthCode() でメール認証コード送信
+//              → 6桁コード入力 → doAuth('register') でアカウント作成・セッション開始
+// sendAuthCode() / resendAuthCode() : EmailJS でコードを送信。60秒クールダウン付き。
+// doAuth()       : ログイン時は verifyPw()（Argon2id）でハッシュ照合。
+//                  登録時は認証コード有効期限（5分）・一致確認後 hashPw() でハッシュ保存。
+// showResetPw()  : パスワードリセット画面。sendResetCode() でメール認証後に新パスワード設定。
+// confirmDeleteAccount() / deleteAccount() : アカウント削除（favs・memos も消去）。
+// updateAuthBtn() : ヘッダーのログインボタンのテキスト・挙動をセッション状態に同期。
+function showAuth(mode){
+  const isL=mode==='login';
+  openModal(`<h3>${isL?'🔑 ログイン':'📝 アカウント作成'}</h3>
+    <div class="auth-note">アカウントの作成で資料のダウンロード / お気に入り登録が使用可能になります！</div>
+    ${isL?`
+      <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
+        <input class="fi" id="a-id" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw').focus();}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('正しい形式で入力して下さい')">
+        <div id="email-hint" style="font-size:12px;color:#e74c3c;margin-top:4px;min-height:16px"></div>
+      </div>
+      <div class="fg" style="margin-top:10px"><label>パスワード<span class="req">必須</span></label>
+        <div style="position:relative">
+          <input class="fi" id="a-pw" type="password" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter'){event.preventDefault();doAuth('login')}" style="padding-right:40px">
+          <button type="button" onclick="togglePw('a-pw',this)" class="pw-toggle">👁</button>
+        </div>
+      </div>
+      <button class="btn-org" style="margin-top:14px;width:100%" onclick="doAuth('login')">ログイン</button>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">パスワードをお忘れの方は <a style="color:var(--org);cursor:pointer" onclick="closeModal();showResetPw()">こちら</a></div>
+    `:`
+      <div id="auth-step1">
+        <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
+          <input class="fi" id="a-id" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw').focus();}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('正しい形式で入力して下さい')">
+        </div>
+        <div class="fg" style="margin-top:10px"><label>パスワード<span class="req">必須</span></label>
+          <div style="position:relative">
+            <input class="fi" id="a-pw" type="password" placeholder="パスワード（6文字以上）" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw2').focus();}" style="padding-right:40px">
+            <button type="button" onclick="togglePw('a-pw',this)" class="pw-toggle">👁</button>
+          </div>
+        </div>
+        <div class="fg" style="margin-top:10px"><label>パスワード（確認）<span class="req">必須</span></label>
+          <div style="position:relative">
+            <input class="fi" id="a-pw2" type="password" placeholder="もう一度入力" onkeydown="if(event.key==='Enter'){event.preventDefault();sendAuthCode()}" style="padding-right:40px">
+            <button type="button" onclick="togglePw('a-pw2',this)" class="pw-toggle">👁</button>
+          </div>
+        </div>
+        <button id="btn-send-code" class="btn-org" style="margin-top:14px;width:100%" onclick="sendAuthCode()">確認コードを送信</button>
+      </div>
+      <div id="auth-step2" style="display:none">
+        <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📧 メールに送られた6桁のコードを入力してください（有効期限：5分）</p>
+        <div class="fg"><label>認証コード<span class="req">必須</span></label>
+          <input class="fi code-input" id="a-code" type="text" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter'){event.preventDefault();doAuth('register')}" oninput="if(this.value.replace(/\D/g,'').length===6){this.value=this.value.replace(/\D/g,'');doAuth('register')}">
+        </div>
+        <button class="btn-org" style="margin-top:14px;width:100%" onclick="doAuth('register')">アカウントを作成</button>
+        <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">届かない場合は <a style="color:var(--org);cursor:pointer" onclick="resendAuthCode()">再送信</a></div>
+      </div>
+    `}
+    <div class="auth-switch">${isL?'アカウントをお持ちでない方は <a onclick="closeModal();showAuth(\'register\')">会員登録</a>':'すでにアカウントをお持ちの方は <a onclick="closeModal();showAuth(\'login\')">ログイン</a>'}</div>`,null,false,true);
+}
+async function doAuth(mode){
+  try{
+  const accs=getAccounts();
+  if(mode==='login'){
+    const email=($('a-id')?.value||'').trim();
+    const pw=$('a-pw')?.value||'';
+    if(!email||!pw){toast("メールアドレスとパスワードを入力してください");return;}
+    if(pw.length<6){toast("パスワードは6文字以上です");return;}
+    const emailKey=_emailKey(email);
+    if(!accs[emailKey]){toast("アカウントが見つかりません");return;}
+    const ok=await verifyPw(pw,accs[emailKey]);
+    if(!ok){toast("パスワードが違います");return;}
+    closeModal();await startSession(email);toast(`ようこそ、${email}さん！`);
+  }else{
+    const entered=($('a-code')?.value||'').trim();
+    if(!entered){toast("認証コードを入力してください");return;}
+    if(!authCode){toast("コードが見つかりません。再送信してください");return;}
+    if(Date.now()>authCode.expiry){toast("コードの有効期限が切れました。再送信してください");authCode=null;showAuth('register');return;}
+    if(entered!==authCode.code){toast("認証コードが違います");return;}
+    const hash=await hashPw(authCode.pw);
+    const emailKey=_emailKey(authCode.email);
+    accs[emailKey]=hash;saveAccounts(accs);
+    const regEmail=authCode.email;
+    closeModal();await startSession(regEmail);authCode=null;
+    toast(`登録完了！ようこそ、${regEmail}さん！`);
+  }
+  }catch(e){toast("認証処理中にエラーが発生しました："+_errMsg(e));}
+}
+function updateAuthBtn(){
+  const btn=$('hdr-auth-btn');if(!btn)return;
+  if(loggedIn){btn.textContent='ログアウト';btn.onclick=()=>confirmLogout();}
+  else{btn.textContent='ログイン';btn.onclick=()=>showAuth('login');}
+  // 詳細パネルが開いていればログイン状態に合わせて即時更新
+  if(cur&&$('detail-panel').classList.contains('open')){
+    openDetail(cur.id);
+  }
+}
+// ===== お問い合わせ =====
+// showInq() : お問い合わせフォームをモーダルで表示。
+//   「サイネージに関する」「広告に関する」の2種類をタブ切替（setInqMode）。
+// submitInq() : ハニーポット（inq-hp）でBOTを弾き、必須項目・電話番号・メール形式を検証。
+//   120秒クールダウン（kn_cd_inq）後に送信可。EmailJSで運営者宛てに詳細を送信する。
+let inqMode='signage';
+function _buildSignageOptions(){
+  let opts='<option value="">指定なし</option>';
+  SG.forEach(function(s){
+    const sel=(cur&&cur.id===s.id)?' selected':'';
+    const stLbl=STATUS_LBL[s.status]||s.status;
+    opts+='<option value="'+s.id+'"'+sel+'>'+s.name+' ['+stLbl+']</option>';
+  });
+  return opts;
+}
+function showInq(){
+  if(mOpen)toggleMenu();
+  const signageOpts=_buildSignageOptions();
+  openModal(`<h3>✉ お問い合わせ</h3>
+    <div class="inq-type-row">
+      <button class="inq-type-btn on" id="ib-s" onclick="setInqMode('signage')">サイネージに関する</button>
+      <button class="inq-type-btn" id="ib-a" onclick="setInqMode('ad')">広告に関する</button>
+    </div>
+    <div class="fg" id="inq-signage-wrap"><label>📍 サイネージ選択</label>
+      <select class="fi" id="inq-signage" onchange="_onInqSignageChange()">${signageOpts}</select>
+      <div id="inq-signage-info" style="font-size:11px;color:#888;margin-top:4px"></div>
+    </div>
+    <div class="two-col">
+      <div class="fg"><label>名前<span class="req">必須</span></label><input class="fi" id="inq-name" placeholder="山田 太郎" oninput="_setFieldErr('inq-name',false)"><div id="inq-name-err" class="input-err"></div></div>
+      <div class="fg"><label>電話番号<span class="req">必須</span></label><input class="fi" id="inq-tel" type="tel" placeholder="090-0000-0000" oninput="_setFieldErr('inq-tel',false)"><div id="inq-tel-err" class="input-err"></div></div>
+    </div>
+    <div class="fg"><label>企業名<span class="req">必須</span></label><input class="fi" id="inq-company" oninput="_setFieldErr('inq-company',false)"><div id="inq-company-err" class="input-err"></div></div>
+    <div class="fg"><label>メールアドレス<span class="req">必須</span></label><input class="fi" id="inq-email" type="email" oninput="_setFieldErr('inq-email',false)"><div id="inq-email-err" class="input-err"></div></div>
+    <div class="two-col">
+      <div class="fg"><label>希望掲載期間</label><input class="fi" id="inq-period" placeholder="例：2026年4月〜"></div>
+      <div class="fg"><label>希望掲載場所</label><input class="fi" id="inq-location" placeholder="例：名古屋市内"></div>
+    </div>
+    <div class="fg"><label>希望予算</label><input class="fi" id="inq-budget" placeholder="例：月額10万円程度"></div>
+    <div class="fg"><label>お問い合わせ種別<span class="req">必須</span></label>
+      <select class="fi" id="inq-sel">
+        <option>空き情報を知りたい</option><option>掲載期間を相談したい</option>
+        <option>料金設定を知りたい</option><option>レンタル・リースがしたい</option><option>その他</option>
+      </select>
+    </div>
+    <div class="fg"><label>その他記入（400文字まで）</label>
+      <textarea class="fi" id="inq-msg" maxlength="400" style="min-height:70px;resize:vertical"></textarea>
+    </div>
+    <input id="inq-hp" type="text" name="website" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+    <button class="btn-org" id="inq-submit-btn" onclick="submitInq()">お問い合わせを送信</button>`,null,false,true);
+  _onInqSignageChange(); // 初期表示時にサイネージ情報を更新
+}
+function _onInqSignageChange(){
+  const sel=$('inq-signage');
+  const info=$('inq-signage-info');
+  if(!sel||!info)return;
+  const id=parseInt(sel.value);
+  const s=id?find(id):null;
+  if(s){
+    const stLbl=STATUS_LBL[s.status]||s.status;
+    const planTxt=s.plans&&s.plans[0]&&s.plans[0].p?'¥'+s.plans[0].p+'/月〜':'';
+    info.innerHTML='📍 '+s.place+(s.addr?' ・ '+s.addr:'')
+      +(planTxt?' ・ '+planTxt:'')
+      +' ・ <span style="color:'+(STATUS_COLOR[s.status]||'#888')+'">● '+stLbl+'</span>';
+  }else{
+    info.textContent='';
+  }
+}
+function setInqMode(m){
+  inqMode=m;const s=$('ib-s'),a=$('ib-a'),sel=$('inq-sel');if(!s||!a||!sel)return;
+  s.classList.toggle('on',m==='signage');a.classList.toggle('on',m==='ad');
+  if(m==='ad')sel.innerHTML=['掲載できない広告内容・審査基準','広告素材の仕様・フォーマット','キャンセル・変更・トラブル対応','支払い方法・請求について','掲載までの流れ・スケジュール','その他'].map(o=>`<option>${o}</option>`).join('');
+  else sel.innerHTML=['空き情報を知りたい','掲載期間を相談したい','料金設定を知りたい','レンタル・リースがしたい','その他'].map(o=>`<option>${o}</option>`).join('');
+}
+// フィールドのエラー状態を設定・解除する汎用関数
+// show=true → 赤ボーダー＋エラーメッセージ表示、show=false → リセット
+function _setFieldErr(id,show,msg){
+  const el=$(id);if(el)el.style.borderColor=show?'#e74c3c':'';
+  const err=$(id+'-err');if(err){err.textContent=show?msg:'';err.style.display=show?'block':'none';}
+}
+function _buildInqMailBody(inqData){
+  const modeLabel=inqData.mode==='ad'?'広告に関する':'サイネージに関する';
+  const lines=[
+    '【広告ナビ お問い合わせ】',
+    '',
+    '受付日時: '+_fmtInqDate(inqData.ts),
+    '種別: '+modeLabel,
+    'サイネージ: '+(inqData.signageName||'（指定なし）'),
+    'お問い合わせ種別: '+(inqData.category||'未選択'),
+    '',
+    'お名前: '+inqData.name,
+    '企業名: '+inqData.company,
+    '電話番号: '+inqData.tel,
+    'メールアドレス: '+inqData.email
+  ];
+  if(inqData.period) lines.push('希望掲載期間: '+inqData.period);
+  if(inqData.location) lines.push('希望掲載場所: '+inqData.location);
+  if(inqData.budget) lines.push('希望予算: '+inqData.budget);
+  if(inqData.userEmail) lines.push('ログインユーザー: '+inqData.userEmail);
+  lines.push('');
+  lines.push('お問い合わせ内容:');
+  lines.push(inqData.message||'（なし）');
+  return lines.join('\n');
+}
+function _saveInquiryRecord(inqData){
+  if(window.prependKokokunaviInquiry){window.prependKokokunaviInquiry(inqData);return;}
+  try{
+    const inqs=JSON.parse(localStorage.getItem('kokoknavi_inquiries')||'[]');
+    inqs.unshift(inqData);
+    localStorage.setItem('kokoknavi_inquiries',JSON.stringify(inqs));
+  }catch(e){}
+}
+async function submitInq(){
+  // ハニーポット：BOTが自動入力した場合は無言で弾く
+  if(($('inq-hp')?.value||'')!==''){return;}
+  const name=($('inq-name')?.value||'').trim();
+  const tel=($('inq-tel')?.value||'').trim();
+  const company=($('inq-company')?.value||'').trim();
+  const email=($('inq-email')?.value||'').trim();
+  const telClean=tel.replace(/[\s\-\(\)]/g,'');
+  // 各フィールドを個別にチェックして赤表示
+  let hasErr=false;
+  if(!name){_setFieldErr('inq-name',true,'名前を入力してください');hasErr=true;}
+  if(!tel){_setFieldErr('inq-tel',true,'電話番号を入力してください');hasErr=true;}
+  else if(!/^\d{10,11}$/.test(telClean)){_setFieldErr('inq-tel',true,'正しい電話番号を入力してください（例：090-0000-0000）');hasErr=true;}
+  if(!company){_setFieldErr('inq-company',true,'企業名を入力してください');hasErr=true;}
+  if(!email){_setFieldErr('inq-email',true,'メールアドレスを入力してください');hasErr=true;}
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){_setFieldErr('inq-email',true,'正しいメールアドレスを入力してください');hasErr=true;}
+  if(hasErr)return;
+  const btn=$('inq-submit-btn');
+  if(btn&&btn.disabled)return;
+  var _cd=_checkSendCooldown('kn_cd_inq',120);
+  if(!_cd.ok){toast("送信は"+_cd.remaining+"秒後にお試しください");return;}
+  const inqData={
+    id:Date.now(),
+    ts:new Date().toISOString(),
+    mode:inqMode,
+    name:name,
+    tel:tel,
+    company:company,
+    email:email,
+    period:($('inq-period')?.value||'').trim(),
+    location:($('inq-location')?.value||'').trim(),
+    budget:($('inq-budget')?.value||'').trim(),
+    category:($('inq-sel')?.value||''),
+    message:($('inq-msg')?.value||'').trim(),
+    signageId:(function(){const v=$('inq-signage');if(v&&v.value){const s=find(parseInt(v.value));return s?s.id:null;}return cur?cur.id:null;})(),
+    signageName:(function(){const v=$('inq-signage');if(v&&v.value){const s=find(parseInt(v.value));return s?s.name:'（指定なし）';}return cur?cur.name:'（指定なし）';})(),
+    userEmail:uName||'',
+    status:'new',
+    adminMemo:''
+  };
+  if(btn){btn.disabled=true;btn.textContent='送信中...';}
+  const mailBody=_buildInqMailBody(inqData);
+  try{
+    await emailjs.send(EJ_SVC,EJ_TPL_CONTACT,{
+      to_email:SECURITY_NOTIFY_EMAIL,
+      reply_to:inqData.email,
+      from_name:inqData.name,
+      name:inqData.name,
+      company:inqData.company,
+      sender_email:inqData.email,
+      sender_phone:inqData.tel,
+      category:inqData.category,
+      signage_name:inqData.signageName,
+      subject:'【広告ナビ お問い合わせ】'+inqData.category,
+      message:mailBody,
+      body:mailBody,
+      code:mailBody
+    });
+    inqData.mailStatus='sent';
+    _saveInquiryRecord(inqData);
+    closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
+  }catch(e){
+    inqData.mailStatus='failed';
+    inqData.mailError=_errMsg(e);
+    _saveInquiryRecord(inqData);
+    localStorage.removeItem('kn_cd_inq');
+    if(btn){btn.disabled=false;btn.textContent='お問い合わせを送信';}
+    toast('メール送信に失敗しましたが、お問い合わせ履歴には保存しました');
+  }
+}
+// ===== お問い合わせ履歴 =====
+const INQ_STATUS_LBL={new:'新着',read:'確認中',replied:'対応済み'};
+const INQ_STATUS_CLS={new:'new',read:'read',replied:'replied'};
+// _getInquiries / _fmtDate → shared-data.js の _getInqs / _fmtInqDate を使用
+function showInqHistory(){
+  if(mOpen)toggleMenu();
+  const inqs=_getInqs();
+  let html='<h3>📋 お問い合わせ履歴</h3>';
+  if(!inqs.length){
+    html+='<div class="inq-empty">📭<br>お問い合わせ履歴はまだありません</div>';
+  }else{
+    html+=inqs.map((q,i)=>{
+      const stLbl=INQ_STATUS_LBL[q.status]||'新着';
+      const stCls=INQ_STATUS_CLS[q.status]||'new';
+      const modeLabel=q.mode==='ad'?'広告':'サイネージ';
+      return `<div class="inq-hist-item" onclick="showInqDetailUser(${i})">
+        <div class="inq-hist-top">
+          <span class="inq-hist-signage">${q.signageName||'（指定なし）'}</span>
+          <span class="inq-hist-date">${_fmtInqDate(q.ts)}</span>
+        </div>
+        <div class="inq-hist-bottom">
+          <span style="font-size:10px;background:#f0f0f0;color:#888;border-radius:3px;padding:1px 6px;flex-shrink:0">${modeLabel}</span>
+          <span class="inq-hist-cat">${q.category||''}</span>
+          <span class="inq-status-badge ${stCls}">${stLbl}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  openModal(html,null,false,true);
+}
+function showInqDetailUser(idx){
+  const inqs=_getInqs();
+  const q=inqs[idx];if(!q)return;
+  const stLbl=INQ_STATUS_LBL[q.status]||'新着';
+  const stCls=INQ_STATUS_CLS[q.status]||'new';
+  const modeLabel=q.mode==='ad'?'広告に関する':'サイネージに関する';
+  let html=`<h3>✉ お問い合わせ詳細</h3>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span class="inq-status-badge ${stCls}" style="font-size:12px;padding:3px 12px">${stLbl}</span>
+      <span style="font-size:12px;color:#aaa">${_fmtInqDate(q.ts)}</span>
+    </div>
+    <div style="background:#f8f8f8;border-radius:6px;padding:12px;margin-bottom:12px">
+      <div class="inq-detail-row"><span class="inq-detail-label">種別</span><span class="inq-detail-val">${modeLabel}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">サイネージ</span><span class="inq-detail-val">${q.signageName||'（指定なし）'}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">お名前</span><span class="inq-detail-val">${q.name}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">企業名</span><span class="inq-detail-val">${q.company}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">電話番号</span><span class="inq-detail-val">${q.tel}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">メール</span><span class="inq-detail-val">${q.email}</span></div>
+      <div class="inq-detail-row"><span class="inq-detail-label">問い合わせ種別</span><span class="inq-detail-val">${q.category||'—'}</span></div>
+      ${q.period?`<div class="inq-detail-row"><span class="inq-detail-label">希望掲載期間</span><span class="inq-detail-val">${q.period}</span></div>`:''}
+      ${q.location?`<div class="inq-detail-row"><span class="inq-detail-label">希望掲載場所</span><span class="inq-detail-val">${q.location}</span></div>`:''}
+      ${q.budget?`<div class="inq-detail-row"><span class="inq-detail-label">希望予算</span><span class="inq-detail-val">${q.budget}</span></div>`:''}
+      ${q.message?`<div class="inq-detail-row"><span class="inq-detail-label">メッセージ</span><span class="inq-detail-val">${q.message}</span></div>`:''}
+    </div>
+    <div class="m-close-row" style="display:flex;gap:8px">
+      <button class="btn-m-close" onclick="closeModal();showInqHistory()">← 一覧に戻る</button>
+      <button class="btn-m-close" onclick="closeModal()">閉じる</button>
+    </div>`;
+  openModal(html,null,true,true);
+}
+// ===== モーダル管理 =====
+// openModal(html, cb, noClose, noBackdrop) :
+//   ・html       : モーダル内コンテンツHTML
+//   ・cb         : モーダル表示後 60ms 後に呼ぶコールバック（グラフ描画などに使用）
+//   ・noClose    : true にすると「閉じる」ボタンを非表示
+//   ・noBackdrop : true にするとオーバーレイクリックで閉じない
+// closeModal() : #mc の innerHTML を空にするだけ。
+// $()          : document.getElementById の省略形。コード全体で多用。
+function _setHamburgerDisabled(disabled){
+  const h=$('hamburger');if(h)h.classList.toggle('disabled',disabled);
+  const m=$('menu-drawer');if(m)m.classList.toggle('disabled',disabled);
+}
+function openModal(html,cb,noClose,noBackdrop){
+  _setHamburgerDisabled(true);
+  const closeBtn=noClose?'':'<div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button></div>';
+  const backdropClick=noBackdrop?'':'onclick="if(event.target.classList.contains(\'m-overlay\'))closeModal()"';
+  $('mc').innerHTML=`<div class="m-overlay" ${backdropClick}><div class="m-box" onclick="event.stopPropagation()">${html}${closeBtn}</div></div>`;
+  if(cb)setTimeout(cb,60);
+}
+function closeModal(){$('mc').innerHTML='';_setHamburgerDisabled(false);}
+function $(id){return document.getElementById(id);}
+// toast は shared-data.js で定義
+</script>
+</body>
+</html>

@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>広告ナビ｜管理者画面</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
+<script src="shared-data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Hiragino Sans',Meiryo,sans-serif}
+:root{--org:#e8650a;--org2:#ff8c2a;--dark:#333;--gray:#888;--light:#f8f8f8;--white:#fff;--border:#e0e0e0;--adm:#1e293b;--adm2:#334155}
+body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:#f5f5f5}
+  :root{--hdr:54px}
+/* HEADER */
+#header{display:flex;align-items:center;height:52px;background:var(--adm);border-bottom:3px solid var(--org);padding:0 16px;gap:12px;z-index:1000;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#logo-wrap{display:flex;flex-direction:column;line-height:1;flex-shrink:0}
+#logo-company{font-size:9px;color:#94a3b8;letter-spacing:.5px}
+#logo-main{font-size:19px;font-weight:900;letter-spacing:-.5px}
+#logo-main .ko{color:var(--org)}
+#logo-main .ku{color:#fff}
+.adm-badge{background:var(--org);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;letter-spacing:.5px;margin-left:4px}
+#search-wrap{flex:1;display:flex;align-items:center;max-width:360px;border:1.5px solid #475569;border-radius:4px;height:32px;overflow:hidden;background:#0f172a}
+#search-wrap input{flex:1;border:none;outline:none;padding:0 10px;font-size:13px;color:#e2e8f0;background:transparent}
+#search-wrap button{background:var(--org);border:none;color:#fff;height:100%;padding:0 12px;cursor:pointer;font-size:14px}
+.hdr-btn{background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
+.hdr-btn:hover{background:#334155;color:#fff}
+.hdr-btn.active{background:var(--org);border-color:var(--org);color:#fff}
+#admin-name{color:#94a3b8;font-size:12px;white-space:nowrap}
+
+/* STATS BAR */
+#stats-bar{display:flex;gap:1px;background:#0f172a;border-bottom:1px solid #334155;flex-shrink:0;justify-content:center}
+.stat-item{flex:1;display:flex;align-items:center;gap:8px;padding:8px 16px;background:#1e293b}
+.stat-num{font-size:20px;font-weight:700}
+.stat-lbl{font-size:11px;color:#64748b}
+
+/* BODY */
+#body{display:flex;flex:1;overflow:hidden}
+#map{flex:1}
+
+/* SIDE PANEL */
+#admin-panel{position:fixed;right:0;top:var(--adm-content-top,88px);width:380px;height:calc(100vh - var(--adm-content-top,88px));background:#1e293b;border-left:1px solid #334155;z-index:2000;overflow-y:auto;transform:translateX(100%);transition:transform .28s ease;display:flex;flex-direction:column}
+#admin-panel.open{transform:translateX(0)}
+.ap-header{padding:14px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#0f172a}
+.ap-title{font-weight:700;font-size:14px;flex:1;color:#e2e8f0}
+.ap-close{background:none;border:none;color:#64748b;cursor:pointer;font-size:18px}
+.ap-body{padding:16px;flex:1;overflow-y:auto}
+.ap-section{margin-bottom:18px;border:1px solid #334155;border-radius:8px;overflow:hidden}
+.ap-sec-head{background:#0f172a;padding:8px 12px;font-size:11px;font-weight:700;color:var(--org);text-transform:uppercase;letter-spacing:.5px}
+.ap-sec-body{padding:12px}
+.fg{margin-bottom:10px}
+.fg label{font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;font-weight:600}
+.fi{width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:7px 10px;font-size:13px;color:#e2e8f0;outline:none;font-family:inherit}
+.fi:focus{border-color:var(--org)}
+.fi-small{padding:5px 8px;font-size:12px}
+.plan-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.plan-edit-row input{flex:1}
+.btn-remove-plan{background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;flex-shrink:0}
+.btn-add-plan{background:none;border:1px dashed #334155;color:#64748b;border-radius:4px;padding:5px 12px;font-size:12px;cursor:pointer;width:100%;margin-top:4px}
+.btn-add-plan:hover{border-color:var(--org);color:var(--org)}
+.status-row{display:flex;gap:6px}
+.status-btn{flex:1;padding:6px;border-radius:4px;border:1px solid #334155;font-size:11px;cursor:pointer;background:#0f172a;color:#64748b;font-weight:600;text-align:center}
+.status-btn.on.green{background:#d1fae5;color:#065f46;border-color:#10b981}
+.status-btn.on.yellow{background:#fef3c7;color:#92400e;border-color:#f59e0b}
+.status-btn.on.red{background:#fee2e2;color:#991b1b;border-color:#ef4444}
+.ap-footer{padding:12px 16px;border-top:1px solid #334155;display:flex;gap:8px;background:#0f172a;flex-shrink:0}
+.btn-save{flex:1;background:var(--org);color:#fff;border:none;border-radius:4px;padding:9px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-save:hover{background:var(--org2)}
+.btn-del-sign{padding:9px 14px;background:#7f1d1d;border:none;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:13px}
+.btn-cancel-edit{flex:0 0 70px;background:#334155;border:none;border-radius:4px;padding:9px;color:#94a3b8;cursor:pointer;font-size:13px}
+
+/* ── 写真アップロード ── */
+.photo-upload-area{border:2px dashed #334155;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .2s;background:#0f172a;position:relative}
+.photo-upload-area:hover{border-color:var(--org)}
+.photo-upload-area.dragover{border-color:var(--org);background:#1e293b}
+.photo-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-upload-hint{font-size:11px;color:#64748b;margin-top:4px}
+.photo-preview-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.photo-thumb{position:relative;width:72px;height:72px;border-radius:6px;overflow:hidden;border:1px solid #334155;flex-shrink:0}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-thumb .main-badge{position:absolute;top:2px;left:2px;background:var(--org);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px}
+.photo-thumb .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.photo-thumb .set-main-btn{position:absolute;bottom:2px;left:2px;right:2px;background:rgba(0,0,0,.7);color:#94a3b8;border:none;border-radius:3px;font-size:8px;cursor:pointer;padding:2px 0;display:none}
+.photo-thumb:hover .set-main-btn{display:block}
+.no-photo-msg{font-size:11px;color:#475569;text-align:center;padding:8px 0}
+
+/* ── 資料アップロード ── */
+.doc-upload-area{border:2px dashed #334155;border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s;background:#0f172a;position:relative}
+.doc-upload-area:hover{border-color:var(--org)}
+.doc-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.doc-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.doc-item{display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 10px}
+.doc-icon{font-size:20px;flex-shrink:0}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:12px;color:#e2e8f0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-meta{font-size:10px;color:#64748b;margin-top:1px}
+.doc-actions{display:flex;gap:4px;flex-shrink:0}
+.btn-doc-dl{background:var(--org);border:none;border-radius:3px;color:#fff;font-size:10px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+.btn-doc-dl:hover{background:var(--org2)}
+.btn-doc-del{background:#7f1d1d;border:none;border-radius:3px;color:#fca5a5;font-size:10px;padding:4px 6px;cursor:pointer}
+.no-doc-msg{font-size:11px;color:#475569;text-align:center;padding:8px 0}
+
+/* LIST PANEL */
+#list-panel{position:fixed;left:0;top:var(--adm-content-top,88px);width:300px;height:calc(100vh - var(--adm-content-top,88px));background:#1e293b;border-right:1px solid #334155;z-index:1999;overflow-y:auto;transform:translateX(-100%);transition:transform .28s ease}
+#list-panel.open{transform:translateX(0)}
+.lp-header{padding:10px 14px;border-bottom:1px solid #334155;background:#0f172a;display:flex;justify-content:space-between;align-items:center}
+.lp-header span{font-size:12px;color:#94a3b8}
+.lp-close{background:none;border:none;color:#64748b;cursor:pointer;font-size:16px}
+.list-item{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #334155;cursor:pointer;transition:background .15s}
+.list-item:hover{background:#0f172a}
+.list-item.selected{background:#0f172a;border-left:3px solid var(--org)}
+.li-thumb{width:52px;height:44px;background:#334155;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden}
+.li-thumb img{width:100%;height:100%;object-fit:cover}
+.li-body{flex:1;min-width:0}
+.li-name{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-meta{font-size:10px;color:#64748b;line-height:1.8}
+.li-price{font-size:11px;font-weight:700;color:var(--org)}
+.li-status{display:inline-block;border-radius:99px;padding:1px 7px;font-size:9px;font-weight:700}
+
+.leaflet-top.leaflet-left{top:0px!important;left:3px!important}
+.leaflet-control-zoom a{width:20px!important;height:20px!important;line-height:20px!important;font-size:14px!important;background:#1e293b!important;color:#fff!important;border-color:#334155!important}
+.leaflet-control-zoom a:hover{background:#334155!important;color:#fff!important}
+.leaflet-control-locate-adm{background:#1e293b!important;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #334155!important;transition:background .2s;text-decoration:none;color:#fff!important}
+.leaflet-control-locate-adm:hover{background:#334155!important;color:#fff!important}
+@keyframes adm-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ADD MODE */
+#add-hint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(245,158,11,.95);color:#fff;padding:10px 24px;border-radius:99px;font-size:13px;font-weight:700;z-index:3000;display:none;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+
+/* POPUP */
+.leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:0 6px 24px rgba(0,0,0,.3)!important;padding:0!important;overflow:hidden;background:#1e293b!important;border:1px solid #334155}
+.leaflet-popup-content{margin:0!important;width:260px!important}
+.leaflet-popup-tip{background:#1e293b!important}
+.pp-img{width:100%;height:100px;object-fit:cover;display:block}
+.pp-head{background:var(--org);color:#fff;padding:11px 14px;font-size:14px;font-weight:700}
+.pp-body{padding:12px 14px;background:#1e293b}
+.pp-row{display:flex;align-items:center;gap:7px;font-size:12px;color:#94a3b8;margin-bottom:6px}
+.pp-price{font-size:15px;font-weight:700;color:var(--org);margin:8px 0 10px}
+.pp-status{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}
+.btn-edit-popup{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:5px;padding:9px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-edit-popup:hover{background:var(--org2)}
+
+/* MODAL */
+.m-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:7000;display:flex;align-items:center;justify-content:center;padding:16px}
+.m-box{background:#1e293b;border:1px solid #334155;border-radius:8px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;padding:22px 20px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.m-box h3{font-size:15px;font-weight:900;color:#e2e8f0;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--org)}
+/* Excel Import */
+.btn-xl-import{background:#0f172a;border:1px solid #334155;color:#64748b;border-radius:4px;padding:7px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit}
+.btn-xl-import:hover{border-color:var(--org);color:var(--org)}
+.excel-table-wrap{overflow:auto;max-height:50vh;border:1px solid #334155;border-radius:6px}
+.excel-table-wrap table{border-collapse:collapse;font-size:12px;min-width:100%}
+.excel-table-wrap td,.excel-table-wrap th{border:1px solid #1e293b;padding:5px 10px;white-space:nowrap;color:#e2e8f0;background:#0f172a}
+.excel-table-wrap th{color:#64748b;font-weight:700;cursor:default;position:sticky;top:0;z-index:1}
+.excel-table-wrap td{cursor:pointer}
+.excel-table-wrap td:hover{background:#1e3a5f!important;color:#fff}
+.excel-cell-keyword{background:#1e3a5f!important;color:var(--org)!important;font-weight:700!important;cursor:default!important}
+.excel-cell-suggest{background:#1c2e4a!important;color:#7dd3fc!important;font-weight:700!important;outline:2px solid #3b82f6;outline-offset:-2px}
+.excel-sheet-tab{background:#334155;color:#94a3b8;border:none;border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.excel-sheet-tab.active{background:var(--org);color:#fff}
+.excel-suggest-bar{background:#1c2e4a;border:1px solid #3b82f6;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#7dd3fc;display:none;line-height:1.7}
+.excel-suggest-bar.show{display:block}
+#add-screen{position:fixed;inset:0;z-index:8000;background:#0f172a;flex-direction:column;display:none}
+#add-screen-hdr{height:52px;background:#1e293b;border-bottom:3px solid var(--org);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#add-screen-body{display:flex;flex-direction:column;flex:1;padding:16px;gap:10px;overflow:hidden}
+#adj-map{flex:1 1 0;min-height:80px;height:0!important;border-radius:6px;overflow:hidden;border:1px solid #334155}
+.m-close-row{text-align:right;margin-top:14px}
+.btn-m-close{background:#334155;color:#94a3b8;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:12px}
+
+/* TOAST */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:rgba(30,41,59,.96);color:#e2e8f0;padding:9px 20px;border-radius:20px;font-size:12px;z-index:9999;transition:all .3s;opacity:0;border:1px solid #334155;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+.two-col{display:flex;gap:10px}
+.two-col .fg{flex:1}
+
+/* LOGIN SCREEN */
+#login-screen{position:fixed;inset:0;background:#0f172a;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:24px 16px}
+#login-screen .login-box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.5);margin:auto 0}
+#login-screen .login-logo{text-align:center;margin-bottom:28px}
+#login-screen .login-logo .lg{font-size:28px;font-weight:900;letter-spacing:-.5px}
+#login-screen .login-logo .sub{font-size:11px;color:#64748b;margin-top:4px}
+#login-screen .login-title{font-size:14px;color:#94a3b8;text-align:center;margin-bottom:20px}
+#login-screen .lfi{width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-size:13px;color:#e2e8f0;outline:none;margin-bottom:12px;font-family:inherit}
+#login-screen .lfi:focus{border-color:var(--org)}
+#login-screen .btn-login{width:100%;background:var(--org);color:#fff;border:none;border-radius:6px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+#login-screen .btn-login:hover{background:var(--org2)}
+#login-screen .login-err{color:#ef4444;font-size:12px;text-align:center;margin-top:10px;min-height:18px}
+.pw-wrap{position:relative;margin-bottom:12px;display:flex;align-items:center;font-size:0;line-height:0}
+.pw-wrap .lfi{margin-bottom:0;padding-right:40px;flex:1}
+.pw-wrap .fi{padding-right:40px;flex:1}
+.pw-toggle{position:absolute;right:0;top:0;bottom:0;width:38px;display:flex;align-items:flex-start;justify-content:center;padding-top:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#64748b;line-height:1}
+.pw-toggle:hover{color:#e2e8f0}
+.fg .pw-wrap{margin-bottom:0}
+/* ── ロック画面 ── */
+#locked-screen{position:fixed;inset:0;background:#0f172a;z-index:100001;display:none;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:16px 0}
+.locked-box{background:#1e293b;border:2px solid #ef4444;border-radius:14px;padding:24px 24px;width:90%;max-width:400px;text-align:center;box-shadow:0 8px 40px rgba(239,68,68,.25);margin:auto}
+.locked-icon{font-size:36px;margin-bottom:8px;display:block;animation:shake .4s ease}
+.locked-title{font-size:17px;font-weight:900;color:#ef4444;margin-bottom:6px}
+.locked-msg{font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:16px}
+.locked-msg strong{color:#e2e8f0}
+.btn-locked-contact{display:inline-block;background:var(--org);color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;margin-bottom:8px;width:100%}
+.btn-locked-contact:hover{background:var(--org2)}
+.locked-note{font-size:10px;color:#475569;margin-top:6px}
+.locked-form{display:none;text-align:left;margin-top:10px;width:100%}
+.locked-form.open{display:block}
+.locked-form input,.locked-form textarea{width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px;padding:7px 10px;margin-bottom:6px;outline:none;font-family:inherit;resize:vertical}
+.locked-form input:focus,.locked-form textarea:focus{border-color:var(--org)}
+.locked-form textarea{min-height:60px}
+.locked-form-err{font-size:12px;color:#f87171;margin-bottom:6px;min-height:16px}
+.locked-form-ok{font-size:12px;color:#34d399;margin-bottom:6px;min-height:16px}
+.btn-locked-send{width:100%;background:var(--org);color:#fff;border:none;border-radius:6px;padding:11px;font-size:14px;font-weight:700;cursor:pointer}
+.btn-locked-send:disabled{opacity:.5;cursor:default}
+.unlock-divider{display:flex;align-items:center;gap:8px;margin:12px 0 8px;color:#334155;font-size:11px}
+.unlock-divider::before,.unlock-divider::after{content:'';flex:1;height:1px;background:#334155}
+.unlock-form{display:none;text-align:left;width:100%}
+.unlock-form.open{display:block}
+.unlock-form-row{display:flex;gap:8px}
+.unlock-form input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:13px;padding:9px 11px;outline:none;font-family:inherit;box-sizing:border-box}
+.unlock-form input:focus{border-color:#ef4444}
+.btn-unlock{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-unlock:hover{background:#dc2626}
+.unlock-err{font-size:12px;color:#f87171;margin-top:6px;min-height:16px}
+/* 解除コード入力セクション */
+#code-unlock-section{display:none;width:100%;margin-top:10px;text-align:left}
+#code-unlock-section.show{display:block}
+.code-unlock-title{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#34d399;font-size:12px;font-weight:700}
+.code-unlock-title::before,.code-unlock-title::after{content:'';flex:1;height:1px;background:#334155}
+.code-unlock-desc{font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:10px}
+.code-unlock-row{display:flex;gap:8px}
+.code-unlock-row input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:18px;font-weight:700;padding:10px 14px;outline:none;font-family:inherit;letter-spacing:6px;text-align:center;box-sizing:border-box}
+.code-unlock-row input:focus{border-color:#34d399}
+.btn-code-unlock{background:#34d399;color:#064e3b;border:none;border-radius:6px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-code-unlock:hover{background:#6ee7b7}
+.btn-code-unlock:disabled{opacity:.5;cursor:default}
+.code-unlock-err{font-size:12px;color:#f87171;margin-top:6px;min-height:16px}
+.code-unlock-ok{font-size:12px;color:#34d399;margin-top:6px;min-height:16px}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+
+/* 問い合わせ管理パネル */
+#inq-panel{position:fixed;right:0;top:var(--adm-content-top,88px);width:420px;height:calc(100vh - var(--adm-content-top,88px));background:#1e293b;border-left:1px solid #334155;z-index:2100;overflow:hidden;transform:translateX(100%);transition:transform .28s ease;display:flex;flex-direction:column}
+#inq-panel.open{transform:translateX(0)}
+.iq-header{padding:12px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;flex-shrink:0;background:#0f172a}
+.iq-title{font-weight:700;font-size:14px;flex:1;color:#e2e8f0}
+.iq-close{background:none;border:none;color:#64748b;cursor:pointer;font-size:18px}
+.iq-filter-row{display:flex;gap:4px;padding:10px 16px;border-bottom:1px solid #334155;flex-shrink:0;background:#0f172a;flex-wrap:wrap}
+.iq-filter-btn{padding:5px 12px;border:1px solid #334155;border-radius:99px;font-size:11px;cursor:pointer;background:transparent;color:#94a3b8;font-weight:600;transition:all .15s}
+.iq-filter-btn.on{background:var(--org);border-color:var(--org);color:#fff}
+.iq-filter-btn:hover{border-color:var(--org);color:var(--org)}
+.iq-filter-btn.on:hover{color:#fff}
+.iq-list{flex:1;overflow-y:auto;padding:8px}
+.iq-item{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 14px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
+.iq-item:hover{border-color:var(--org)}
+.iq-item.unread{border-left:3px solid #3b82f6}
+.iq-item-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.iq-item-name{font-size:13px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iq-item-date{font-size:10px;color:#475569;flex-shrink:0}
+.iq-item-mid{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.iq-item-signage{font-size:11px;color:#94a3b8;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iq-item-bottom{display:flex;align-items:center;gap:6px}
+.iq-item-cat{font-size:10px;color:#64748b;flex:1}
+.iq-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;flex-shrink:0}
+.iq-badge.new{background:#1e3a5f;color:#60a5fa}
+.iq-badge.read{background:#422006;color:#fbbf24}
+.iq-badge.replied{background:#052e16;color:#4ade80}
+.iq-mode-badge{font-size:9px;background:#334155;color:#94a3b8;border-radius:3px;padding:1px 6px;flex-shrink:0}
+.iq-detail-section{background:#0f172a;border:1px solid #334155;border-radius:8px;margin-bottom:10px;overflow:hidden}
+.iq-detail-head{background:#0f172a;padding:8px 12px;font-size:11px;font-weight:700;color:var(--org);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #334155}
+.iq-detail-body{padding:10px 12px}
+.iq-detail-row{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:#94a3b8;line-height:1.8;padding:3px 0;border-bottom:1px solid #1e293b}
+.iq-detail-row:last-child{border-bottom:none}
+.iq-detail-label{font-weight:600;color:#64748b;flex-shrink:0;min-width:100px}
+.iq-detail-val{flex:1;color:#e2e8f0;word-break:break-all}
+.iq-status-row{display:flex;gap:6px}
+.iq-status-btn{flex:1;padding:7px;border-radius:4px;border:1px solid #334155;font-size:11px;cursor:pointer;background:#0f172a;color:#64748b;font-weight:600;text-align:center;transition:all .15s}
+.iq-status-btn.on.blue{background:#1e3a5f;color:#60a5fa;border-color:#3b82f6}
+.iq-status-btn.on.yellow{background:#422006;color:#fbbf24;border-color:#f59e0b}
+.iq-status-btn.on.green{background:#052e16;color:#4ade80;border-color:#22c55e}
+.iq-memo-ta{width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:8px 10px;font-size:12px;color:#e2e8f0;outline:none;font-family:inherit;resize:vertical;min-height:60px}
+.iq-memo-ta:focus{border-color:var(--org)}
+.iq-footer{padding:10px 16px;border-top:1px solid #334155;display:flex;gap:8px;background:#0f172a;flex-shrink:0}
+.iq-empty{text-align:center;color:#475569;font-size:13px;padding:40px 20px}
+.iq-count-badge{background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:50%;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;margin-left:4px}
+</style>
+</head>
+<body>
+
+<!-- LOCKED SCREEN -->
+<div id="locked-screen">
+  <div class="locked-box">
+    <span class="locked-icon">🔒</span>
+    <div class="locked-title">アカウントがロックされました</div>
+    <div class="locked-msg">
+      パスワードを<strong>5回連続</strong>で間違えたため、<br>
+      セキュリティ保護のためアカウントをロックしました。<br><br>
+      ログインを再開するには<strong>サイト運営者</strong>にお問い合わせください。<br>
+      運営者がロックを解除します。
+    </div>
+    <button class="btn-locked-contact" onclick="toggleLockedForm()">✉ 運営者に問い合わせる</button>
+    <div id="locked-form" class="locked-form">
+      <input id="lc-name"  type="text"  placeholder="お名前" />
+      <input id="lc-email" type="email" placeholder="返信先メールアドレス" />
+      <textarea id="lc-msg" placeholder="お問い合わせ内容（例：ロック解除をお願いします）">ロック解除をお願いします。</textarea>
+      <div id="lc-err" class="locked-form-err"></div>
+      <div id="lc-ok"  class="locked-form-ok"></div>
+      <button id="lc-send-btn" class="btn-locked-send" onclick="sendLockedContact()">送信する</button>
+    </div>
+    <div id="code-unlock-section">
+      <div class="code-unlock-title">解除コードで解除</div>
+      <div class="code-unlock-desc">運営者から届いた<strong style="color:#34d399">6桁の解除コード</strong>を入力してください。</div>
+      <div class="code-unlock-row">
+        <input id="unlock-code-input" type="text" maxlength="6" placeholder="000000" onkeydown="if(event.key==='Enter')doCodeUnlock()" />
+        <button id="btn-code-unlock" class="btn-code-unlock" onclick="doCodeUnlock()">解除する</button>
+      </div>
+      <div id="unlock-code-err" class="code-unlock-err"></div>
+      <div id="unlock-code-ok" class="code-unlock-ok"></div>
+    </div>
+    <div class="locked-note">心当たりのない場合はセキュリティ侵害の可能性があります。至急ご連絡ください。</div>
+    <div class="unlock-divider">運営者によるロック解除</div>
+    <div id="unlock-form" class="unlock-form">
+      <div class="unlock-form-row">
+        <input id="unlock-pw" type="password" placeholder="管理者パスワード" onkeydown="if(event.key==='Enter')doUnlockAdmin()" />
+        <button class="btn-unlock" onclick="doUnlockAdmin()">解除</button>
+      </div>
+      <div id="unlock-err" class="unlock-err"></div>
+    </div>
+    <button style="background:none;border:none;color:#475569;font-size:11px;cursor:pointer;margin-top:4px;padding:4px" onclick="toggleUnlockForm(event)">▲ 運営者の方はこちら</button>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="lg"><span style="color:var(--org)">広</span><span style="color:#fff">告</span><span style="color:var(--org)">ナビ</span><span class="adm-badge" style="font-size:10px;margin-left:6px">ADMIN</span></div>
+      <div class="sub">テンフィールズファクトリー</div>
+    </div>
+    <div class="login-title">管理者アカウントでログイン</div>
+    <input class="lfi" id="login-id" type="text" placeholder="ログインID" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+    <div class="pw-wrap">
+      <input class="lfi" id="login-pw" type="password" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()">
+      <button type="button" class="pw-toggle" onclick="togglePw('login-pw',this)" tabindex="-1">👁</button>
+    </div>
+    <button class="btn-login" onclick="doLogin()">ログイン</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div id="header">
+  <div id="logo-wrap">
+    <span id="logo-company">テンフィールズファクトリー</span>
+    <div id="logo-main"><span class="ko">広</span><span class="ku">告</span><span class="ko">ナビ</span><span class="adm-badge">ADMIN</span></div>
+  </div>
+  <div id="search-wrap">
+    <input type="text" id="q" placeholder="サイネージを検索..." onkeydown="if(event.key==='Enter')doSearch()">
+    <button onclick="doSearch()">🔍</button>
+  </div>
+  <button class="hdr-btn" id="list-toggle-btn" onclick="toggleList()">📋 一覧</button>
+  <button class="hdr-btn active" id="add-mode-btn" onclick="toggleAddModal()">＋ 新規追加</button>
+  <button class="hdr-btn" onclick="confirmClearAll()" style="border-color:#ef4444;color:#ef4444">🗑 全削除</button>
+  <button class="hdr-btn" id="inq-toggle-btn" onclick="toggleInqPanel()">📩 問い合わせ<span id="inq-hdr-badge" class="iq-count-badge" style="display:none">0</span></button>
+  <span id="admin-name" style="margin-left:auto;color:#94a3b8;font-size:12px;white-space:nowrap">👤 <span id="admin-id-display"></span></span>
+  <button class="hdr-btn" onclick="showChangePwModal()" style="flex-shrink:0">🔑 PW変更</button>
+  <button class="hdr-btn" onclick="showLogoutModal()" style="border-color:#ef4444;color:#ef4444;flex-shrink:0">ログアウト</button>
+</div>
+
+<!-- STATS BAR -->
+<div id="stats-bar">
+  <div class="stat-item"><span class="stat-num" id="s-total" style="color:#e2e8f0">0</span><span class="stat-lbl">表示中のサイネージ</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-on" style="color:#10b981">0</span><span class="stat-lbl">稼働中</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-empty" style="color:#f59e0b">0</span><span class="stat-lbl">空き</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-maint" style="color:#ef4444">0</span><span class="stat-lbl">メンテ中</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-fav" style="color:#e91e63">0</span><span class="stat-lbl">お気に入り登録数</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-inq" style="color:#60a5fa">0</span><span class="stat-lbl">未読問い合わせ</span></div>
+</div>
+
+<!-- BODY -->
+<div id="body"><div id="map"></div></div>
+
+<!-- LIST PANEL -->
+<div id="list-panel">
+  <div class="lp-header"><span id="lp-count">0件</span><button class="lp-close" onclick="toggleList()">✕</button></div>
+  <div id="lp-items"></div>
+</div>
+
+<!-- ADMIN EDIT PANEL -->
+<div id="admin-panel">
+  <div class="ap-header">
+    <span class="ap-title" id="ap-title">サイネージ情報編集</span>
+    <button class="ap-close" onclick="closeAdmin()">✕</button>
+  </div>
+  <div class="ap-body" id="ap-body"></div>
+  <div class="ap-footer">
+    <button class="btn-save" onclick="saveSign()">💾 保存</button>
+    <button class="btn-cancel-edit" onclick="closeAdmin()">戻る</button>
+    <button class="btn-del-sign" onclick="deleteSign()">🗑️</button>
+  </div>
+</div>
+
+<!-- ADD SIGNAGE SCREEN -->
+<div id="add-screen">
+  <div id="add-screen-hdr">
+    <button onclick="closeAddModal()" class="hdr-btn">← 戻る</button>
+    <span style="font-size:15px;font-weight:900;color:#e2e8f0">＋ 新規サイネージ登録</span>
+  </div>
+  <div id="add-screen-body">
+    <div style="flex-shrink:0">
+      <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">住所 <span style="color:var(--org);font-size:10px">必須</span></label>
+      <div style="display:flex;gap:6px">
+        <input class="fi" id="new-addr" placeholder="例：東京都渋谷区道玄坂2-1" onkeydown="if(event.key==='Enter')geocodeAndAdd()"/>
+        <button onclick="geocodeAndAdd()" id="geo-btn" style="background:var(--org);color:#fff;border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">検索</button>
+      </div>
+    </div>
+    <p id="addr-desc" style="flex-shrink:0;font-size:12px;color:#64748b;margin:0">住所を入力するだけで地図にピンを追加できます。</p>
+    <div id="geo-result-wrap" style="display:none;flex-shrink:0;align-items:flex-start;gap:8px">
+      <div id="geo-result" style="flex:1;background:#1e293b;border-radius:6px;padding:10px 12px;font-size:12px;color:#94a3b8;border:1px solid #334155"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+        <button id="geo-confirm-btn" style="display:none;background:var(--org);color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="confirmGeoAdd()">この場所に追加 →</button>
+        <button class="btn-m-close" onclick="closeAddModal()">キャンセル</button>
+      </div>
+    </div>
+    <div id="geo-error" style="display:none;flex-shrink:0;background:#fee2e2;border-radius:6px;padding:10px 12px;font-size:12px;color:#991b1b"></div>
+    <div id="adj-map" style="display:none"></div>
+  </div>
+</div>
+
+<!-- EXCEL IMPORT MODAL -->
+<div id="excel-modal" style="display:none" class="m-overlay" onclick="closeExcelModal()">
+  <div class="m-box" style="max-width:760px;padding:20px" onclick="event.stopPropagation()">
+    <h3>📊 Excelから通行者数を読み込む</h3>
+    <div id="xl-saved-area" style="display:none;margin-bottom:14px;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;color:#94a3b8;font-weight:700">📂 保存済みExcel</span>
+        <button onclick="triggerExcelFilePicker()" style="background:var(--org);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">＋ 新しいファイルを読み込む</button>
+      </div>
+      <div id="xl-saved-list"></div>
+    </div>
+    <div id="excel-suggest-bar" class="excel-suggest-bar"></div>
+    <div id="excel-sheet-tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>
+    <p style="font-size:11px;color:#64748b;margin-bottom:8px">読み込みたい値のセルをクリックすると通行者数フィールドに入力されます。オレンジ色＝キーワード行、青色＝関連値候補</p>
+    <div id="excel-table-wrap" class="excel-table-wrap"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:space-between;align-items:center">
+      <button id="xl-save-btn" onclick="saveCurrentExcel()" style="display:none;background:#0f4c81;border:1px solid #1e40af;color:#93c5fd;border-radius:4px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:inherit">💾 このExcelを保存する</button>
+      <button onclick="closeExcelModal()" class="btn-cancel-edit" style="padding:9px 20px">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div id="changepw-modal" style="display:none" class="m-overlay">
+  <div class="m-box" style="max-width:360px" onclick="event.stopPropagation()">
+    <h3>🔑 パスワード変更</h3>
+    <div class="fg">
+      <label>現在のパスワード</label>
+      <div class="pw-wrap">
+        <input class="fi" id="cpw-current" type="password" placeholder="現在のパスワード">
+        <button type="button" class="pw-toggle" onclick="togglePw('cpw-current',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>新しいパスワード <span style="color:var(--org);font-size:10px">6文字以上</span></label>
+      <div class="pw-wrap">
+        <input class="fi" id="cpw-new" type="password" placeholder="新しいパスワード">
+        <button type="button" class="pw-toggle" onclick="togglePw('cpw-new',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>新しいパスワード（確認）</label>
+      <div class="pw-wrap">
+        <input class="fi" id="cpw-new2" type="password" placeholder="もう一度入力">
+        <button type="button" class="pw-toggle" onclick="togglePw('cpw-new2',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div id="cpw-err" style="font-size:12px;color:#ef4444;min-height:16px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeChangePwModal()" class="btn-cancel-edit" style="flex:1;padding:10px;font-size:13px">キャンセル</button>
+      <button onclick="doChangePw()" class="btn-save" style="flex:2;padding:10px;font-size:13px">変更する</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGOUT MODAL -->
+<div id="logout-modal" style="display:none" class="m-overlay">
+  <div class="m-box" style="max-width:360px;text-align:center" onclick="event.stopPropagation()">
+    <div style="font-size:48px;margin-bottom:12px">⏻</div>
+    <h3 style="text-align:center;margin-bottom:8px">ログアウト確認</h3>
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:24px">管理者画面からログアウトしますか？</p>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button onclick="hideLogoutModal()" class="btn-cancel-edit" style="flex:1;font-size:13px;padding:10px">キャンセル</button>
+      <button onclick="doLogout()" class="btn-save" style="background:#ef4444;flex:1;font-size:13px;padding:10px">ログアウト</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div id="del-modal" style="display:none" class="m-overlay">
+  <div class="m-box" style="max-width:360px;text-align:center" onclick="event.stopPropagation()">
+    <div style="font-size:48px;margin-bottom:12px">🗑️</div>
+    <h3 id="del-modal-title" style="text-align:center;margin-bottom:8px"></h3>
+    <p id="del-modal-msg" style="font-size:13px;color:#94a3b8;margin-bottom:24px"></p>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button onclick="closeDelModal()" class="btn-cancel-edit" style="flex:1;font-size:13px;padding:10px">いいえ</button>
+      <button id="del-modal-yes" class="btn-save" style="background:#ef4444;flex:1;font-size:13px;padding:10px">はい</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGOUT SCREEN -->
+<div id="logout-screen" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:100000;align-items:center;justify-content:center">
+  <div style="text-align:center">
+    <div style="font-size:28px;font-weight:900;letter-spacing:-.5px;margin-bottom:8px"><span style="color:var(--org)">広</span><span style="color:#fff">告</span><span style="color:var(--org)">ナビ</span></div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:32px">テンフィールズファクトリー</div>
+    <div style="font-size:18px;color:#e2e8f0;margin-bottom:8px">✅ ログアウトしました</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:32px">ご利用ありがとうございました。</div>
+    <button onclick="reLogin()" style="background:var(--org);color:#fff;border:none;border-radius:6px;padding:12px 32px;font-size:14px;font-weight:700;cursor:pointer">ログイン画面へ</button>
+  </div>
+</div>
+
+<div id="add-hint">🖱️ 地図上をクリックしてサイネージを追加</div>
+
+<!-- INQUIRY PANEL -->
+<div id="inq-panel">
+  <div class="iq-header">
+    <span class="iq-title" id="iq-title">📩 お問い合わせ管理</span>
+    <button class="iq-close" onclick="toggleInqPanel()">✕</button>
+  </div>
+  <div class="iq-filter-row" id="iq-filter-row">
+    <button class="iq-filter-btn on" data-filter="all" onclick="setInqFilter('all',this)">全て</button>
+    <button class="iq-filter-btn" data-filter="new" onclick="setInqFilter('new',this)">🔵 新着</button>
+    <button class="iq-filter-btn" data-filter="read" onclick="setInqFilter('read',this)">🟡 確認中</button>
+    <button class="iq-filter-btn" data-filter="replied" onclick="setInqFilter('replied',this)">🟢 対応済み</button>
+    <button class="iq-filter-btn" onclick="exportInqCSV()" style="margin-left:auto;border-color:#475569">📥 CSV</button>
+  </div>
+  <div class="iq-list" id="iq-list"></div>
+  <div class="iq-footer">
+    <span style="font-size:11px;color:#475569;flex:1" id="iq-footer-count">0件</span>
+    <button onclick="confirmClearInquiries()" style="background:#7f1d1d;border:none;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:11px;padding:5px 10px">🗑 全削除</button>
+  </div>
+</div>
+<div id="mc"></div>
+<div id="toast"></div>
+
+<script>
+// ===== セキュリティ設定（要変更） =====
+// SECURITY_NOTIFY_EMAIL / EJ_PUBLIC_KEY / EJ_SVC / EJ_TPL_CONTACT は shared-data.js で定義
+var LOGIN_MAX_FAILS = 5;
+emailjs.init({publicKey: EJ_PUBLIC_KEY});
+
+// ===== DATA =====
+var SG = window.getKokokunaviDefaultSG();
+
+// localStorageに保存済みデータがあれば読み込む（yomiはDEFAULT_SGから自動補完）
+(function(){
+  try{
+    if(!localStorage.getItem('kokoknavi_cleared_1')){localStorage.removeItem('kokoknavi_sg');localStorage.setItem('kokoknavi_cleared_1','1');}
+    var saved=localStorage.getItem('kokoknavi_sg');
+    if(saved){
+      var parsed=JSON.parse(saved);
+      if(Array.isArray(parsed)&&parsed.length){
+        var defMap={};
+        window.getKokokunaviDefaultSG().forEach(function(d){defMap[d.id]=d;});
+        parsed.forEach(function(s){
+          if(!defMap[s.id]) return;
+          if(defMap[s.id].yomi&&!s._yomiEdited) s.yomi=defMap[s.id].yomi;
+          if(!s._typeEdited) s.type=defMap[s.id].type;
+          if(!s._sizeEdited) s.size=defMap[s.id].size;
+        });
+        SG=parsed;
+        localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));
+      }
+    }
+  }catch(e){}
+})();
+
+var map, clusterGroup, markers={}, curId=null, addMode=false, listOpen=false, editingId=null;
+// 編集中の一時ストレージ
+var tmpPhotos=[]; // {id, name, isMain, _saved}
+var tmpDocs=[];   // {id, name, size, type, _saved}
+
+// ===== MAP INIT =====
+function _updateContentTop(){
+  var h=(document.getElementById('header')||{offsetHeight:52}).offsetHeight;
+  var s=(document.getElementById('stats-bar')||{offsetHeight:36}).offsetHeight;
+  document.documentElement.style.setProperty('--adm-header-h',h+'px');
+  document.documentElement.style.setProperty('--adm-content-top',(h+s)+'px');
+}
+window.onload=function(){
+  _updateContentTop();
+  document.getElementById('logo-wrap').style.cursor='pointer';
+  document.getElementById('logo-wrap').onclick=function(){
+    try{var b=clusterGroup.getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40]});}
+    catch(e){map.setView([36.5,136.5],6);}
+  };
+  map=L.map('map',{worldCopyJump:false,maxBounds:[[22,120],[50,156]],maxBoundsViscosity:1.0,minZoom:5}).setView([36.5,136.5],5);
+  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
+    attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',maxZoom:18,minZoom:5,noWrap:true
+  }).addTo(map);
+  clusterGroup=L.markerClusterGroup({
+    maxClusterRadius:60,
+    showCoverageOnHover:false,
+    iconCreateFunction:function(cluster){
+      var c=cluster.getChildCount();
+      return L.divIcon({
+        html:'<div style="position:relative;width:110px;height:118px">'
+          +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
+          +'<div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+c+'</div>'
+          +'</div>',
+        iconSize:[110,118],iconAnchor:[55,118],className:''
+      });
+    }
+  });
+  map.addLayer(clusterGroup);
+  addAdmLocateControl();
+  map.on('click',function(e){
+    if(listOpen){listOpen=false;document.getElementById('list-panel').classList.remove('open');document.getElementById('list-toggle-btn').classList.remove('active');}
+    if(!addMode) return;
+    newSignage(e.latlng.lat,e.latlng.lng);
+  });
+  map.on('moveend',updateStats);
+  map.on('zoomend',updateStats);
+
+
+  preloadMediaCache(SG,function(){
+    render(); renderList(SG);
+    try{var b=clusterGroup.getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40],maxZoom:10});}catch(e){}
+  });
+  _updateInqCount();
+};
+
+// ===== 現在地コントロール =====
+var _admLocMarker=null;
+function addAdmLocateControl(){
+  var LC=L.Control.extend({options:{position:'topleft'},onAdd:function(){
+    var container=L.DomUtil.create('div','leaflet-bar leaflet-control');
+    var btn=L.DomUtil.create('a','leaflet-control-locate-adm',container);
+    btn.title='現在地へ移動';btn.innerHTML='📍';btn.href='#';
+    btn.style.cssText='width:20px;height:20px;line-height:20px;font-size:13px;display:flex;align-items:center;justify-content:center;';
+    btn.onclick=function(e){
+      e.preventDefault();
+      btn.style.animation='adm-pulse 0.8s infinite';btn.innerHTML='⏳';
+      navigator.geolocation&&navigator.geolocation.getCurrentPosition(
+        function(p){
+          var lat=p.coords.latitude,lng=p.coords.longitude;
+          map.setView([lat,lng],16);
+          if(_admLocMarker)map.removeLayer(_admLocMarker);
+          _admLocMarker=L.marker([lat,lng],{icon:L.divIcon({
+            html:'<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 2px #3b82f6,0 2px 6px rgba(0,0,0,.5)"></div>',
+            iconSize:[16,16],iconAnchor:[8,8],className:''
+          }),zIndexOffset:1000}).addTo(map);
+          _admLocMarker.bindPopup('<div style="font-size:12px;font-weight:700;color:#3b82f6">📍 現在地</div>',{closeButton:false}).openPopup();
+          btn.style.animation='';btn.innerHTML='📍';
+          toast('現在地に移動しました');
+        },
+        function(){btn.style.animation='';btn.innerHTML='📍';toast('現在地を取得できませんでした');}
+      );
+    };
+    L.DomEvent.disableClickPropagation(container);return container;
+  }});
+  new LC().addTo(map);
+}
+
+// ===== RENDER MARKERS =====
+function render(){
+  clusterGroup.clearLayers();
+  markers={};
+  SG.forEach(function(s){
+    var m=L.marker([s.lat,s.lng],{icon:pinIcon(s)});
+    m.bindPopup(popupHtml(s),{maxWidth:280});
+    m.on('click',function(){curId=s.id;});
+    markers[s.id]=m;
+    clusterGroup.addLayer(m);
+  });
+  updateStats();
+}
+
+function popupHtml(s){
+  var stBg=STATUS_BG[s.status]||'#eee',stTc=STATUS_TC[s.status]||'#333',stLb=STATUS_LBL[s.status]||s.status;
+  var mainPhoto=s.photos&&s.photos.find(function(p){return p.isMain;});
+  var _pUrl=(mainPhoto&&photoCache[mainPhoto.id])||(s.photos&&s.photos.length&&photoCache[s.photos[0].id])||'';
+  var imgHtml=_pUrl?'<img class="pp-img" src="'+_pUrl+'" alt="写真"/>':'';
+  var _planPrice=(s.plans&&s.plans.length&&s.plans[0])?s.plans[0].p:'—';
+  return '<div>'
+    +imgHtml
+    +'<div class="pp-head">📍 '+s.name+'</div>'
+    +'<div class="pp-body">'
+    +'<span class="pp-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
+    +'<div class="pp-row">🏠 '+s.addr+'</div>'
+    +'<div class="pp-row">👟 '+s.ped+'</div>'
+    +'<div class="pp-row">🚗 '+s.trf+'</div>'
+    +'<div class="pp-price">¥'+_planPrice+'/月〜</div>'
+    +'<button class="btn-edit-popup" onclick="openAdmin('+s.id+')">✏️ 編集する</button>'
+    +'</div></div>';
+}
+
+// ===== STATS =====
+// getFavIds → shared-data.js の共通関数を使用
+function updateStats(){
+  var favIds=getFavIds();
+  var bounds=map?map.getBounds():null;
+  var visible=bounds
+    ? SG.filter(function(s){return bounds.contains([s.lat,s.lng]);})
+    : SG;
+  var on=0,em=0,mt=0,fav=0;
+  visible.forEach(function(s){
+    if(s.status==='ON') on++;
+    else if(s.status==='EMPTY') em++;
+    else if(s.status==='MAINT') mt++;
+    if(favIds.indexOf(s.id)>=0) fav++;
+  });
+  document.getElementById('s-total').textContent=visible.length;
+  document.getElementById('s-on').textContent=on;
+  document.getElementById('s-empty').textContent=em;
+  document.getElementById('s-maint').textContent=mt;
+  document.getElementById('s-fav').textContent=fav;
+}
+
+// ===== ADMIN PANEL =====
+function openAdmin(id){
+  var s=find(id); if(!s) return;
+  editingId=id;
+  // tmpコピー（保存済みフラグを付与、dataUrlはphotoCache/docCacheから参照）
+  tmpPhotos=(s.photos||[]).map(function(p){return {id:p.id,name:p.name,isMain:p.isMain,_saved:true};});
+  tmpDocs=(s.docs||[]).map(function(d){return {id:d.id,name:d.name,size:d.size,type:d.type,_saved:true};});
+
+  document.getElementById('ap-title').textContent='編集：'+s.name;
+  var body=document.getElementById('ap-body');
+  body.innerHTML='';
+
+  // 基本情報
+  body.appendChild(section('基本情報',[
+    fg('サイネージ名',inp('a-name',s.name)),
+    fg('読み（よみがな）',inp('a-yomi',s.yomi,'例：さがけん からつし からおけさいねーじ')),
+    twoCol(fg('エリア',inp('a-area',s.area)),fg('設置場所',inp('a-place',s.place))),
+    fg('住所',inp('a-addr',s.addr)),
+    (function(){
+      var sizeInput=inp('a-size',s.size);
+      sizeInput.placeholder='例：640mm×2240mm または 1.43';
+      sizeInput.addEventListener('blur',function(){
+        if(window.formatSizeFieldValue) this.value=window.formatSizeFieldValue(this.value);
+      });
+      return twoCol(fg('サイズ',sizeInput),fg('表示形式',inp('a-type',s.type)));
+    })(),
+    twoCol(fg('緯度',inp('a-lat',s.lat)),fg('経度',inp('a-lng',s.lng))),
+    fg('ターゲット',inp('a-target',s.target)),
+    (function(){
+      var wrap=document.createElement('div');wrap.className='fg';
+      var lbl=document.createElement('label');lbl.textContent='通行者数';
+      var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
+      var pedInp=inp('a-ped',s.ped);pedInp.style.flex='1';
+      var xlBtn=document.createElement('button');xlBtn.type='button';xlBtn.className='btn-xl-import';
+      xlBtn.textContent='📊 Excelから';
+      xlBtn.onclick=function(){openExcelImport('a-ped');};
+      row.appendChild(pedInp);row.appendChild(xlBtn);
+      wrap.appendChild(lbl);wrap.appendChild(row);
+      return wrap;
+    })(),
+    (function(){
+      var wrap=document.createElement('div');wrap.className='fg';
+      var lbl=document.createElement('label');lbl.textContent='交通量';
+      var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
+      var trfInp=inp('a-trf',s.trf);trfInp.style.flex='1';
+      var xlBtn=document.createElement('button');xlBtn.type='button';xlBtn.className='btn-xl-import';
+      xlBtn.textContent='📊 Excelから';
+      xlBtn.onclick=function(){openExcelImport('a-trf');};
+      row.appendChild(trfInp);row.appendChild(xlBtn);
+      wrap.appendChild(lbl);wrap.appendChild(row);
+      return wrap;
+    })(),
+  ]));
+
+  // ── 写真管理セクション ──
+  body.appendChild(section('📷 写真管理',[buildPhotoSection()]));
+
+  // ステータス
+  var stWrap=document.createElement('div');
+  stWrap.className='status-row';
+  ['ON','EMPTY','MAINT'].forEach(function(st){
+    var b=document.createElement('button');
+    b.className='status-btn'+(s.status===st?' on '+(st==='ON'?'green':st==='EMPTY'?'yellow':'red'):'');
+    b.textContent=STATUS_LBL[st];
+    b.dataset.st=st;
+    b.onclick=function(){
+      document.querySelectorAll('.status-btn').forEach(function(x){x.className='status-btn';});
+      b.className='status-btn on '+(st==='ON'?'green':st==='EMPTY'?'yellow':'red');
+    };
+    stWrap.appendChild(b);
+  });
+  body.appendChild(section('ステータス',[stWrap]));
+
+  // 掲載プラン
+  var planWrap=document.createElement('div');
+  planWrap.id='plan-rows';
+  s.plans.forEach(function(p,i){ planWrap.appendChild(planRow(p.n,p.p,i)); });
+  var addPlanBtn=document.createElement('button');
+  addPlanBtn.className='btn-add-plan';
+  addPlanBtn.textContent='＋ プランを追加';
+  addPlanBtn.onclick=function(){
+    var idx=document.querySelectorAll('#plan-rows .plan-edit-row').length;
+    document.getElementById('plan-rows').insertBefore(planRow('プラン'+String.fromCharCode(65+idx),'',idx),addPlanBtn);
+  };
+  planWrap.appendChild(addPlanBtn);
+  body.appendChild(section('掲載プラン（料金）',[planWrap]));
+
+  // ── 資料管理セクション ──
+  body.appendChild(section('📄 資料管理',[buildDocSection()]));
+
+  // お気に入り
+  var favEl=document.createElement('div');
+  favEl.style.cssText='background:#0f172a;border-radius:6px;padding:10px 12px;font-size:13px;color:#e2e8f0;display:flex;align-items:center;gap:8px';
+  var _favIds=getFavIds();
+  favEl.innerHTML='<span style="font-size:18px">❤️</span><span>お気に入り登録数：<strong style="color:#e91e63">'+(_favIds.indexOf(s.id)>=0?1:0)+'件</strong></span>';
+  body.appendChild(section('統計',[favEl]));
+
+  document.getElementById('admin-panel').classList.add('open');
+  map.setView([s.lat,s.lng],14);
+}
+
+// ===== 写真セクション構築 =====
+function buildPhotoSection(){
+  var wrap=document.createElement('div');
+
+  // アップロードエリア
+  var upArea=document.createElement('div');
+  upArea.className='photo-upload-area';
+  upArea.innerHTML='<div style="font-size:24px">🖼️</div>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-top:4px">クリックまたはドラッグで写真を追加</div>'
+    +'<div class="photo-upload-hint">JPG・PNG・GIF対応 / 複数選択可</div>';
+  var fileInput=document.createElement('input');
+  fileInput.type='file'; fileInput.id='photo-file-input'; fileInput.name='photo-file-input'; fileInput.accept='image/*'; fileInput.multiple=true;
+  fileInput.onchange=function(e){ handlePhotoFiles(e.target.files); };
+  upArea.appendChild(fileInput);
+
+  // ドラッグ&ドロップ
+  upArea.addEventListener('dragover',function(e){e.preventDefault();upArea.classList.add('dragover');});
+  upArea.addEventListener('dragleave',function(){upArea.classList.remove('dragover');});
+  upArea.addEventListener('drop',function(e){
+    e.preventDefault(); upArea.classList.remove('dragover');
+    handlePhotoFiles(e.dataTransfer.files);
+  });
+  wrap.appendChild(upArea);
+
+  // プレビュー一覧
+  var previewWrap=document.createElement('div');
+  previewWrap.className='photo-preview-wrap';
+  previewWrap.id='photo-preview-wrap';
+  wrap.appendChild(previewWrap);
+
+  refreshPhotoPreview(previewWrap);
+  return wrap;
+}
+
+function compressImage(dataUrl, cb){
+  var img=new Image();
+  img.onload=function(){
+    var maxW=1920,maxH=1080;
+    var scale=Math.min(1,maxW/img.width,maxH/img.height);
+    var cw=Math.round(img.width*scale),ch=Math.round(img.height*scale);
+    var canvas=document.createElement('canvas');
+    canvas.width=cw; canvas.height=ch;
+    canvas.getContext('2d').drawImage(img,0,0,cw,ch);
+    cb(canvas.toDataURL('image/jpeg',0.85));
+  };
+  img.src=dataUrl;
+}
+
+function handlePhotoFiles(files){
+  Array.from(files).forEach(function(file){
+    if(!file.type.startsWith('image/')) return;
+    var reader=new FileReader();
+    reader.onload=function(e){
+      compressImage(e.target.result,function(compressed){
+        var id=idbGenId();
+        idbPut('photos',id,compressed,function(){
+          photoCache[id]=compressed;
+          tmpPhotos.push({id:id,name:file.name,isMain:tmpPhotos.length===0,_saved:false});
+          refreshPhotoPreview();
+        });
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function refreshPhotoPreview(containerEl){
+  var wrap=containerEl||document.getElementById('photo-preview-wrap');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  if(tmpPhotos.length===0){
+    var msg=document.createElement('div');
+    msg.className='no-photo-msg'; msg.textContent='写真がまだ登録されていません';
+    wrap.appendChild(msg); return;
+  }
+  tmpPhotos.forEach(function(p,i){
+    var thumb=document.createElement('div');
+    thumb.className='photo-thumb';
+    var img=document.createElement('img'); img.src=photoCache[p.id]||''; img.alt=p.name||'';
+    thumb.appendChild(img);
+    if(p.isMain){
+      var badge=document.createElement('div'); badge.className='main-badge'; badge.textContent='メイン';
+      thumb.appendChild(badge);
+    }
+    // 保存済み/新規バッジ
+    var stBadge=document.createElement('div');
+    stBadge.style.cssText='position:absolute;bottom:2px;left:2px;font-size:7px;font-weight:700;padding:1px 4px;border-radius:3px;color:#fff;background:'+(p._saved?'rgba(16,185,129,.9)':'rgba(37,99,235,.9)');
+    stBadge.textContent=p._saved?'保存済':'新規';
+    thumb.appendChild(stBadge);
+    var delBtn=document.createElement('button'); delBtn.className='del-photo'; delBtn.textContent='✕';
+    delBtn.title='削除';
+    delBtn.onclick=function(e){e.stopPropagation(); tmpPhotos.splice(i,1); if(tmpPhotos.length>0&&!tmpPhotos.find(function(x){return x.isMain;})) tmpPhotos[0].isMain=true; refreshPhotoPreview();};
+    thumb.appendChild(delBtn);
+    if(!p.isMain){
+      var mainBtn=document.createElement('button'); mainBtn.className='set-main-btn'; mainBtn.textContent='メインに設定';
+      mainBtn.onclick=function(e){e.stopPropagation(); tmpPhotos.forEach(function(x){x.isMain=false;}); tmpPhotos[i].isMain=true; refreshPhotoPreview();};
+      thumb.appendChild(mainBtn);
+    }
+    wrap.appendChild(thumb);
+  });
+}
+
+// ===== 資料セクション構築 =====
+function buildDocSection(){
+  var wrap=document.createElement('div');
+
+  var upArea=document.createElement('div');
+  upArea.className='doc-upload-area';
+  upArea.innerHTML='<div style="font-size:22px">📎</div>'
+    +'<div style="font-size:12px;color:#94a3b8;margin-top:4px">クリックで資料をアップロード</div>'
+    +'<div style="font-size:10px;color:#475569;margin-top:2px">PDF・Word・Excel・画像など</div>';
+  var fileInput=document.createElement('input');
+  fileInput.type='file'; fileInput.id='doc-file-input'; fileInput.name='doc-file-input';
+  fileInput.accept='.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.zip';
+  fileInput.multiple=true;
+  fileInput.onchange=function(e){ handleDocFiles(e.target.files); };
+  upArea.appendChild(fileInput);
+  wrap.appendChild(upArea);
+
+  var listWrap=document.createElement('div');
+  listWrap.className='doc-list';
+  listWrap.id='doc-list-wrap';
+  wrap.appendChild(listWrap);
+
+  refreshDocList(listWrap);
+  return wrap;
+}
+
+function handleDocFiles(files){
+  Array.from(files).forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var id=idbGenId();
+      idbPut('docs',id,e.target.result,function(){
+        docCache[id]=e.target.result;
+        tmpDocs.push({id:id,name:file.name,size:file.size,type:file.type,_saved:false});
+        refreshDocList();
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function refreshDocList(containerEl){
+  var wrap=containerEl||document.getElementById('doc-list-wrap');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  if(tmpDocs.length===0){
+    var msg=document.createElement('div');
+    msg.className='no-doc-msg'; msg.textContent='資料がまだ登録されていません';
+    wrap.appendChild(msg); return;
+  }
+  tmpDocs.forEach(function(d,i){
+    var item=document.createElement('div');
+    item.className='doc-item';
+    var icon=docIcon(d.name,d.type);
+    var sizeTxt=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+'MB':(d.size>1024?(d.size/1024).toFixed(0)+'KB':d.size+'B');
+    item.innerHTML='<div class="doc-icon">'+icon+'</div>'
+      +'<div class="doc-info"><div class="doc-name" title="'+d.name+'">'+d.name+'</div>'
+      +'<div class="doc-meta">'+sizeTxt+'</div></div>';
+    var actions=document.createElement('div');
+    actions.className='doc-actions';
+    // ダウンロードボタン
+    var dlBtn=document.createElement('button');
+    dlBtn.className='btn-doc-dl'; dlBtn.textContent='⬇ DL';
+    dlBtn.onclick=function(e){
+      e.stopPropagation();
+      var url=docCache[d.id]||'';
+      if(!url){toast('データが見つかりません');return;}
+      var a=document.createElement('a');
+      a.href=url; a.download=d.name; a.click();
+    };
+    // 削除ボタン
+    var delBtn=document.createElement('button');
+    delBtn.className='btn-doc-del'; delBtn.textContent='🗑';
+    delBtn.onclick=function(e){e.stopPropagation(); tmpDocs.splice(i,1); refreshDocList();};
+    actions.appendChild(dlBtn); actions.appendChild(delBtn);
+    item.appendChild(actions);
+    wrap.appendChild(item);
+  });
+}
+
+function docIcon(name,type){
+  var ext=(name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf') return '📕';
+  if(['doc','docx'].includes(ext)) return '📘';
+  if(['xls','xlsx'].includes(ext)) return '📗';
+  if(['ppt','pptx'].includes(ext)) return '📙';
+  if(['jpg','jpeg','png','gif'].includes(ext)) return '🖼️';
+  if(ext==='zip') return '📦';
+  return '📄';
+}
+
+// ===== HELPER UI =====
+function planRow(name,price,idx){
+  var row=document.createElement('div'); row.className='plan-edit-row';
+  var ni=document.createElement('input'); ni.className='fi fi-small'; ni.id='plan-name-'+idx; ni.name='plan-name-'+idx; ni.autocomplete='off'; ni.placeholder='プラン名'; ni.value=name; ni.dataset.pname=idx;
+  var pi=document.createElement('input'); pi.className='fi fi-small'; pi.id='plan-price-'+idx; pi.name='plan-price-'+idx; pi.autocomplete='off'; pi.placeholder='金額（例：65,000）'; pi.value=price; pi.dataset.pprice=idx;
+  var rm=document.createElement('button'); rm.className='btn-remove-plan'; rm.textContent='✕';
+  rm.onclick=function(){row.remove();};
+  row.appendChild(ni); row.appendChild(pi); row.appendChild(rm);
+  return row;
+}
+
+function section(title,nodes){
+  var wrap=document.createElement('div'); wrap.className='ap-section';
+  var head=document.createElement('div'); head.className='ap-sec-head'; head.textContent=title;
+  var body=document.createElement('div'); body.className='ap-sec-body';
+  nodes.forEach(function(n){body.appendChild(n);});
+  wrap.appendChild(head); wrap.appendChild(body);
+  return wrap;
+}
+
+function fg(label,inputEl){
+  var wrap=document.createElement('div'); wrap.className='fg';
+  var lbl=document.createElement('label'); lbl.textContent=label;
+  wrap.appendChild(lbl); wrap.appendChild(inputEl);
+  return wrap;
+}
+
+function inp(id,val){
+  var el=document.createElement('input'); el.className='fi'; el.id=id; el.name=id; el.autocomplete='off'; el.value=val||'';
+  return el;
+}
+
+function twoCol(a,b){
+  var wrap=document.createElement('div'); wrap.className='two-col';
+  wrap.appendChild(a); wrap.appendChild(b);
+  return wrap;
+}
+
+function closeAdmin(){
+  document.getElementById('admin-panel').classList.remove('open');
+  editingId=null; tmpPhotos=[]; tmpDocs=[];
+}
+
+// ===== SAVE =====
+function saveSign(){
+  if(editingId===null) return;
+  var s=find(editingId); if(!s) return;
+  // 削除されたメディアのIDを記録（IDB削除用）
+  var _oldPhotoIds=(s.photos||[]).map(function(p){return p.id;}).filter(Boolean);
+  var _oldDocIds=(s.docs||[]).map(function(d){return d.id;}).filter(Boolean);
+
+  s.name   =gv('a-name');
+  s.yomi   =gv('a-yomi');
+  s._yomiEdited=true;
+  s.area   =gv('a-area');
+  s.place  =gv('a-place');
+  s.addr   =gv('a-addr');
+  s.size   =window.formatSizeFieldValue?window.formatSizeFieldValue(gv('a-size')):gv('a-size'); s._sizeEdited=true;
+  s.type   =gv('a-type'); s._typeEdited=true;
+  s.lat    =parseFloat(gv('a-lat'))||s.lat;
+  s.lng    =parseFloat(gv('a-lng'))||s.lng;
+  s.target =gv('a-target');
+  s.ped    =gv('a-ped');
+  s.trf    =gv('a-trf');
+  s.e      =s.e||'🏢'; // 絵文字はphotoに置き換わるが後方互換で保持
+
+  var activeBtn=document.querySelector('.status-btn.on');
+  if(activeBtn) s.status=activeBtn.dataset.st;
+
+  var rows=document.querySelectorAll('#plan-rows .plan-edit-row');
+  s.plans=[];
+  rows.forEach(function(row){
+    var ni=row.querySelector('input[data-pname]');
+    var pi=row.querySelector('input[data-pprice]');
+    if(ni&&pi&&ni.value) s.plans.push({n:ni.value,p:pi.value});
+  });
+
+  // 削除されたメディアをIDBから消去
+  var _newPhotoIds=tmpPhotos.map(function(p){return p.id;}).filter(Boolean);
+  _oldPhotoIds.forEach(function(id){if(_newPhotoIds.indexOf(id)<0){idbDelete('photos',id);delete photoCache[id];}});
+  var _newDocIds=tmpDocs.map(function(d){return d.id;}).filter(Boolean);
+  _oldDocIds.forEach(function(id){if(_newDocIds.indexOf(id)<0){idbDelete('docs',id);delete docCache[id];}});
+  // 写真・資料はIDと名前のみSGに保存（dataUrlはIDB）
+  s.photos=tmpPhotos.map(function(p){return {id:p.id,name:p.name,isMain:p.isMain};});
+  s.docs  =tmpDocs.map(function(d){return {id:d.id,name:d.name,size:d.size,type:d.type};});
+
+  render();
+  renderList(SG);
+  closeAdmin();
+  try{
+    localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));
+    localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());
+    toast('「'+s.name+'」を保存しました ✓');
+  }catch(e){
+    toast('⚠ データが大きすぎて保存できませんでした。写真を減らしてください。');
+  }
+}
+
+// ===== DELETE =====
+function closeDelModal(){
+  var m=document.getElementById('del-modal');
+  if(m) m.style.display='none';
+}
+function deleteSign(){
+  if(editingId===null) return;
+  var s=find(editingId); if(!s) return;
+  var name=s.name;
+  // Step 1
+  document.getElementById('del-modal-title').textContent='「'+name+'」を削除しますか？';
+  document.getElementById('del-modal-msg').textContent='この操作は元に戻せません。';
+  document.getElementById('del-modal-yes').onclick=function(){
+    // Step 2
+    document.getElementById('del-modal-title').textContent='本当に良いですか？';
+    document.getElementById('del-modal-msg').textContent='「'+name+'」を完全に削除します。';
+    document.getElementById('del-modal-yes').onclick=function(){
+      closeDelModal();
+      var toDelete=find(editingId);
+      if(toDelete){
+        (toDelete.photos||[]).forEach(function(p){if(p.id){idbDelete('photos',p.id);delete photoCache[p.id];}});
+        (toDelete.docs||[]).forEach(function(d){if(d.id){idbDelete('docs',d.id);delete docCache[d.id];}});
+      }
+      SG=SG.filter(function(x){return x.id!==editingId;});
+      render(); renderList(SG); closeAdmin();
+      try{ localStorage.setItem('kokoknavi_sg',JSON.stringify(SG)); localStorage.setItem('kokoknavi_sg_ts',Date.now().toString()); }catch(e){}
+      toast('削除しました');
+    };
+  };
+  document.getElementById('del-modal').style.display='flex';
+}
+
+// ===== CLEAR ALL =====
+function confirmClearAll(){
+  if(!SG.length){toast('ピンはありません');return;}
+  if(!confirm('全てのピン（'+SG.length+'件）を削除しますか？\nこの操作は元に戻せません。')) return;
+  idbClearStore('photos',function(){photoCache={};});
+  idbClearStore('docs',function(){docCache={};});
+  SG=[];
+  try{localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());}catch(e){}
+  render(); renderList(SG);
+  toast('全ピンを削除しました');
+}
+
+// ===== SHARED HELPERS =====
+function showCenteredFlex(el){
+  el.style.display='flex';el.style.flexDirection='column';
+  el.style.alignItems='center';el.style.justifyContent='center';
+}
+function resetLoginForm(){
+  document.getElementById('login-id').value='';
+  document.getElementById('login-pw').value='';
+  document.getElementById('login-err').textContent='';
+}
+function cleanupMapMarkers(){
+  if(adjustMap){adjustMap.remove();adjustMap=null;adjustMarker=null;}
+  if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+}
+function resetGeoUI(){
+  document.getElementById('geo-result-wrap').style.display='none';
+  document.getElementById('geo-error').style.display='none';
+  document.getElementById('geo-confirm-btn').style.display='none';
+  var d=document.getElementById('addr-desc');if(d)d.style.display='';
+}
+function setAddModalExpanded(expanded){
+  document.querySelector('#add-modal .add-signage-modal').classList.toggle('expanded',!!expanded);
+}
+
+// ===== ADD MODAL =====
+var geoLat=null,geoLng=null;
+var previewMarker=null; // メインマップ上の仮置きピン
+function toggleAddModal(){
+  document.getElementById('add-screen').style.display='flex';
+  document.getElementById('new-addr').value='';
+  resetGeoUI();
+  geoLat=null; geoLng=null;
+  if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+  setTimeout(function(){document.getElementById('new-addr').focus();},100);
+}
+function closeAddModal(){
+  document.getElementById('add-screen').style.display='none';
+  document.getElementById('adj-map').style.display='none';
+  cleanupMapMarkers();
+}
+
+var adjustMap=null,adjustMarker=null;
+
+// 住所正規化：全角→半角・丁目/番/号を数字区切りに統一
+function normalizeJpAddr(addr){
+  return addr
+    .replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
+    .replace(/[ー－—−‐]/g,'-')
+    .replace(/（[^）]*）|\([^)]*\)/g,'')   // カッコ内除去
+    .replace(/([0-9]+)\s*丁目\s*/g,'$1-')
+    .replace(/([0-9]+)\s*番地?\s*/g,'$1-')
+    .replace(/([0-9]+)\s*号\s*/g,'$1')
+    .replace(/-+$/,'')
+    .replace(/[　 ]+/g,'')
+    .trim();
+}
+
+
+function geocodeByLatLng(){
+  var lat=parseFloat(document.getElementById('new-lat').value);
+  var lng=parseFloat(document.getElementById('new-lng').value);
+  if(isNaN(lat)||isNaN(lng)||lat<24||lat>46||lng<122||lng>154){
+    toast('有効な緯度・経度を入力してください（日本国内：緯度24〜46、経度122〜154）');
+    return;
+  }
+  geoLat=lat; geoLng=lng;
+  showAdjustMap('📍 緯度: '+lat.toFixed(6)+' / 経度: '+lng.toFixed(6),true,17);
+}
+
+function geocodeAndAdd(){
+  var rawAddr=document.getElementById('new-addr').value.trim();
+  if(!rawAddr){toast('住所を入力してください');return;}
+  var btn=document.getElementById('geo-btn');
+  btn.textContent='検索中...'; btn.disabled=true;
+  resetGeoUI();
+
+  var addr=normalizeJpAddr(rawAddr);
+
+  // 住所の精度を判定する関数（数字マッチ＋漢字かな語マッチの複合スコア）
+  function scorePrecision(title, input){
+    var t=(title||'').replace(/[\s　]/g,'');
+    var i=(input||'').replace(/[\s　]/g,'');
+    // 数字マッチ（番地・丁目）
+    var nums=i.match(/[0-9]+/g)||[];
+    var numScore=nums.length===0?0.5:(nums.filter(function(n){return t.indexOf(n)>=0;}).length/nums.length);
+    // 漢字・かな語マッチ（都道府県・市区町村・町名）
+    var words=(i.match(/[\u3041-\u9fff\u4e00-\u9fff]{2,}/g)||[]);
+    var wordScore=words.length===0?0.5:(words.filter(function(w){return t.indexOf(w)>=0;}).length/words.length);
+    return numScore*0.65+wordScore*0.35;
+  }
+
+  // ① GSI API：正規化済みアドレスで検索（最大10件取得して最良を選択）
+  function tryGSI(q, fallback){
+    var url='https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(q);
+    fetch(url)
+      .then(function(r){return r.json();})
+      .then(function(data){
+        if(!data||data.length===0){fallback();return;}
+        // 番地の数字が一致するものを優先
+        var scored=data.map(function(d){
+          return {d:d, score:scorePrecision(d.properties.title||'', q)};
+        });
+        scored.sort(function(a,b){return b.score-a.score;});
+        var best=scored[0].d;
+        var score=scored[0].score;
+        geoLng=parseFloat(best.geometry.coordinates[0]);
+        geoLat=parseFloat(best.geometry.coordinates[1]);
+        var title=best.properties.title||q;
+        var src=best.properties.dataSource||'';
+        btn.textContent='検索'; btn.disabled=false;
+        // スコア0.8以上＝番地レベル精度
+        if(score>=0.8){
+          showAdjustMap('📍 '+title+(src?' ['+src+']':''),false,18);
+        } else if(score>=0.4){
+          showAdjustMap('📍 '+title+' (番地を確認してください)',true,16);
+        } else {
+          showAdjustMap('📍 「'+title+'」周辺。ピンをドラッグして調整してください。',true,14);
+        }
+      })
+      .catch(function(){fallback();});
+  }
+
+  // ② GSI：丁目までで再検索（番地が取れなかった場合）
+  function tryGSIChome(){
+    var chomeMatch=addr.match(/^(.+?[0-9]+-[0-9]+)/);
+    var shorter=chomeMatch?chomeMatch[1]:addr.replace(/-[^-]*$/,'');
+    if(shorter&&shorter!==addr){
+      tryGSI(shorter, tryNominatim);
+    } else {
+      tryNominatim();
+    }
+  }
+
+  // ③ Nominatim 構造化クエリ（GSIで取れない施設名・ビル名など）
+  function tryNominatim(){
+    // 都道府県・市区町村・それ以降を分割して構造化クエリに変換
+    var m=addr.match(/^(.{2,4}[都道府県])(.{2,10}?[市区町村郡])(.*)$/);
+    var url;
+    if(m){
+      url='https://nominatim.openstreetmap.org/search?format=json'
+        +'&state='+encodeURIComponent(m[1])
+        +'&city='+encodeURIComponent(m[2])
+        +'&street='+encodeURIComponent(m[3]||'')
+        +'&countrycodes=jp&limit=5&accept-language=ja&addressdetails=1';
+    } else {
+      url='https://nominatim.openstreetmap.org/search?format=json'
+        +'&q='+encodeURIComponent(addr)
+        +'&countrycodes=jp&limit=5&accept-language=ja&addressdetails=1';
+    }
+    fetch(url)
+      .then(function(r){return r.json();})
+      .then(function(data){
+        btn.textContent='検索'; btn.disabled=false;
+        if(!data||data.length===0){tryNominatimCity();return;}
+        data.sort(function(a,b){return (b.importance||0)-(a.importance||0);});
+        geoLat=parseFloat(data[0].lat); geoLng=parseFloat(data[0].lon);
+        showAdjustMap('📍 '+data[0].display_name,true,15);
+      })
+      .catch(function(){btn.textContent='検索';btn.disabled=false;
+        showAdjustMap('⚠️ 通信エラー。ピンをドラッグして調整してください。',true,8);});
+  }
+
+  // ④ 最終手段：市区町村レベルで表示
+  function tryNominatimCity(){
+    var cityMatch=addr.match(/^(.{2,4}[都道府県].{1,10}[市区町村])/);
+    if(!cityMatch){
+      showAdjustMap('⚠️ 住所が特定できませんでした。ピンをドラッグして調整してください。',true,8);
+      return;
+    }
+    var url='https://nominatim.openstreetmap.org/search?format=json&q='
+      +encodeURIComponent(cityMatch[1])+'&countrycodes=jp&limit=1&accept-language=ja';
+    fetch(url)
+      .then(function(r){return r.json();})
+      .then(function(data){
+        if(data&&data.length>0){
+          geoLat=parseFloat(data[0].lat); geoLng=parseFloat(data[0].lon);
+          showAdjustMap('📍 「'+cityMatch[1]+'」周辺。ピンをドラッグして正確な位置に調整してください。',true,13);
+        } else {
+          showAdjustMap('⚠️ 住所が特定できませんでした。ピンをドラッグして調整してください。',true,8);
+        }
+      })
+      .catch(function(){
+        showAdjustMap('⚠️ 住所が特定できませんでした。ピンをドラッグして調整してください。',true,8);
+      });
+  }
+
+  // rawAddrを先に試す（正規化前の入力の方が精度が高い場合がある）
+  if(rawAddr !== addr){
+    tryGSI(rawAddr, function(){ tryGSI(addr, tryGSIChome); });
+  } else {
+    tryGSI(addr, tryGSIChome);
+  }
+}
+
+function showAdjustMap(msg,needsAdjust,zoom){
+  var z=zoom||(needsAdjust?10:16);
+  var d=document.getElementById('addr-desc');if(d)d.style.display='none';
+  var res=document.getElementById('geo-result');
+  res.innerHTML='<div style="margin-bottom:8px">'+msg+'</div>'
+    +'<div style="font-size:11px;color:'+(needsAdjust?'#f59e0b':'#10b981')+';margin-bottom:4px">'
+    +(needsAdjust?'⚠️ 下の地図でピン（🔶）をドラッグして位置を調整してください':'✅ 下の地図でピン（🔶）をドラッグして微調整もできます')+'</div>'
+    +'<div style="font-size:11px;color:#475569" id="adj-latlng">緯度: '+geoLat.toFixed(6)+' / 経度: '+geoLng.toFixed(6)+'</div>';
+  document.getElementById('geo-result-wrap').style.display='flex';
+  document.getElementById('geo-confirm-btn').style.display='inline-block';
+
+  // 古いadjMapを破棄
+  cleanupMapMarkers();
+
+  // モーダル内ミニマップを表示
+  var adjMapEl=document.getElementById('adj-map');
+  adjMapEl.style.display='block';
+  setTimeout(function(){
+    adjustMap=L.map('adj-map',{zoomControl:true,attributionControl:false}).setView([geoLat,geoLng],z);
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
+      attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',maxZoom:18,noWrap:true
+    }).addTo(adjustMap);
+    var previewIcon=L.divIcon({
+      html:'<div style="width:32px;height:32px;background:#f59e0b;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
+      iconSize:[32,32],iconAnchor:[16,32],className:''
+    });
+    adjustMarker=L.marker([geoLat,geoLng],{draggable:true,icon:previewIcon}).addTo(adjustMap);
+    function _updateAdjPos(latlng){
+      geoLat=latlng.lat; geoLng=latlng.lng;
+      var el=document.getElementById('adj-latlng');
+      if(el) el.textContent='緯度: '+geoLat.toFixed(6)+' / 経度: '+geoLng.toFixed(6);
+    }
+    adjustMarker.on('drag',function(){ _updateAdjPos(adjustMarker.getLatLng()); });
+    adjustMap.on('click',function(e){
+      adjustMarker.setLatLng(e.latlng);
+      _updateAdjPos(e.latlng);
+    });
+    adjustMap.invalidateSize();
+    setTimeout(function(){adjustMap.invalidateSize();},150);
+  },60);
+}
+
+function confirmGeoAdd(){
+  if(geoLat===null||geoLng===null) return;
+  var addr=document.getElementById('new-addr').value.trim();
+  document.getElementById('add-screen').style.display='none';
+  document.getElementById('adj-map').style.display='none';
+  cleanupMapMarkers();
+  newSignage(geoLat,geoLng,addr);
+}
+
+function toggleAddMode(){
+  addMode=!addMode;
+  var btn=document.getElementById('add-mode-btn');
+  var hint=document.getElementById('add-hint');
+  if(addMode){btn.textContent='✕ キャンセル';btn.style.background='#f59e0b';hint.style.display='block';map.getContainer().style.cursor='crosshair';}
+  else{btn.textContent='＋ 新規追加';btn.style.background='';hint.style.display='none';map.getContainer().style.cursor='';}
+}
+
+function newSignage(lat,lng,addr){
+  var id=Date.now();
+  var _prefM=(addr||'').match(/^(.{2,4}[都道府県])/);
+  SG.push({id:id,name:'新規サイネージ',lat:lat,lng:lng,
+    area:'',place:_prefM?_prefM[1]:'',target:'',addr:addr||'',size:'',type:'デジタル',
+    ped:'',trf:'',status:'EMPTY',favCount:0,
+    plans:[{n:'プランA',p:''}],e:'📺',photos:[],docs:[]});
+  if(addMode) toggleAddMode();
+  render(); renderList(SG); openAdmin(id);
+  toast('地図にピンを追加しました。情報を入力してください。');
+}
+
+// ===== LIST =====
+function toggleList(){
+  listOpen=!listOpen;
+  document.getElementById('list-panel').classList.toggle('open',listOpen);
+  document.getElementById('list-toggle-btn').classList.toggle('active',listOpen);
+}
+
+function renderList(items){
+  document.getElementById('lp-count').textContent=items.length+'件';
+  var html=items.map(function(s){
+    var stBg=STATUS_BG[s.status]||'#eee',stTc=STATUS_TC[s.status]||'#333',stLb=STATUS_LBL[s.status]||s.status;
+    var mainPhoto=s.photos&&s.photos.find(function(p){return p.isMain;});
+    var _tUrl=(mainPhoto&&photoCache[mainPhoto.id])||(s.photos&&s.photos.length&&photoCache[s.photos[0].id])||'';
+    var thumbContent=_tUrl
+      ?'<img src="'+_tUrl+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:4px">'
+      :'<span style="font-size:22px">'+s.e+'</span>';
+    var _lPlanPrice=(s.plans&&s.plans.length&&s.plans[0])?s.plans[0].p:'—';
+    return '<div class="list-item" id="li-'+s.id+'" onclick="openAdmin('+s.id+')">'
+      +'<div class="li-thumb">'+thumbContent+'</div>'
+      +'<div class="li-body">'
+      +'<div class="li-name">'+s.name+'</div>'
+      +'<div class="li-meta">📍 '+s.place+' &nbsp; 👟 '+s.ped+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:2px">'
+      +'<span class="li-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
+      +'<span class="li-price">¥'+_lPlanPrice+'/月〜</span>'
+      +'</div></div></div>';
+  }).join('');
+  document.getElementById('lp-items').innerHTML=html;
+}
+
+// ===== SEARCH =====
+// _nrmS / _romajiToHira / find / gv は shared-data.js で定義
+function doSearch(){
+  var raw=document.getElementById('q').value.trim();
+  if(!raw){renderList(SG);return;}
+  var forms=_queryForms(raw);
+  var hit=function(s){return forms.some(function(q){return _nrmS(s).includes(q);});};
+  var res=SG.filter(function(s){
+    return hit(s.name)||hit(s.yomi||'')||hit(s.area||'')||hit(s.place||'')||hit(s.addr||'');
+  });
+  renderList(res);
+  if(!listOpen) toggleList();
+  toast(res.length+'件見つかりました');
+}
+// ===== LOGIN =====
+
+// 保存済みハッシュ取得（未設定なら初期パスワードadmin1234のハッシュを生成して保存）
+async function getAdminPwHash(){
+  var stored=localStorage.getItem('kokoknavi_admin_pw_hash');
+  // 旧SHA-256形式（$argon2id$で始まらない）はリセット
+  if(!stored||!stored.startsWith('$argon2id$')){
+    try{
+      stored=await hashPw('admin1234');
+      localStorage.setItem('kokoknavi_admin_pw_hash',stored);
+    }catch(e){
+      console.error('Argon2 hash error:',e);
+      throw new Error('パスワードハッシュの生成に失敗しました');
+    }
+  }
+  return stored;
+}
+
+// ロック画面を表示
+function showLockedScreen(){
+  document.getElementById('login-screen').style.display='none';
+  var ls=document.getElementById('locked-screen');
+  ls.style.display='flex';
+}
+
+// 問い合わせフォームの開閉
+function toggleLockedForm(){
+  var form=document.getElementById('locked-form');
+  form.classList.toggle('open');
+}
+
+// ロック解除問い合わせをEmailJSで送信（解除コード付き）
+function sendLockedContact(){
+  var name=document.getElementById('lc-name').value.trim();
+  var email=document.getElementById('lc-email').value.trim();
+  var msg=document.getElementById('lc-msg').value.trim();
+  var errEl=document.getElementById('lc-err');
+  var okEl=document.getElementById('lc-ok');
+  var btn=document.getElementById('lc-send-btn');
+  errEl.textContent=''; okEl.textContent='';
+  if(!name){errEl.textContent='お名前を入力してください';return;}
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){errEl.textContent='正しいメールアドレスを入力してください';return;}
+  if(!msg){errEl.textContent='お問い合わせ内容を入力してください';return;}
+  // 6桁の解除コードを生成して保存
+  var unlockCode=String(Math.floor(100000+Math.random()*900000));
+  var mailBody='【ロック解除依頼】\n\n'
+    +'お名前: '+name+'\n'
+    +'返信先: '+email+'\n\n'
+    +msg+'\n\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'🔑 ロック解除コード: '+unlockCode+'\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+    +'上記の解除コードをこの方（'+email+'）にお伝えください。\n'
+    +'解除コードを入力するとロックが自動解除され、\n'
+    +'解除完了のメールが自動送信されます。';
+  localStorage.setItem('kokoknavi_unlock_code',unlockCode);
+  localStorage.setItem('kokoknavi_unlock_email',email);
+  btn.disabled=true; btn.textContent='送信中…';
+  emailjs.send(EJ_SVC, EJ_TPL_AUTH, {
+    to_email: SECURITY_NOTIFY_EMAIL,
+    reply_to: email,
+    from_name: name,
+    name: name,
+    email: email,
+    subject: '【広告ナビ】ロック解除依頼',
+    message: mailBody,
+    body: mailBody,
+    code: mailBody
+  }).then(function(){
+    okEl.textContent='✅ 送信しました。運営者から解除コードが届くまでお待ちください。';
+    btn.textContent='送信済み';
+    // 解除コード入力欄を表示
+    document.getElementById('code-unlock-section').classList.add('show');
+  }).catch(function(e){
+    errEl.textContent='送信に失敗しました。時間をおいて再度お試しください。';
+    btn.disabled=false; btn.textContent='送信する';
+    localStorage.removeItem('kokoknavi_unlock_code');
+    localStorage.removeItem('kokoknavi_unlock_email');
+    console.warn('問い合わせ送信失敗:',e);
+  });
+}
+
+// 解除コード入力によるロック解除
+async function doCodeUnlock(){
+  var inputCode=document.getElementById('unlock-code-input').value.trim();
+  var errEl=document.getElementById('unlock-code-err');
+  var okEl=document.getElementById('unlock-code-ok');
+  var btn=document.getElementById('btn-code-unlock');
+  errEl.textContent=''; okEl.textContent='';
+  if(!inputCode){errEl.textContent='解除コードを入力してください';return;}
+  var storedCode=localStorage.getItem('kokoknavi_unlock_code');
+  if(!storedCode||inputCode!==storedCode){
+    errEl.textContent='解除コードが正しくありません';
+    document.getElementById('unlock-code-input').value='';
+    return;
+  }
+  btn.disabled=true; btn.textContent='解除中…';
+  // ロック解除
+  localStorage.removeItem('kokoknavi_admin_locked');
+  localStorage.removeItem('kokoknavi_admin_fail_count');
+  localStorage.removeItem('kokoknavi_unlock_code');
+  localStorage.removeItem('kokoknavi_unlock_email');
+  okEl.textContent='✅ ロックを解除しました';
+  toast('✅ ロックを解除しました');
+  // 2秒後にログイン画面へ
+  setTimeout(function(){
+    document.getElementById('locked-screen').style.display='none';
+    showCenteredFlex(document.getElementById('login-screen'));
+    resetLoginForm();
+  },2000);
+}
+
+// 運営者解除フォームの開閉
+function toggleUnlockForm(e){
+  var form=document.getElementById('unlock-form');
+  var btn=e?e.target:null;
+  var isOpen=form.classList.toggle('open');
+  btn.textContent=isOpen?'▼ 運営者の方はこちら':'▲ 運営者の方はこちら';
+  if(isOpen) setTimeout(function(){document.getElementById('unlock-pw').focus();},50);
+}
+
+// 管理者パスワードで認証してロック解除
+async function doUnlockAdmin(){
+  var pw=document.getElementById('unlock-pw').value;
+  var errEl=document.getElementById('unlock-err');
+  errEl.textContent='';
+  if(!pw){errEl.textContent='パスワードを入力してください';return;}
+  var stored=await getAdminPwHash();
+  if(!await verifyPw(pw,stored)){errEl.textContent='パスワードが正しくありません';document.getElementById('unlock-pw').value='';return;}
+  localStorage.removeItem('kokoknavi_admin_locked');
+  localStorage.removeItem('kokoknavi_admin_fail_count');
+  toast('✅ ロックを解除しました');
+  document.getElementById('locked-screen').style.display='none';
+  showCenteredFlex(document.getElementById('login-screen'));
+  resetLoginForm();
+}
+
+// ログイン時に既にロック中かチェック（ページ読み込み時）
+document.addEventListener('DOMContentLoaded',function(){
+  if(localStorage.getItem('kokoknavi_admin_locked')==='1'){
+    showLockedScreen();
+    // 以前に発行済みの解除コードがあれば入力欄を表示
+    if(localStorage.getItem('kokoknavi_unlock_code')){
+      document.getElementById('code-unlock-section').classList.add('show');
+    }
+  }
+});
+
+async function doLogin(){
+  // ロック中は即ロック画面
+  if(localStorage.getItem('kokoknavi_admin_locked')==='1'){showLockedScreen();return;}
+
+  var id=document.getElementById('login-id').value.trim();
+  var pw=document.getElementById('login-pw').value;
+  var err=document.getElementById('login-err');
+  if(!id||!pw){err.textContent='IDとパスワードを入力してください';return;}
+  try{
+  var storedHash=await getAdminPwHash();
+  if(id==='admin' && await verifyPw(pw,storedHash)){
+    // 成功 → 失敗カウントリセット
+    localStorage.removeItem('kokoknavi_admin_fail_count');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-id-display').textContent=id;
+    err.textContent='';
+  } else {
+    // 失敗カウントを更新
+    var fails=parseInt(localStorage.getItem('kokoknavi_admin_fail_count')||'0')+1;
+    localStorage.setItem('kokoknavi_admin_fail_count',String(fails));
+    var remaining=LOGIN_MAX_FAILS-fails;
+    if(fails>=LOGIN_MAX_FAILS){
+      // ロック発動
+      localStorage.setItem('kokoknavi_admin_locked','1');
+      showLockedScreen();
+    } else {
+      err.textContent='IDまたはパスワードが違います（あと'+remaining+'回で自動ロック）';
+      document.getElementById('login-pw').value='';
+    }
+  }
+  }catch(e){err.textContent='認証処理でエラーが発生しました。ページを再読み込みしてください。';console.error('doLogin error:',e);}
+}
+
+// ===== CHANGE PASSWORD =====
+function showChangePwModal(){
+  document.getElementById('cpw-current').value='';
+  document.getElementById('cpw-new').value='';
+  document.getElementById('cpw-new2').value='';
+  document.getElementById('cpw-err').textContent='';
+  document.getElementById('changepw-modal').style.display='flex';
+}
+function closeChangePwModal(){
+  document.getElementById('changepw-modal').style.display='none';
+}
+async function doChangePw(){
+  var cur=document.getElementById('cpw-current').value;
+  var nw=document.getElementById('cpw-new').value;
+  var nw2=document.getElementById('cpw-new2').value;
+  var errEl=document.getElementById('cpw-err');
+  if(!cur||!nw||!nw2){errEl.textContent='すべての項目を入力してください';return;}
+  if(nw.length<6){errEl.textContent='新しいパスワードは6文字以上にしてください';return;}
+  if(nw!==nw2){errEl.textContent='新しいパスワードが一致しません';return;}
+  if(cur===nw){errEl.textContent='現在と同じパスワードには変更できません';return;}
+  var jst=new Date(Date.now()+9*60*60*1000);
+  var today=jst.toISOString().slice(0,10);
+  if(localStorage.getItem('kokoknavi_admin_pw_changed_date')===today){errEl.textContent='本日はすでにパスワードを変更済みです（1日1回まで）';return;}
+  var storedHash=await getAdminPwHash();
+  if(!await verifyPw(cur,storedHash)){errEl.textContent='現在のパスワードが正しくありません';return;}
+  var newHash=await hashPw(nw);
+  localStorage.setItem('kokoknavi_admin_pw_hash',newHash);
+  localStorage.setItem('kokoknavi_admin_pw_changed_date',today);
+  closeChangePwModal();
+  toast('✅ パスワードを変更しました');
+}
+
+// 広告ナビでお気に入り変更があったらステータスバーをリアルタイム更新
+window.addEventListener('storage',function(e){
+  if(e.key==='kokoknavi_favs') updateStats();
+  if(e.key==='kokoknavi_inquiries'){
+    _updateInqCount();
+    if(_inqPanelOpen) renderInqList();
+  }
+});
+
+// ===== お問い合わせ管理 =====
+var _inqPanelOpen=false;
+var _inqFilter='all';
+var _inqDetailId=null; // 詳細表示中のIDまたはnull
+var INQ_ST_LBL={new:'新着',read:'確認中',replied:'対応済み'};
+var INQ_ST_CLS={new:'new',read:'read',replied:'replied'};
+
+// _getInqs / _fmtInqDate → shared-data.js の共通関数を使用
+function _saveInqs(arr){
+  if(window.setKokokunaviInquiries){window.setKokokunaviInquiries(arr);return;}
+  try{localStorage.setItem('kokoknavi_inquiries',JSON.stringify(arr));}catch(e){}
+}
+
+function _updateInqCount(){
+  var inqs=_getInqs();
+  var newCount=inqs.filter(function(q){return q.status==='new';}).length;
+  var badge=document.getElementById('inq-hdr-badge');
+  var statEl=document.getElementById('s-inq');
+  if(badge){badge.textContent=newCount;badge.style.display=newCount>0?'inline-flex':'none';}
+  if(statEl) statEl.textContent=newCount;
+}
+
+function toggleInqPanel(){
+  _inqPanelOpen=!_inqPanelOpen;
+  var panel=document.getElementById('inq-panel');
+  var btn=document.getElementById('inq-toggle-btn');
+  if(_inqPanelOpen){
+    // 管理者編集パネルが開いていたら閉じる
+    document.getElementById('admin-panel').classList.remove('open');
+    panel.classList.add('open');
+    if(btn)btn.classList.add('active');
+    _inqDetailId=null;
+    renderInqList();
+  }else{
+    panel.classList.remove('open');
+    if(btn)btn.classList.remove('active');
+  }
+}
+
+function setInqFilter(f,btnEl){
+  _inqFilter=f;
+  document.querySelectorAll('#iq-filter-row .iq-filter-btn[data-filter]').forEach(function(b){
+    b.classList.toggle('on',b.dataset.filter===f);
+  });
+  _inqDetailId=null;
+  renderInqList();
+}
+
+function renderInqList(){
+  var inqs=_getInqs();
+  var filtered=_inqFilter==='all'?inqs:inqs.filter(function(q){return q.status===_inqFilter;});
+  var list=document.getElementById('iq-list');
+  var footer=document.getElementById('iq-footer-count');
+  var title=document.getElementById('iq-title');
+
+  // 詳細表示モードならば詳細を表示
+  if(_inqDetailId!==null){
+    var q=inqs.find(function(x){return x.id===_inqDetailId;});
+    if(q){
+      _renderInqDetail(q, list);
+      if(footer) footer.textContent='';
+      if(title) title.textContent='📩 お問い合わせ詳細';
+      return;
+    }
+    _inqDetailId=null;
+  }
+
+  if(title) title.textContent='📩 お問い合わせ管理';
+  if(footer) footer.textContent=filtered.length+'件'+(inqs.length!==filtered.length?' / 全'+inqs.length+'件':'');
+
+  if(!filtered.length){
+    list.innerHTML='<div class="iq-empty">📭<br>お問い合わせはありません</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(function(q){
+    var stLbl=INQ_ST_LBL[q.status]||'新着';
+    var stCls=INQ_ST_CLS[q.status]||'new';
+    var modeLabel=q.mode==='ad'?'広告':'サイネージ';
+    var isUnread=q.status==='new'?' unread':'';
+    return '<div class="iq-item'+isUnread+'" onclick="openInqDetail('+q.id+')">' +
+      '<div class="iq-item-top">' +
+        '<span class="iq-item-name">'+q.name+' / '+q.company+'</span>' +
+        '<span class="iq-item-date">'+_fmtInqDate(q.ts)+'</span>' +
+      '</div>' +
+      '<div class="iq-item-mid">' +
+        '<span class="iq-mode-badge">'+modeLabel+'</span>' +
+        '<span class="iq-item-signage">'+(q.signageName||'（指定なし）')+'</span>' +
+      '</div>' +
+      '<div class="iq-item-bottom">' +
+        '<span class="iq-item-cat">'+q.category+'</span>' +
+        '<span class="iq-badge '+stCls+'">'+stLbl+'</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  list.scrollTop=0;
+}
+
+function openInqDetail(id){
+  _inqDetailId=id;
+  renderInqList();
+}
+
+function _renderInqDetail(q, container){
+  var stLbl=INQ_ST_LBL[q.status]||'新着';
+  var stCls=INQ_ST_CLS[q.status]||'new';
+  var modeLabel=q.mode==='ad'?'広告に関する':'サイネージに関する';
+  var html='<div style="padding:12px">';
+  // 戻るボタン
+  html+='<button onclick="_inqDetailId=null;renderInqList()" style="background:none;border:none;color:var(--org);cursor:pointer;font-size:13px;font-weight:700;margin-bottom:12px;padding:0">◀ 一覧に戻る</button>';
+  // ステータスバッジと日時
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+    '<span class="iq-badge '+stCls+'" style="font-size:11px;padding:3px 10px">'+stLbl+'</span>' +
+    '<span style="font-size:11px;color:#475569">'+_fmtInqDate(q.ts)+'</span>' +
+  '</div>';
+  // 基本情報
+  html+='<div class="iq-detail-section">' +
+    '<div class="iq-detail-head">送信者情報</div>' +
+    '<div class="iq-detail-body">' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">お名前</span><span class="iq-detail-val">'+q.name+'</span></div>' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">企業名</span><span class="iq-detail-val">'+q.company+'</span></div>' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">電話番号</span><span class="iq-detail-val"><a href="tel:'+q.tel+'" style="color:var(--org)">'+q.tel+'</a></span></div>' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">メール</span><span class="iq-detail-val"><a href="mailto:'+q.email+'" style="color:var(--org)">'+q.email+'</a></span></div>' +
+      (q.userEmail?'<div class="iq-detail-row"><span class="iq-detail-label">ログインID</span><span class="iq-detail-val">'+q.userEmail+'</span></div>':'') +
+    '</div></div>';
+  // 問い合わせ内容
+  html+='<div class="iq-detail-section">' +
+    '<div class="iq-detail-head">問い合わせ内容</div>' +
+    '<div class="iq-detail-body">' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">種別</span><span class="iq-detail-val">'+modeLabel+'</span></div>' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">サイネージ</span><span class="iq-detail-val">'+(q.signageName||'（指定なし）')+'</span></div>' +
+      '<div class="iq-detail-row"><span class="iq-detail-label">お問い合わせ種別</span><span class="iq-detail-val">'+q.category+'</span></div>' +
+      (q.period?'<div class="iq-detail-row"><span class="iq-detail-label">希望掲載期間</span><span class="iq-detail-val">'+q.period+'</span></div>':'') +
+      (q.location?'<div class="iq-detail-row"><span class="iq-detail-label">希望掲載場所</span><span class="iq-detail-val">'+q.location+'</span></div>':'') +
+      (q.budget?'<div class="iq-detail-row"><span class="iq-detail-label">希望予算</span><span class="iq-detail-val">'+q.budget+'</span></div>':'') +
+      (q.message?'<div class="iq-detail-row"><span class="iq-detail-label">メッセージ</span><span class="iq-detail-val" style="white-space:pre-wrap">'+q.message+'</span></div>':'') +
+    '</div></div>';
+  // ステータス変更
+  html+='<div class="iq-detail-section">' +
+    '<div class="iq-detail-head">ステータス変更</div>' +
+    '<div class="iq-detail-body">' +
+      '<div class="iq-status-row">';
+  ['new','read','replied'].forEach(function(st){
+    var isOn=q.status===st;
+    var color=st==='new'?'blue':st==='read'?'yellow':'green';
+    html+='<button class="iq-status-btn'+(isOn?' on '+color:'')+'" onclick="changeInqStatus('+q.id+',\''+st+'\')">'+INQ_ST_LBL[st]+'</button>';
+  });
+  html+='</div></div></div>';
+  // 管理者メモ
+  html+='<div class="iq-detail-section">' +
+    '<div class="iq-detail-head">📝 管理者メモ</div>' +
+    '<div class="iq-detail-body">' +
+      '<textarea class="iq-memo-ta" id="iq-memo-ta" placeholder="対応状況や備考をメモ...">'+(q.adminMemo||'')+'</textarea>' +
+      '<button onclick="saveInqMemo('+q.id+')" style="margin-top:6px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:700">💾 メモを保存</button>' +
+    '</div></div>';
+  // 削除ボタン
+  html+='<button onclick="deleteInquiry('+q.id+')" style="margin-top:8px;width:100%;background:#7f1d1d;border:none;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:12px;padding:8px;font-weight:600">🗑 この問い合わせを削除</button>';
+  html+='</div>';
+  container.innerHTML=html;
+  container.scrollTop=0;
+}
+
+function changeInqStatus(id,status){
+  var inqs=_getInqs();
+  var found=false;
+  inqs.forEach(function(q){if(q.id===id){q.status=status;found=true;}});
+  if(!found)return;
+  _saveInqs(inqs);
+  _updateInqCount();
+  renderInqList();
+  toast('ステータスを「'+INQ_ST_LBL[status]+'」に変更しました');
+}
+
+function saveInqMemo(id){
+  var memo=document.getElementById('iq-memo-ta');
+  if(!memo)return;
+  var inqs=_getInqs();
+  inqs.forEach(function(q){if(q.id===id) q.adminMemo=memo.value;});
+  _saveInqs(inqs);
+  toast('メモを保存しました');
+}
+
+function deleteInquiry(id){
+  if(!confirm('この問い合わせを削除しますか？'))return;
+  var inqs=_getInqs().filter(function(q){return q.id!==id;});
+  _saveInqs(inqs);
+  _inqDetailId=null;
+  _updateInqCount();
+  renderInqList();
+  toast('問い合わせを削除しました');
+}
+
+function confirmClearInquiries(){
+  var inqs=_getInqs();
+  if(!inqs.length){toast('問い合わせはありません');return;}
+  if(!confirm('全ての問い合わせ（'+inqs.length+'件）を削除しますか？\nこの操作は元に戻せません。'))return;
+  _saveInqs([]);
+  _inqDetailId=null;
+  _updateInqCount();
+  renderInqList();
+  toast('全ての問い合わせを削除しました');
+}
+
+function exportInqCSV(){
+  var inqs=_getInqs();
+  if(!inqs.length){toast('エクスポートするデータがありません');return;}
+  var headers=['ID','送信日時','種別','ステータス','名前','企業名','電話番号','メール','サイネージ','問い合わせ種別','希望掲載期間','希望掲載場所','希望予算','メッセージ','管理者メモ'];
+  var rows=[headers.join(',')];
+  inqs.forEach(function(q){
+    var row=[
+      q.id,
+      _fmtInqDate(q.ts),
+      q.mode==='ad'?'広告':'サイネージ',
+      INQ_ST_LBL[q.status]||'新着',
+      '"'+(q.name||'').replace(/"/g,'""')+'"',
+      '"'+(q.company||'').replace(/"/g,'""')+'"',
+      q.tel||'',
+      q.email||'',
+      '"'+(q.signageName||'').replace(/"/g,'""')+'"',
+      '"'+(q.category||'').replace(/"/g,'""')+'"',
+      '"'+(q.period||'').replace(/"/g,'""')+'"',
+      '"'+(q.location||'').replace(/"/g,'""')+'"',
+      '"'+(q.budget||'').replace(/"/g,'""')+'"',
+      '"'+(q.message||'').replace(/"/g,'""')+'"',
+      '"'+(q.adminMemo||'').replace(/"/g,'""')+'"'
+    ];
+    rows.push(row.join(','));
+  });
+  var bom='\uFEFF';
+  var blob=new Blob([bom+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='inquiries_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSVをエクスポートしました');
+}
+
+// ===== EXCEL IMPORT =====
+var _excelWB=null;
+var _excelTargetId=null;
+var _xlSavedMeta=[];
+
+function _xlLoadMeta(){try{_xlSavedMeta=JSON.parse(localStorage.getItem('kokoknavi_xl_files')||'[]');}catch(e){_xlSavedMeta=[];}}
+function _xlSaveMeta(){try{localStorage.setItem('kokoknavi_xl_files',JSON.stringify(_xlSavedMeta));}catch(e){}}
+
+function _xlFieldLabel(fieldId){return fieldId==='a-trf'?'交通量':'通行者数';}
+
+function openExcelImport(fieldId){
+  _excelTargetId=fieldId;
+  var label=_xlFieldLabel(fieldId);
+  document.querySelector('#excel-modal h3').textContent='📊 Excelから'+label+'を読み込む';
+  document.querySelector('#excel-modal p').textContent='読み込みたい値のセルをクリックすると'+label+'フィールドに入力されます。オレンジ色＝キーワード行、青色＝関連値候補';
+  _xlLoadMeta();
+  if(_xlSavedMeta.length>0){
+    _excelWB=null;
+    document.getElementById('excel-suggest-bar').className='excel-suggest-bar';
+    document.getElementById('excel-sheet-tabs').innerHTML='';
+    document.getElementById('excel-table-wrap').innerHTML='<p style="color:#64748b;padding:16px;text-align:center">左上の保存済みExcelを選ぶか、新しいファイルを読み込んでください</p>';
+    document.getElementById('xl-save-btn').style.display='none';
+    _renderXlSavedArea();
+    document.getElementById('excel-modal').style.display='flex';
+  }else{
+    document.getElementById('xl-saved-area').style.display='none';
+    triggerExcelFilePicker();
+  }
+}
+
+function triggerExcelFilePicker(){
+  var fi=document.createElement('input');
+  fi.type='file';fi.accept='.xlsx,.xls,.csv,.ods';
+  fi.onchange=function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var buf=ev.target.result;
+        var data=new Uint8Array(buf);
+        _excelWB=XLSX.read(data,{type:'array'});
+        _excelWB._rawData=buf;
+        _excelWB._fileName=file.name;
+        document.getElementById('xl-saved-area').style.display='none';
+        renderExcelModal(_excelWB.SheetNames[0]);
+        var sb=document.getElementById('xl-save-btn');
+        sb.style.display='';sb.textContent='💾 このExcelを保存する';sb.disabled=false;
+        document.getElementById('excel-modal').style.display='flex';
+      }catch(err){
+        toast('ファイルの読み込みに失敗しました');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  fi.click();
+}
+
+function _renderXlSavedArea(){
+  var area=document.getElementById('xl-saved-area');
+  if(!_xlSavedMeta.length){area.style.display='none';return;}
+  area.style.display='';
+  var list=document.getElementById('xl-saved-list');
+  list.innerHTML='';
+  _xlSavedMeta.forEach(function(meta){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1e293b;';
+    var nameBtn=document.createElement('button');
+    nameBtn.textContent='📗 '+meta.name;
+    nameBtn.style.cssText='flex:1;text-align:left;background:none;border:none;color:#7dd3fc;cursor:pointer;font-size:12px;padding:2px 4px;border-radius:3px;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    nameBtn.onmouseover=function(){this.style.background='#1e3a5f';};
+    nameBtn.onmouseout=function(){this.style.background='none';};
+    nameBtn.onclick=function(){loadSavedExcel(meta.id);};
+    var dateSpan=document.createElement('span');
+    dateSpan.style.cssText='font-size:10px;color:#475569;white-space:nowrap;flex-shrink:0;';
+    dateSpan.textContent=new Date(meta.savedAt).toLocaleDateString('ja-JP');
+    var delBtn=document.createElement('button');
+    delBtn.textContent='✕';delBtn.title='削除';
+    delBtn.style.cssText='background:#7f1d1d;border:none;color:#fca5a5;border-radius:3px;padding:2px 6px;cursor:pointer;font-size:11px;flex-shrink:0;font-family:inherit;';
+    delBtn.onclick=function(e){e.stopPropagation();deleteSavedExcel(meta.id);};
+    row.appendChild(nameBtn);row.appendChild(dateSpan);row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+}
+
+function loadSavedExcel(id){
+  idbGet('xl_files',id,function(err,buf){
+    if(err||!buf){toast('読み込みに失敗しました');return;}
+    try{
+      var data=new Uint8Array(buf);
+      _excelWB=XLSX.read(data,{type:'array'});
+      var meta=_xlSavedMeta.find(function(m){return m.id===id;});
+      _excelWB._rawData=buf;
+      _excelWB._fileName=meta?meta.name:'';
+      document.getElementById('xl-saved-area').style.display='none';
+      document.getElementById('xl-save-btn').style.display='none';
+      renderExcelModal(_excelWB.SheetNames[0]);
+    }catch(e2){toast('ファイルの読み込みに失敗しました');}
+  });
+}
+
+function saveCurrentExcel(){
+  if(!_excelWB||!_excelWB._rawData){toast('保存するデータがありません');return;}
+  var id='xl_'+Date.now();
+  var name=_excelWB._fileName||'不明なExcel';
+  var btn=document.getElementById('xl-save-btn');
+  btn.disabled=true;btn.textContent='保存中…';
+  idbPut('xl_files',id,_excelWB._rawData,function(err){
+    if(err){toast('保存に失敗しました');btn.disabled=false;btn.textContent='💾 このExcelを保存する';return;}
+    _xlLoadMeta();
+    _xlSavedMeta.unshift({id:id,name:name,savedAt:Date.now()});
+    _xlSaveMeta();
+    btn.style.display='none';
+    toast('「'+name+'」を保存しました ✓');
+  });
+}
+
+function deleteSavedExcel(id){
+  idbDelete('xl_files',id,function(){
+    _xlLoadMeta();
+    _xlSavedMeta=_xlSavedMeta.filter(function(m){return m.id!==id;});
+    _xlSaveMeta();
+    _renderXlSavedArea();
+    toast('削除しました');
+  });
+}
+
+function renderExcelModal(sheetName){
+  var wb=_excelWB;
+  sheetName=sheetName||wb.SheetNames[0];
+
+  // シートタブ
+  var tabsEl=document.getElementById('excel-sheet-tabs');
+  tabsEl.innerHTML='';
+  wb.SheetNames.forEach(function(name){
+    var tab=document.createElement('button');
+    tab.textContent=name;
+    tab.className='excel-sheet-tab'+(name===sheetName?' active':'');
+    tab.onclick=function(){renderExcelModal(name);};
+    tabsEl.appendChild(tab);
+  });
+
+  var ws=wb.Sheets[sheetName];
+  if(!ws||!ws['!ref']){
+    document.getElementById('excel-table-wrap').innerHTML='<p style="color:#64748b;padding:16px;text-align:center">データがありません</p>';
+    document.getElementById('excel-suggest-bar').className='excel-suggest-bar';
+    return;
+  }
+
+  var range=XLSX.utils.decode_range(ws['!ref']);
+  var maxR=Math.min(range.e.r,range.s.r+99);
+  var maxC=Math.min(range.e.c,range.s.c+29);
+
+  // フィールドに応じたキーワードパターンで関連セルを候補として特定
+  var _kwRe=_excelTargetId==='a-trf'?/交通|車|traffic|trf|台数/i:/通行|歩行者|ped/i;
+  var suggestedAddrs={};
+  var suggestValues=[];
+  for(var R=range.s.r;R<=maxR;R++){
+    for(var C=range.s.c;C<=maxC;C++){
+      var addr=XLSX.utils.encode_cell({r:R,c:C});
+      var cell=ws[addr];
+      if(cell&&typeof cell.v==='string'&&_kwRe.test(cell.v)){
+        var rAddr=XLSX.utils.encode_cell({r:R,c:C+1});
+        if(ws[rAddr]&&ws[rAddr].v!==''&&ws[rAddr].v!==undefined){
+          suggestedAddrs[rAddr]=true;
+          suggestValues.push(String(ws[rAddr].w!==undefined?ws[rAddr].w:ws[rAddr].v));
+        }
+        var dAddr=XLSX.utils.encode_cell({r:R+1,c:C});
+        if(ws[dAddr]&&ws[dAddr].v!==''&&ws[dAddr].v!==undefined){
+          suggestedAddrs[dAddr]=true;
+          suggestValues.push(String(ws[dAddr].w!==undefined?ws[dAddr].w:ws[dAddr].v));
+        }
+      }
+    }
+  }
+
+  // サジェストバー
+  var sugBar=document.getElementById('excel-suggest-bar');
+  if(suggestValues.length>0){
+    var unique=[...new Set(suggestValues)];
+    sugBar.innerHTML='💡 「'+_xlFieldLabel(_excelTargetId)+'」に関連すると思われる値: '
+      +unique.map(function(v){
+        var sv=v.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return '<strong style="color:#fff;margin-right:6px;cursor:pointer;text-decoration:underline" onclick="document.getElementById(\''+_excelTargetId+'\').value=\''+sv+'\';closeExcelModal();">'+v+'</strong>';
+      }).join('');
+    sugBar.className='excel-suggest-bar show';
+  }else{
+    sugBar.className='excel-suggest-bar';
+  }
+
+  // テーブル描画
+  var table=document.createElement('table');
+  var thead=document.createElement('thead');
+  var htr=document.createElement('tr');
+  var thRn=document.createElement('th');thRn.textContent='';htr.appendChild(thRn);
+  for(var CC=range.s.c;CC<=maxC;CC++){
+    var th=document.createElement('th');
+    th.textContent=XLSX.utils.encode_col(CC);
+    htr.appendChild(th);
+  }
+  thead.appendChild(htr);table.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+  for(var RI=range.s.r;RI<=maxR;RI++){
+    var tr=document.createElement('tr');
+    var rn=document.createElement('td');
+    rn.textContent=RI+1;rn.style.cssText='color:#475569;cursor:default;text-align:center;min-width:28px;font-size:11px';
+    tr.appendChild(rn);
+    for(var CI=range.s.c;CI<=maxC;CI++){
+      var a2=XLSX.utils.encode_cell({r:RI,c:CI});
+      var c2=ws[a2];
+      var val=c2?(c2.w!==undefined?c2.w:String(c2.v)):'';
+      var td=document.createElement('td');
+      td.textContent=val;
+      var isKw=typeof val==='string'&&_kwRe.test(val);
+      var isSug=!!suggestedAddrs[a2];
+      if(isKw){td.className='excel-cell-keyword';}
+      else if(isSug){td.className='excel-cell-suggest';}
+      if(val!==''&&!isKw){
+        (function(v,tid){
+          td.onclick=function(){
+            var el=document.getElementById(tid);
+            if(el)el.value=v;
+            closeExcelModal();
+          };
+        })(val,_excelTargetId);
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+
+  var wrap=document.getElementById('excel-table-wrap');
+  wrap.innerHTML='';wrap.appendChild(table);
+}
+
+function closeExcelModal(){
+  document.getElementById('excel-modal').style.display='none';
+  document.getElementById('xl-saved-area').style.display='none';
+  document.getElementById('xl-save-btn').style.display='none';
+  _excelWB=null;
+}
+
+// ===== LOGOUT =====
+function showLogoutModal(){
+  document.getElementById('logout-modal').style.display='flex';
+}
+function hideLogoutModal(){
+  document.getElementById('logout-modal').style.display='none';
+}
+function doLogout(){
+  document.getElementById('logout-modal').style.display='none';
+  showCenteredFlex(document.getElementById('logout-screen'));
+}
+function reLogin(){
+  document.getElementById('logout-screen').style.display='none';
+  if(localStorage.getItem('kokoknavi_admin_locked')==='1'){showLockedScreen();return;}
+  showCenteredFlex(document.getElementById('login-screen'));
+  resetLoginForm();
+}
+</script>
+</body>
+</html>
