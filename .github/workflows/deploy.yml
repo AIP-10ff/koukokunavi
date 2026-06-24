@@ -1,23 +1,37 @@
-name: EC2デプロイ
+name: GitHub Pagesデプロイ
 
 on:
   push:
     branches:
       - main
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: コードをチェックアウト
         uses: actions/checkout@v4
 
-      - name: EC2にデプロイ
-        uses: appleboy/scp-action@v0.1.7
+      - name: GitHub Pages設定
+        uses: actions/configure-pages@v4
+
+      - name: adsフォルダをアップロード
+        uses: actions/upload-pages-artifact@v3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "ads/*"
-          target: "/var/www/html/"
-          strip_components: 1
+          path: 'ads/'
+
+      - name: デプロイ実行
+        id: deployment
+        uses: actions/deploy-pages@v4
