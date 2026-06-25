@@ -709,6 +709,38 @@ document.addEventListener('visibilitychange', function(){
   _reloadSgFromStorage(true);
 });
 
+// ===== 交通量・通行量データの自動取得（全訪問者向け） =====
+// 管理者の同期に依存せず、各訪問者のブラウザが公開スプレッドシート（読み取り専用）
+// から直接、地点ごとの最新の通行量(人)・交通量(車)を取得してピンへ反映する。
+// 表示用に ped/trf のみマージし、他のサイネージ情報は壊さない。
+let _trafficViewerTimer=null;
+function _loadTrafficForViewer(){
+  if(typeof fetchTrafficDaily!=='function') return;        // shared-data.js 未読込なら何もしない
+  if(location.protocol==='file:') return;                  // file:// はCORSで取得不可
+  const id=localStorage.getItem('kn_traffic_sheet_id')||TRAFFIC_SHEET_ID_DEFAULT;
+  const name=localStorage.getItem('kn_traffic_sheet_name')||'';
+  let mapObj={}; try{mapObj=JSON.parse(localStorage.getItem('kn_traffic_map')||'{}')||{};}catch(e){}
+  fetchTrafficDaily(id,name).then(function(recs){
+    let changed=0;
+    recs.forEach(function(rec){
+      const sg=trafficMatchSignage(rec, SG, mapObj);
+      if(!sg) return;
+      if(rec.ped!=='' && sg.ped!==rec.ped){ sg.ped=rec.ped; changed++; }
+      if(rec.trf!=='' && sg.trf!==rec.trf){ sg.trf=rec.trf; changed++; }
+    });
+    if(changed && map){
+      putMarkers(SG); // ピン（人/車アイコン・ポップアップ）を再描画
+      if(cur && $('detail-panel').classList.contains('open')){
+        const u=SG.find(x=>x.id===cur.id); if(u) openDetail(u.id);
+      }
+    }
+  }).catch(function(){ /* 取得失敗時は静かにスキップ（既存表示のまま） */ });
+  // 提供側の更新間隔(30分)に合わせて定期再取得（ページを開いている間）
+  if(!_trafficViewerTimer){
+    _trafficViewerTimer=setInterval(_loadTrafficForViewer, 30*60*1000);
+  }
+}
+
 // ===== メール認証（EmailJS） =====
 // EJ_PUBLIC_KEY / EJ_SVC / EJ_TPL_AUTH は shared-data.js で定義
 emailjs.init({publicKey:EJ_PUBLIC_KEY});
@@ -864,6 +896,7 @@ function initMap(lat,lng){
   });
   map.addLayer(clusterGroup);
   putMarkers(SG);
+  _loadTrafficForViewer(); // 公開スプレッドシートから最新の通行量・交通量を取得して反映
   addLocateControl();
   addFacilityControl();
   facilityLayer=L.markerClusterGroup({

@@ -537,6 +537,28 @@ function trafficHaversineKm(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// 1地点の最新行 → SG配列内の対応サイネージを解決
+// 優先順: 手動マップ(mapObj[地点名]=id) → 地点名一致(正規化) → 緯度経度50m以内
+// admin/user 両画面共用。見つからなければ null。
+function trafficMatchSignage(rec, sgList, mapObj){
+  if(!sgList||!sgList.length) return null;
+  mapObj=mapObj||{};
+  if(mapObj[rec.loc]!=null){
+    var wantId=Number(mapObj[rec.loc]);
+    for(var k=0;k<sgList.length;k++){ if(sgList[k].id===wantId) return sgList[k]; }
+  }
+  var key=_nrmS(rec.loc).replace(/\s/g,'');
+  for(var i=0;i<sgList.length;i++){ if(_nrmS(sgList[i].name).replace(/\s/g,'')===key) return sgList[i]; }
+  if(rec.lat!=null&&rec.lng!=null&&!isNaN(rec.lat)&&!isNaN(rec.lng)){
+    for(var j=0;j<sgList.length;j++){
+      if(sgList[j].lat==null||sgList[j].lng==null) continue;
+      if(trafficHaversineKm(rec.lat,rec.lng,sgList[j].lat,sgList[j].lng)<=0.05) return sgList[j];
+    }
+  }
+  return null;
+}
+window.trafficMatchSignage=trafficMatchSignage;
+
 // IDBからキャッシュ読み込み + 旧localStorage形式を自動移行
 // sg: SGデータ配列（各ページのSGをそのまま渡す）
 function preloadMediaCache(sg,cb){
