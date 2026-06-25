@@ -343,8 +343,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <div class="lg"><span style="color:var(--org)">広</span><span style="color:#fff">告</span><span style="color:var(--org)">ナビ</span><span class="adm-badge" style="font-size:10px;margin-left:6px">ADMIN</span></div>
       <div class="sub">テンフィールズファクトリー</div>
     </div>
-    <div class="login-title">管理者アカウントでログイン</div>
-    <input class="lfi" id="login-id" type="text" placeholder="ログインID" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+    <div class="login-title">管理者パスワードでログイン</div>
     <div class="pw-wrap">
       <input class="lfi" id="login-pw" type="password" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()">
       <button type="button" class="pw-toggle" onclick="togglePw('login-pw',this)" tabindex="-1">👁</button>
@@ -1165,7 +1164,6 @@ function showCenteredFlex(el){
   el.style.alignItems='center';el.style.justifyContent='center';
 }
 function resetLoginForm(){
-  document.getElementById('login-id').value='';
   document.getElementById('login-pw').value='';
   document.getElementById('login-err').textContent='';
 }
@@ -1620,17 +1618,16 @@ async function doLogin(){
   // ロック中は即ロック画面
   if(localStorage.getItem('kokoknavi_admin_locked')==='1'){showLockedScreen();return;}
 
-  var id=document.getElementById('login-id').value.trim();
   var pw=document.getElementById('login-pw').value;
   var err=document.getElementById('login-err');
-  if(!id||!pw){err.textContent='IDとパスワードを入力してください';return;}
+  if(!pw){err.textContent='パスワードを入力してください';return;}
   try{
   var storedHash=await getAdminPwHash();
-  if(id==='admin' && await verifyPw(pw,storedHash)){
+  if(await verifyPw(pw,storedHash)){
     // 成功 → 失敗カウントリセット
     localStorage.removeItem('kokoknavi_admin_fail_count');
     document.getElementById('login-screen').style.display='none';
-    document.getElementById('admin-id-display').textContent=id;
+    document.getElementById('admin-id-display').textContent='管理者';
     err.textContent='';
   } else {
     // 失敗カウントを更新
@@ -1642,7 +1639,7 @@ async function doLogin(){
       localStorage.setItem('kokoknavi_admin_locked','1');
       showLockedScreen();
     } else {
-      err.textContent='IDまたはパスワードが違います（あと'+remaining+'回で自動ロック）';
+      err.textContent='パスワードが違います（あと'+remaining+'回で自動ロック）';
       document.getElementById('login-pw').value='';
     }
   }
