@@ -1256,6 +1256,13 @@ async function trafficSyncNow(){
   _tfSaveConfig();
   var id=_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT), name=_tfGet(TF_LS.name,'');
   var res=document.getElementById('tf-result');
+  if(location.protocol==='file:'){
+    res.innerHTML='<div style="color:#ef4444;line-height:1.8">⚠ ファイルを直接開いている（file://）ため、ブラウザのCORS制限でスプレッドシートを読み取れません。<br>'
+      +'次のいずれかのURLで開いてください:<br>'
+      +'① ローカルサーバー： <b>http://localhost:8777/admin.html</b>（同梱の「ローカルテスト起動.bat」をダブルクリック）<br>'
+      +'② 公開サイト： <b>https://app.signage-ad.com/admin.html</b>（デプロイ後）</div>';
+    return;
+  }
   res.innerHTML='<div style="color:#94a3b8">⏳ 取得中…</div>';
   try{
     var recs=await fetchTrafficDaily(id,name);
