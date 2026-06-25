@@ -716,7 +716,6 @@ document.addEventListener('visibilitychange', function(){
 let _trafficViewerTimer=null;
 function _loadTrafficForViewer(){
   if(typeof fetchTrafficDaily!=='function') return;        // shared-data.js 未読込なら何もしない
-  if(location.protocol==='file:') return;                  // file:// はCORSで取得不可
   const id=localStorage.getItem('kn_traffic_sheet_id')||TRAFFIC_SHEET_ID_DEFAULT;
   const name=localStorage.getItem('kn_traffic_sheet_name')||'';
   let mapObj={}; try{mapObj=JSON.parse(localStorage.getItem('kn_traffic_map')||'{}')||{};}catch(e){}

@@ -522,12 +522,79 @@ function parseTrafficDaily(csvText){
   return Object.keys(byLoc).map(function(k){return byLoc[k];});
 }
 
-// 取得（公開シート前提）→ 地点ごと最新行配列を解決する Promise
-window.fetchTrafficDaily=function(sheetId, sheetName){
-  return fetch(trafficGvizUrl(sheetId, sheetName), {cache:'no-store'})
-    .then(function(res){ if(!res.ok) throw new Error('HTTP '+res.status); return res.text(); })
-    .then(function(txt){ return parseTrafficDaily(txt); });
-};
+// gviz JSON（responseHandler）レスポンス → 地点ごとの「最新日付の行」配列
+// CSV版(parseTrafficDaily)と同じ形 [{loc,date,dateKey,ped,trf,lat,lng,detail}] を返す
+function _dateKeyToStr(dk){
+  if(!dk) return '';
+  var y=Math.floor(dk/10000), m=Math.floor((dk%10000)/100), d=dk%100;
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function parseTrafficDailyJson(resp){
+  if(!resp || !resp.table){
+    if(resp && resp.status==='error'){
+      var er=(resp.errors&&resp.errors[0])||{};
+      throw new Error(er.detailed_message||er.message||'シート取得エラー（公開設定・シート名をご確認ください）');
+    }
+    return [];
+  }
+  var table=resp.table;
+  var cols=(table.cols||[]).map(function(c){return (c&&c.label!=null)?String(c.label).trim():'';});
+  var rows=table.rows||[];
+  var head, dataRows;
+  if(cols.indexOf('地点名')>=0){            // 通常: 1行目がヘッダーとして認識されている
+    head=cols; dataRows=rows.map(function(r){return (r&&r.c)||[];});
+  }else{                                     // 予備: 1行目がデータ扱い → それをヘッダーにする
+    if(!rows.length) return [];
+    head=((rows[0].c)||[]).map(function(c){return (c&&c.v!=null)?String(c.v).trim():'';});
+    dataRows=rows.slice(1).map(function(r){return (r&&r.c)||[];});
+  }
+  function col(name){return head.indexOf(name);}
+  function cellV(cells,idx){ if(idx<0||!cells||idx>=cells.length) return ''; var c=cells[idx]; if(c==null) return ''; if(c.v!=null) return c.v; return c.f!=null?c.f:''; }
+  function cellDate(cells,idx){ if(idx<0||!cells||idx>=cells.length) return ''; var c=cells[idx]; if(c==null) return ''; return (c.f!=null&&c.f!=='')?c.f:(c.v!=null?c.v:''); }
+  var iDate=col('年月日'), iLoc=col('地点名'), iLat=col('緯度'), iLng=col('経度'), iPed=col('通行量_合計'), iTrf=col('交通量_合計');
+  if(iLoc<0) return [];
+  var byLoc={};
+  for(var r=0;r<dataRows.length;r++){
+    var cells=dataRows[r];
+    var loc=String(cellV(cells,iLoc)||'').trim();
+    if(!loc) continue;
+    var dk=_trafficDateKey(cellDate(cells,iDate));
+    var cur=byLoc[loc];
+    if(cur && cur.dateKey>=dk) continue;     // 最新日付優先
+    var detail={};
+    _TRAFFIC_DETAIL_COLS.forEach(function(nm){var ci=col(nm); if(ci>=0) detail[nm]=_trafficNum(cellV(cells,ci));});
+    byLoc[loc]={
+      loc:loc, date:_dateKeyToStr(dk), dateKey:dk,
+      ped:_trafficNum(cellV(cells,iPed)),
+      trf:_trafficNum(cellV(cells,iTrf)),
+      lat:iLat>=0?parseFloat(cellV(cells,iLat)):null,
+      lng:iLng>=0?parseFloat(cellV(cells,iLng)):null,
+      detail:detail
+    };
+  }
+  return Object.keys(byLoc).map(function(k){return byLoc[k];});
+}
+
+// JSONP取得（<script>タグ経由＝CORS非対象）。file:// でも localhost でも公開URLでも動く。
+var _trafficJsonpSeq=0;
+function fetchTrafficDailyJsonp(sheetId, sheetName){
+  return new Promise(function(resolve, reject){
+    var cb='__knTrafficCb_'+(++_trafficJsonpSeq)+'_'+Math.floor(Math.random()*1e9);
+    var url='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/gviz/tq?tqx=out:json;responseHandler:'+cb;
+    if(sheetName) url+='&sheet='+encodeURIComponent(sheetName);
+    var script=document.createElement('script');
+    var done=false, timer;
+    function cleanup(){ try{delete window[cb];}catch(e){window[cb]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); if(timer)clearTimeout(timer); }
+    timer=setTimeout(function(){ if(done)return; done=true; cleanup(); reject(new Error('タイムアウト（シートの公開設定をご確認ください）')); }, 15000);
+    window[cb]=function(resp){ if(done)return; done=true; try{ var recs=parseTrafficDailyJson(resp); cleanup(); resolve(recs); }catch(e){ cleanup(); reject(e); } };
+    script.onerror=function(){ if(done)return; done=true; cleanup(); reject(new Error('読み込みに失敗しました（ネットワーク／シートの公開設定をご確認ください）')); };
+    script.src=url;
+    (document.head||document.documentElement).appendChild(script);
+  });
+}
+
+// 公開取得の標準入口。JSONP方式（file://含めどこでも動作）。
+window.fetchTrafficDaily=fetchTrafficDailyJsonp;
 
 // 2地点間の距離（km）— ピンの緯度経度マッチ用
 function trafficHaversineKm(lat1,lng1,lat2,lng2){
