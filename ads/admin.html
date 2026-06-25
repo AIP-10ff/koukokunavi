@@ -367,7 +367,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <button class="hdr-btn active" id="add-mode-btn" onclick="toggleAddModal()">＋ 新規追加</button>
   <button class="hdr-btn" onclick="confirmClearAll()" style="border-color:#ef4444;color:#ef4444">🗑 全削除</button>
   <button class="hdr-btn" id="inq-toggle-btn" onclick="toggleInqPanel()">📩 問い合わせ<span id="inq-hdr-badge" class="iq-count-badge" style="display:none">0</span></button>
-  <button class="hdr-btn" onclick="openTrafficModal()" style="border-color:#3b82f6;color:#93c5fd">📊 交通量同期</button>
   <span id="admin-name" style="margin-left:auto;color:#94a3b8;font-size:12px;white-space:nowrap">👤 <span id="admin-id-display"></span></span>
   <button class="hdr-btn" onclick="showChangePwModal()" style="flex-shrink:0">🔑 PW変更</button>
   <button class="hdr-btn" onclick="showLogoutModal()" style="border-color:#ef4444;color:#ef4444;flex-shrink:0">ログアウト</button>
@@ -485,36 +484,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <button onclick="closeChangePwModal()" class="btn-cancel-edit" style="flex:1;padding:10px;font-size:13px">キャンセル</button>
       <button onclick="doChangePw()" class="btn-save" style="flex:2;padding:10px;font-size:13px">変更する</button>
     </div>
-  </div>
-</div>
-
-<!-- TRAFFIC SYNC MODAL -->
-<div id="traffic-modal" style="display:none" class="m-overlay" onclick="closeTrafficModal()">
-  <div class="m-box" style="max-width:560px;width:92vw;max-height:88vh;overflow-y:auto" onclick="event.stopPropagation()">
-    <h3>📊 交通量・通行量データ同期</h3>
-    <p style="font-size:12px;color:#94a3b8;margin:-4px 0 12px;line-height:1.6">
-      交通量測定システムが出力するGoogleスプレッドシート（公開リンク）から、地点ごとの
-      <b style="color:#93c5fd">通行量（人）</b>と<b style="color:#93c5fd">交通量（車）</b>を読み取り、各ピンへ反映します。<br>
-      ※ シートは「<b>リンクを知っている全員が閲覧可</b>」に共有してください。
-    </p>
-    <div class="fg">
-      <label>スプレッドシート URL または ID</label>
-      <input class="fi" id="tf-id" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
-    </div>
-    <div class="fg">
-      <label>シート名（タブ名）<span style="color:#64748b;font-size:10px">空欄＝先頭シート / 例: 日次</span></label>
-      <input class="fi" id="tf-sheet" placeholder="日次">
-    </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;margin-bottom:12px;cursor:pointer">
-      <input type="checkbox" id="tf-auto" style="width:16px;height:16px;cursor:pointer">
-      この画面を開いている間、30分ごとに自動で同期する
-    </label>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-      <button onclick="trafficSyncNow()" class="btn-save" style="flex:1;padding:10px;font-size:13px">🔄 今すぐ同期</button>
-      <button onclick="closeTrafficModal()" class="btn-cancel-edit" style="padding:10px 16px;font-size:13px">閉じる</button>
-    </div>
-    <div id="tf-last" style="font-size:11px;color:#64748b;margin-bottom:6px">最終同期: なし</div>
-    <div id="tf-result" style="font-size:13px"></div>
   </div>
 </div>
 
@@ -1189,153 +1158,6 @@ function confirmClearAll(){
   toast('全ピンを削除しました');
 }
 
-// ===== 交通量・通行量 スプレッドシート同期 =====
-var TF_LS={id:'kn_traffic_sheet_id', name:'kn_traffic_sheet_name', auto:'kn_traffic_auto', map:'kn_traffic_map', last:'kn_traffic_last'};
-var _tfTimer=null;
-
-function _tfGet(k,def){var v=localStorage.getItem(k);return v==null?def:v;}
-function _tfGetMap(){try{return JSON.parse(localStorage.getItem(TF_LS.map)||'{}')||{};}catch(e){return{};}}
-function _tfSetMap(m){try{localStorage.setItem(TF_LS.map,JSON.stringify(m));}catch(e){}}
-function _tfEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-
-function openTrafficModal(){
-  var m=document.getElementById('traffic-modal'); if(!m)return;
-  document.getElementById('tf-id').value=_tfGet(TF_LS.id, TRAFFIC_SHEET_ID_DEFAULT);
-  document.getElementById('tf-sheet').value=_tfGet(TF_LS.name,'');
-  document.getElementById('tf-auto').checked=_tfGet(TF_LS.auto,'1')==='1';
-  document.getElementById('tf-result').innerHTML='';
-  _tfRenderLast();
-  m.style.display='flex';
-}
-function closeTrafficModal(){var m=document.getElementById('traffic-modal');if(m)m.style.display='none';}
-
-function _tfRenderLast(){
-  var el=document.getElementById('tf-last'); if(!el)return;
-  var t=_tfGet(TF_LS.last,'');
-  el.textContent='最終同期: '+(t?new Date(Number(t)).toLocaleString('ja-JP'):'なし');
-}
-
-// モーダルの入力内容をlocalStorageへ保存
-function _tfSaveConfig(){
-  var idEl=document.getElementById('tf-id');
-  var id=idEl?trafficExtractSheetId(idEl.value):_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT);
-  if(!id) id=TRAFFIC_SHEET_ID_DEFAULT;
-  localStorage.setItem(TF_LS.id,id);
-  if(idEl) idEl.value=id;
-  var nm=document.getElementById('tf-sheet');
-  if(nm) localStorage.setItem(TF_LS.name, nm.value.trim());
-  var au=document.getElementById('tf-auto');
-  if(au) localStorage.setItem(TF_LS.auto, au.checked?'1':'0');
-  _tfSetupAuto();
-}
-
-// 1地点の最新行 → 対応するピンを解決（手動マップ→名前一致→緯度経度近接）
-function _tfMatch(rec){
-  var map=_tfGetMap();
-  if(map[rec.loc]!=null){var byId=find(Number(map[rec.loc]));if(byId)return byId;}
-  var key=_nrmS(rec.loc).replace(/\s/g,'');
-  for(var i=0;i<SG.length;i++){if(_nrmS(SG[i].name).replace(/\s/g,'')===key)return SG[i];}
-  if(rec.lat!=null&&rec.lng!=null&&!isNaN(rec.lat)&&!isNaN(rec.lng)){
-    for(var j=0;j<SG.length;j++){
-      if(SG[j].lat==null||SG[j].lng==null)continue;
-      if(trafficHaversineKm(rec.lat,rec.lng,SG[j].lat,SG[j].lng)<=0.05)return SG[j]; // 約50m以内
-    }
-  }
-  return null;
-}
-
-// 1地点の値をピンへ反映
-function _tfApply(sg,rec){
-  if(rec.ped!=='') sg.ped=rec.ped;   // 通行量_合計 → 通行者数（人）
-  if(rec.trf!=='') sg.trf=rec.trf;   // 交通量_合計 → 交通量（車）
-  sg.traffic={date:rec.date, ped:rec.ped, trf:rec.trf, detail:rec.detail, updatedAt:Date.now()}; // 付帯情報
-}
-
-// 手動／ボタン同期（結果表示あり）
-async function trafficSyncNow(){
-  _tfSaveConfig();
-  var id=_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT), name=_tfGet(TF_LS.name,'');
-  var res=document.getElementById('tf-result');
-  res.innerHTML='<div style="color:#94a3b8">⏳ 取得中…</div>';
-  try{
-    var recs=await fetchTrafficDaily(id,name);
-    if(!recs.length){res.innerHTML='<div style="color:#f59e0b">⚠ データ行が見つかりませんでした。<br>シートの共有設定（リンクを知っている全員が閲覧可）とシート名をご確認ください。</div>';return;}
-    var updated=0, unmatched=[];
-    recs.forEach(function(rec){
-      var sg=_tfMatch(rec);
-      if(!sg){unmatched.push(rec);return;}
-      _tfApply(sg,rec); updated++;
-    });
-    _tfPersist();
-    render(); renderList(SG); _tfRenderLast();
-    _tfRenderResult(updated, recs.length, unmatched);
-    toast('交通量データを同期しました（'+updated+'件更新）');
-  }catch(e){
-    res.innerHTML='<div style="color:#ef4444">⚠ 取得に失敗しました: '+_tfEsc(_errMsg(e))+'<br>シートが「リンクを知っている全員が閲覧可」になっているかご確認ください。</div>';
-  }
-}
-
-function _tfPersist(){
-  try{
-    localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));
-    localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());
-  }catch(e){}
-  localStorage.setItem(TF_LS.last,Date.now().toString());
-}
-
-function _tfRenderResult(updated,total,unmatched){
-  var res=document.getElementById('tf-result');
-  var html='<div style="color:#10b981;font-weight:700;margin-bottom:6px">✓ '+updated+' / '+total+' 地点をピンへ反映しました</div>';
-  if(unmatched.length){
-    html+='<div style="color:#f59e0b;font-size:12px;margin:10px 0 6px">未マッチの地点（'+unmatched.length+'件）— ピンを手動で割り当ててください:</div>';
-    var opts='<option value="">— 割り当てない —</option>'+SG.map(function(s){return '<option value="'+s.id+'">'+_tfEsc(s.name)+'</option>';}).join('');
-    unmatched.forEach(function(rec,idx){
-      html+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;flex-wrap:wrap">'
-        +'<span style="flex:1 1 160px;color:#e2e8f0;min-width:0">'+_tfEsc(rec.loc)+' <span style="color:#64748b;white-space:nowrap">(人'+(rec.ped||'-')+'/車'+(rec.trf||'-')+')</span></span>'
-        +'<select id="tf-map-'+idx+'" class="fi" style="flex:1 1 160px;padding:5px;font-size:12px">'+opts+'</select>'
-        +'<button onclick="trafficAssign('+idx+',\''+encodeURIComponent(rec.loc)+'\')" style="background:var(--org);color:#fff;border:none;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">割当</button>'
-        +'</div>';
-    });
-  }
-  res.innerHTML=html;
-}
-
-// 未マッチ地点を手動でピンに割り当て→保存→再同期
-function trafficAssign(idx,locEnc){
-  var loc=decodeURIComponent(locEnc);
-  var sel=document.getElementById('tf-map-'+idx);
-  if(!sel||!sel.value){toast('ピンを選択してください');return;}
-  var map=_tfGetMap(); map[loc]=Number(sel.value); _tfSetMap(map);
-  toast('「'+loc+'」を割り当てました。再同期します');
-  trafficSyncNow();
-}
-
-// 自動同期（バックグラウンド・通知最小）
-function trafficSyncSilent(){
-  var id=_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT), name=_tfGet(TF_LS.name,'');
-  return fetchTrafficDaily(id,name).then(function(recs){
-    var updated=0;
-    recs.forEach(function(rec){var sg=_tfMatch(rec);if(sg){_tfApply(sg,rec);updated++;}});
-    if(updated){_tfPersist();render();renderList(SG);}
-    else{localStorage.setItem(TF_LS.last,Date.now().toString());}
-    _tfRenderLast();
-  }).catch(function(){});
-}
-
-function _tfSetupAuto(){
-  if(_tfTimer){clearInterval(_tfTimer);_tfTimer=null;}
-  if(_tfGet(TF_LS.auto,'1')==='1'){
-    _tfTimer=setInterval(trafficSyncSilent, 30*60*1000);
-  }
-}
-
-// ログイン成功後に1回だけ初回同期＋自動同期セットアップ
-function _tfInitAfterLogin(){
-  if(localStorage.getItem(TF_LS.id)==null) localStorage.setItem(TF_LS.id, TRAFFIC_SHEET_ID_DEFAULT);
-  _tfSetupAuto();
-  trafficSyncSilent();
-}
-
 // ===== SHARED HELPERS =====
 function showCenteredFlex(el){
   el.style.display='flex';el.style.flexDirection='column';
@@ -1807,7 +1629,6 @@ async function doLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('admin-id-display').textContent='管理者';
     err.textContent='';
-    try{_tfInitAfterLogin();}catch(e){}
   } else {
     // 失敗カウントを更新
     var fails=parseInt(localStorage.getItem('kokoknavi_admin_fail_count')||'0')+1;
