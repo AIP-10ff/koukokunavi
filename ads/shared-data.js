@@ -122,7 +122,9 @@ var _PIN_CAR_SVG='<svg width="28" height="20" viewBox="0 0 28 20" style="display
   +'<circle cx="20" cy="15.5" r="2.2" fill="#222"/>'
   +'</svg>';
 
-function pinIcon(s){
+// ピンの内側HTML（画像＋価格/サイズ/通行アイコン＋バッジ＋NEW）を生成する。
+// Leaflet(divIcon)・Google Maps(AdvancedMarker)の両方から利用する共通関数。
+function pinInnerHtml(s){
   var badge=s&&s.status?PIN_BADGE[s.status]:null;
   var badgeHtml=badge
     ? '<div style="position:absolute;top:4px;right:4px;background:'+badge.bg+';color:'+badge.color+';font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+badge.text+'</div>'
@@ -132,25 +134,27 @@ function pinIcon(s){
     ? '<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#e8650a;color:#fff;font-size:9px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);letter-spacing:.5px;z-index:3">NEW!</div>'
     : '';
 
-  // ピン内 3 段オーバーレイ（価格 / サイズ / 通行アイコン）
-  // 画像 168×189 → 110×124 表示。行内側 y 範囲: 価格 10-54 / サイズ 56-96 / アイコン 98-139（原寸基準）
+  // ピン内 2 段オーバーレイ（価格 / サイズ）
+  // ※ 交通種別の人／車アイコンの上書きは廃止（元画像のデザインを活かすため）
+  // 画像 168×189 → 110×124 表示。行内側 y 範囲: 価格 10-54 / サイズ 56-96（原寸基準）
   var priceTxt=_pinFirstPrice(s&&s.plans);
   var sizeTxt =_pinSizeM2(s&&s.size);
-  var trafKind=_pinTrafficKind(s);
   var rowBase ='position:absolute;left:23px;width:64px;display:flex;align-items:center;justify-content:center;color:#111;line-height:1;z-index:2';
   var priceHtml='<div style="'+rowBase+';top:9px;height:22px;font-size:10.5px;font-weight:900;letter-spacing:-0.5px">'+priceTxt+'</div>';
   var sizeHtml ='<div style="'+rowBase+';top:39px;height:20px;font-size:11px;font-weight:700;letter-spacing:-0.3px">'+sizeTxt+'</div>';
-  var iconHtml =trafKind
-    ? '<div style="'+rowBase+';top:65px;height:22px">'+(trafKind==='ped'?_PIN_PERSON_SVG:_PIN_CAR_SVG)+'</div>'
-    : '';
 
   var html='<div style="position:relative;width:110px;height:118px">'
     +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-    +priceHtml+sizeHtml+iconHtml
+    +priceHtml+sizeHtml
     +badgeHtml
     +newHtml
     +'</div>';
-  return L.divIcon({html:html,iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});
+  return html;
+}
+
+// Leaflet 用ピンアイコン（admin.html が使用）。Google Maps 版は koukokunavi.html 側で pinInnerHtml を直接利用する。
+function pinIcon(s){
+  return L.divIcon({html:pinInnerHtml(s),iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});
 }
 
 // =============================================================
