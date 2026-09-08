@@ -43,20 +43,37 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: SSM経由でサーバーへ配置
+        env:
+          PRESIGNED_URL: ${{ steps.up.outputs.url }}
         run: |
           set -e
+
+          # 署名付きURLは & や = を含むため、短縮記法ではなくJSONで渡す
+          cat > mkparams.py <<'PY'
+          import json, os
+
+          url = os.environ["PRESIGNED_URL"]
+          command = (
+              "set -e; "
+              "curl -sSf -o /tmp/app.tar.gz '" + url + "'; "
+              "tar -xzf /tmp/app.tar.gz -C /var/www/html; "
+              "rm -f /tmp/app.tar.gz; "
+              "nginx -t; "
+              "echo DEPLOY_OK"
+          )
+          with open("params.json", "w") as f:
+              json.dump({"commands": [command]}, f)
+          PY
+          python3 mkparams.py
+
           CMD=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "deploy koukokunavi ${GITHUB_SHA::7}" \
-            --parameters commands="set -e; \
-              curl -sSf -o /tmp/app.tar.gz '${{ steps.up.outputs.url }}'; \
-              tar -xzf /tmp/app.tar.gz -C /var/www/html; \
-              rm -f /tmp/app.tar.gz; \
-              nginx -t; \
-              echo DEPLOY_OK" \
+            --parameters file://params.json \
             --query Command.CommandId --output text)
           echo "CommandId: $CMD"
+          rm -f params.json mkparams.py
 
           STATUS=Pending
           for i in $(seq 1 40); do
