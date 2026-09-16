@@ -1,9 +1,13 @@
 name: AWSデプロイ
 
+# main     → 本番        https://app.signage-ad.com/   (/var/www/html)
+# staging  → ステージング  https://app2.signage-ad.com/  (/var/www/staging)
+
 on:
   push:
     branches:
       - main
+      - staging
   workflow_dispatch:
 
 permissions:
@@ -23,6 +27,26 @@ jobs:
       - name: コードをチェックアウト
         uses: actions/checkout@v4
 
+      - name: デプロイ先を決定
+        id: target
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            echo "dir=/var/www/html"       >> "$GITHUB_OUTPUT"
+            echo "url=https://app.signage-ad.com"  >> "$GITHUB_OUTPUT"
+            echo "env=本番" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=/var/www/staging"    >> "$GITHUB_OUTPUT"
+            echo "url=https://app2.signage-ad.com" >> "$GITHUB_OUTPUT"
+            echo "env=ステージング" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: デプロイ内容を表示
+        run: |
+          echo "ブランチ : $GITHUB_REF_NAME"
+          echo "環境     : ${{ steps.target.outputs.env }}"
+          echo "配置先   : ${{ steps.target.outputs.dir }}"
+          echo "URL      : ${{ steps.target.outputs.url }}"
+
       - name: adsフォルダを固める
         run: tar -czf app.tar.gz -C ads .
 
@@ -36,7 +60,7 @@ jobs:
         id: up
         run: |
           set -e
-          KEY="app-${GITHUB_SHA}.tar.gz"
+          KEY="app-${GITHUB_REF_NAME}-${GITHUB_SHA}.tar.gz"
           aws s3 cp app.tar.gz "s3://$BUCKET/$KEY"
           URL=$(aws s3 presign "s3://$BUCKET/$KEY" --expires-in 900)
           echo "::add-mask::$URL"
@@ -45,6 +69,7 @@ jobs:
       - name: SSM経由でサーバーへ配置
         env:
           PRESIGNED_URL: ${{ steps.up.outputs.url }}
+          TARGET_DIR: ${{ steps.target.outputs.dir }}
         run: |
           set -e
 
@@ -53,13 +78,15 @@ jobs:
           import json, os
 
           url = os.environ["PRESIGNED_URL"]
+          target = os.environ["TARGET_DIR"]
           command = (
               "set -e; "
               "curl -sSf -o /tmp/app.tar.gz '" + url + "'; "
-              "tar -xzf /tmp/app.tar.gz -C /var/www/html; "
+              "mkdir -p " + target + "; "
+              "tar -xzf /tmp/app.tar.gz -C " + target + "; "
               "rm -f /tmp/app.tar.gz; "
               "nginx -t; "
-              "echo DEPLOY_OK"
+              "echo DEPLOY_OK " + target
           )
           with open("params.json", "w") as f:
               json.dump({"commands": [command]}, f)
@@ -69,7 +96,7 @@ jobs:
           CMD=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
-            --comment "deploy koukokunavi ${GITHUB_SHA::7}" \
+            --comment "deploy koukokunavi ${GITHUB_REF_NAME} ${GITHUB_SHA::7}" \
             --parameters file://params.json \
             --query Command.CommandId --output text)
           echo "CommandId: $CMD"
@@ -96,8 +123,10 @@ jobs:
 
       - name: 公開URLの応答を確認
         run: |
-          for u in https://app2.signage-ad.com/ https://app2.signage-ad.com/koukokunavi.html; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$u")
-            echo "$u -> $code"
+          BASE="${{ steps.target.outputs.url }}"
+          for p in "/" "/koukokunavi.html"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE$p")
+            echo "$BASE$p -> $code"
             [ "$code" = "200" ] || exit 1
           done
+          echo "✅ ${{ steps.target.outputs.env }} へのデプロイ完了: $BASE"
