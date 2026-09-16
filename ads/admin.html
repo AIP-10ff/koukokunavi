@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>広告ナビ｜管理者画面</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<!-- Google Maps JavaScript API（利用者画面と同一のブートストラップローダー・同一APIキー） -->
+<script>
+(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})
+({key:"AIzaSyDdYpOzy6kX1LV49MjqfL0opYjVDLRAPtY",v:"weekly",language:"ja",region:"JP"});
+</script>
+<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
 <script src="shared-data.js"></script>
@@ -126,20 +127,21 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .li-price{font-size:11px;font-weight:700;color:var(--org)}
 .li-status{display:inline-block;border-radius:99px;padding:1px 7px;font-size:9px;font-weight:700}
 
-.leaflet-top.leaflet-left{top:0px!important;left:3px!important}
-.leaflet-control-zoom a{width:20px!important;height:20px!important;line-height:20px!important;font-size:14px!important;background:#1e293b!important;color:#fff!important;border-color:#334155!important}
-.leaflet-control-zoom a:hover{background:#334155!important;color:#fff!important}
-.leaflet-control-locate-adm{background:#1e293b!important;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #334155!important;transition:background .2s;text-decoration:none;color:#fff!important}
-.leaflet-control-locate-adm:hover{background:#334155!important;color:#fff!important}
+/* 現在地ボタン（Google Maps のカスタムコントロール） */
+.gm-locate-adm{transition:background .2s}
+.gm-locate-adm:hover{background:#334155!important}
 @keyframes adm-pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ADD MODE */
 #add-hint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(245,158,11,.95);color:#fff;padding:10px 24px;border-radius:99px;font-size:13px;font-weight:700;z-index:3000;display:none;box-shadow:0 4px 16px rgba(0,0,0,.3)}
 
-/* POPUP */
-.leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:0 6px 24px rgba(0,0,0,.3)!important;padding:0!important;overflow:hidden;background:#1e293b!important;border:1px solid #334155}
-.leaflet-popup-content{margin:0!important;width:260px!important}
-.leaflet-popup-tip{background:#1e293b!important}
+/* POPUP（Google Maps InfoWindow をダークテーマに合わせる） */
+.gm-style .gm-style-iw-c{background:#1e293b!important;border:1px solid #334155;border-radius:10px!important;box-shadow:0 6px 24px rgba(0,0,0,.3)!important;padding:0!important;overflow:hidden}
+.gm-style .gm-style-iw-d{background:#1e293b!important;overflow:hidden!important;max-width:260px!important}
+.gm-style .gm-style-iw-tc::after{background:#1e293b!important}
+/* 既定の閉じるボタンを見やすく（濃紺背景に白） */
+.gm-style .gm-style-iw-c button.gm-ui-hover-effect>span{background-color:#94a3b8!important}
+.gm-style .gm-style-iw-c button.gm-ui-hover-effect:hover>span{background-color:#fff!important}
 .pp-img{width:100%;height:100px;object-fit:cover;display:block}
 .pp-head{background:var(--org);color:#fff;padding:11px 14px;font-size:14px;font-weight:700}
 .pp-body{padding:12px 14px;background:#1e293b}
@@ -611,7 +613,7 @@ var SG = window.getKokokunaviDefaultSG();
   }catch(e){}
 })();
 
-var map, clusterGroup, markers={}, curId=null, addMode=false, listOpen=false, editingId=null;
+var map, _admCluster=null, markers={}, curId=null, addMode=false, listOpen=false, editingId=null;
 // 編集中の一時ストレージ
 var tmpPhotos=[]; // {id, name, isMain, _saved}
 var tmpDocs=[];   // {id, name, size, type, _saved}
@@ -623,45 +625,41 @@ function _updateContentTop(){
   document.documentElement.style.setProperty('--adm-header-h',h+'px');
   document.documentElement.style.setProperty('--adm-content-top',(h+s)+'px');
 }
-window.onload=function(){
+window.onload=async function(){
   _updateContentTop();
   document.getElementById('logo-wrap').style.cursor='pointer';
   document.getElementById('logo-wrap').onclick=function(){
-    try{var b=clusterGroup.getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40]});}
-    catch(e){map.setView([36.5,136.5],6);}
+    // ロゴクリックで全ピンが収まる位置に戻す
+    try{
+      if(SG.length){
+        var bb=new google.maps.LatLngBounds();
+        SG.forEach(function(s){ bb.extend({lat:s.lat,lng:s.lng}); });
+        map.fitBounds(bb,40);
+      }else{
+        map.setCenter({lat:36.5,lng:136.5}); map.setZoom(6);
+      }
+    }catch(e){ try{map.setCenter({lat:36.5,lng:136.5});map.setZoom(6);}catch(_){} }
   };
-  map=L.map('map',{worldCopyJump:false,maxBounds:[[22,120],[50,156]],maxBoundsViscosity:1.0,minZoom:5}).setView([36.5,136.5],5);
-  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
-    attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',maxZoom:18,minZoom:5,noWrap:true
-  }).addTo(map);
-  clusterGroup=L.markerClusterGroup({
-    maxClusterRadius:60,
-    showCoverageOnHover:false,
-    iconCreateFunction:function(cluster){
-      var c=cluster.getChildCount();
-      return L.divIcon({
-        html:'<div style="position:relative;width:110px;height:118px">'
-          +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-          +'<div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+c+'</div>'
-          +'</div>',
-        iconSize:[110,118],iconAnchor:[55,118],className:''
-      });
-    }
-  });
-  map.addLayer(clusterGroup);
+  await _admInitGoogleMap();
   addAdmLocateControl();
-  map.on('click',function(e){
+  map.addListener('click',function(e){
     if(listOpen){listOpen=false;document.getElementById('list-panel').classList.remove('open');document.getElementById('list-toggle-btn').classList.remove('active');}
     if(!addMode) return;
-    newSignage(e.latlng.lat,e.latlng.lng);
+    newSignage(e.latLng.lat(),e.latLng.lng());
   });
-  map.on('moveend',updateStats);
-  map.on('zoomend',updateStats);
+  map.addListener('idle',updateStats);
 
 
   preloadMediaCache(SG,function(){
     render(); renderList(SG);
-    try{var b=clusterGroup.getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40],maxZoom:10});}catch(e){}
+    try{
+      if(SG.length){
+        var bb=new google.maps.LatLngBounds();
+        SG.forEach(function(s){ bb.extend({lat:s.lat,lng:s.lng}); });
+        map.fitBounds(bb,40);
+        google.maps.event.addListenerOnce(map,'idle',function(){ if(map.getZoom()>10) map.setZoom(10); });
+      }
+    }catch(e){}
   });
   _updateInqCount();
 };
@@ -669,46 +667,89 @@ window.onload=function(){
 // ===== 現在地コントロール =====
 var _admLocMarker=null;
 function addAdmLocateControl(){
-  var LC=L.Control.extend({options:{position:'topleft'},onAdd:function(){
-    var container=L.DomUtil.create('div','leaflet-bar leaflet-control');
-    var btn=L.DomUtil.create('a','leaflet-control-locate-adm',container);
-    btn.title='現在地へ移動';btn.innerHTML='📍';btn.href='#';
-    btn.style.cssText='width:20px;height:20px;line-height:20px;font-size:13px;display:flex;align-items:center;justify-content:center;';
-    btn.onclick=function(e){
-      e.preventDefault();
-      btn.style.animation='adm-pulse 0.8s infinite';btn.innerHTML='⏳';
-      navigator.geolocation&&navigator.geolocation.getCurrentPosition(
-        function(p){
-          var lat=p.coords.latitude,lng=p.coords.longitude;
-          map.setView([lat,lng],16);
-          if(_admLocMarker)map.removeLayer(_admLocMarker);
-          _admLocMarker=L.marker([lat,lng],{icon:L.divIcon({
-            html:'<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 2px #3b82f6,0 2px 6px rgba(0,0,0,.5)"></div>',
-            iconSize:[16,16],iconAnchor:[8,8],className:''
-          }),zIndexOffset:1000}).addTo(map);
-          _admLocMarker.bindPopup('<div style="font-size:12px;font-weight:700;color:#3b82f6">📍 現在地</div>',{closeButton:false}).openPopup();
-          btn.style.animation='';btn.innerHTML='📍';
-          toast('現在地に移動しました');
-        },
-        function(){btn.style.animation='';btn.innerHTML='📍';toast('現在地を取得できませんでした');}
-      );
-    };
-    L.DomEvent.disableClickPropagation(container);return container;
-  }});
-  new LC().addTo(map);
+  var container=document.createElement('div');
+  container.className='gm-locate-adm';
+  container.title='現在地へ移動';
+  container.innerHTML='📍';
+  container.style.cssText='background:#1e293b;color:#fff;border:1px solid #334155;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;margin:8px;';
+  container.onclick=function(e){
+    e.preventDefault(); e.stopPropagation();
+    container.style.animation='adm-pulse 0.8s infinite'; container.innerHTML='⏳';
+    navigator.geolocation&&navigator.geolocation.getCurrentPosition(
+      function(p){
+        var lat=p.coords.latitude,lng=p.coords.longitude;
+        map.setCenter({lat:lat,lng:lng}); map.setZoom(16);
+        if(_admLocMarker) _admLocMarker.map=null;
+        var el=document.createElement('div');
+        el.innerHTML='<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 2px #3b82f6,0 2px 6px rgba(0,0,0,.5)"></div>';
+        _admLocMarker=new _AGM.AdvancedMarkerElement({map:map,position:{lat:lat,lng:lng},content:el.firstElementChild,zIndex:1000});
+        container.style.animation=''; container.innerHTML='📍';
+        toast('現在地に移動しました');
+      },
+      function(){container.style.animation='';container.innerHTML='📍';toast('現在地を取得できませんでした');}
+    );
+  };
+  map.controls[google.maps.ControlPosition.TOP_LEFT].push(container);
 }
+
+// ===== Google Maps 初期化（管理画面） =====
+var _AGM=null;            // {Map,InfoWindow,AdvancedMarkerElement}
+var _admInfoWin=null;     // 共用 InfoWindow（Leafletのpopup相当）
+async function _admInitGoogleMap(){
+  const {Map,InfoWindow}=await google.maps.importLibrary("maps");
+  const {AdvancedMarkerElement}=await google.maps.importLibrary("marker");
+  _AGM={Map,InfoWindow,AdvancedMarkerElement};
+  map=new Map(document.getElementById('map'),{
+    center:{lat:36.5,lng:136.5},zoom:5,minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
+    mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
+    restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
+  });
+  _admInfoWin=new InfoWindow();
+}
+
+// Leafletのpinicon相当（AdvancedMarkerElement用の中身を組み立てる）
+function _admPinContent(s){
+  var wrap=document.createElement('div');
+  wrap.innerHTML='<div style="width:110px">'+pinInnerHtml(s)+'</div>';
+  return wrap.firstElementChild;
+}
+
+// クラスタの見た目（利用者画面と同じデザイン）
+var _admClusterRenderer={
+  render:function(cluster){
+    var count=cluster.count, position=cluster.position;
+    var wrap=document.createElement('div');
+    wrap.innerHTML='<div style="position:relative;width:110px;height:118px">'
+      +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
+      +'<div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+count+'</div>'
+      +'</div>';
+    return new _AGM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild});
+  }
+};
 
 // ===== RENDER MARKERS =====
 function render(){
-  clusterGroup.clearLayers();
+  if(!map||!_AGM) return;
+  // 既存マーカーを地図から外す
+  Object.keys(markers).forEach(function(k){ try{markers[k].map=null;}catch(e){} });
   markers={};
+  if(_admCluster){ try{_admCluster.clearMarkers();}catch(e){} }
+  var list=[];
   SG.forEach(function(s){
-    var m=L.marker([s.lat,s.lng],{icon:pinIcon(s)});
-    m.bindPopup(popupHtml(s),{maxWidth:280});
-    m.on('click',function(){curId=s.id;});
+    var m=new _AGM.AdvancedMarkerElement({position:{lat:s.lat,lng:s.lng},content:_admPinContent(s)});
+    m.addListener('click',function(){
+      curId=s.id;
+      _admInfoWin.setContent('<div style="max-width:280px">'+popupHtml(s)+'</div>');
+      _admInfoWin.open({map:map,anchor:m});
+    });
     markers[s.id]=m;
-    clusterGroup.addLayer(m);
+    list.push(m);
   });
+  if(!_admCluster){
+    _admCluster=new markerClusterer.MarkerClusterer({map:map,markers:list,renderer:_admClusterRenderer});
+  }else{
+    _admCluster.addMarkers(list);
+  }
   updateStats();
 }
 
@@ -735,9 +776,9 @@ function popupHtml(s){
 // getFavIds → shared-data.js の共通関数を使用
 function updateStats(){
   var favIds=getFavIds();
-  var bounds=map?map.getBounds():null;
+  var bounds=(map&&map.getBounds)?map.getBounds():null;
   var visible=bounds
-    ? SG.filter(function(s){return bounds.contains([s.lat,s.lng]);})
+    ? SG.filter(function(s){return bounds.contains(new google.maps.LatLng(s.lat,s.lng));})
     : SG;
   var on=0,em=0,mt=0,fav=0;
   visible.forEach(function(s){
@@ -1346,8 +1387,10 @@ function resetLoginForm(){
   document.getElementById('login-err').textContent='';
 }
 function cleanupMapMarkers(){
-  if(adjustMap){adjustMap.remove();adjustMap=null;adjustMarker=null;}
-  if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+  // Google Maps では地図インスタンスの破棄は不要。マーカーを外し参照を切るだけでよい
+  if(adjustMarker){ try{adjustMarker.map=null;}catch(e){} adjustMarker=null; }
+  adjustMap=null;
+  if(previewMarker){ try{previewMarker.map=null;}catch(e){} previewMarker=null; }
 }
 function resetGeoUI(){
   document.getElementById('geo-result-wrap').style.display='none';
@@ -1367,7 +1410,7 @@ function toggleAddModal(){
   document.getElementById('new-addr').value='';
   resetGeoUI();
   geoLat=null; geoLng=null;
-  if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+  if(previewMarker){ try{previewMarker.map=null;}catch(e){} previewMarker=null; }
   setTimeout(function(){document.getElementById('new-addr').focus();},100);
 }
 function closeAddModal(){
@@ -1547,27 +1590,26 @@ function showAdjustMap(msg,needsAdjust,zoom){
   var adjMapEl=document.getElementById('adj-map');
   adjMapEl.style.display='block';
   setTimeout(function(){
-    adjustMap=L.map('adj-map',{zoomControl:true,attributionControl:false}).setView([geoLat,geoLng],z);
-    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
-      attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',maxZoom:18,noWrap:true
-    }).addTo(adjustMap);
-    var previewIcon=L.divIcon({
-      html:'<div style="width:32px;height:32px;background:#f59e0b;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
-      iconSize:[32,32],iconAnchor:[16,32],className:''
+    adjustMap=new _AGM.Map(document.getElementById('adj-map'),{
+      center:{lat:geoLat,lng:geoLng},zoom:z,mapId:"4ef6e0c1e3644c4183545b90",
+      mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false
     });
-    adjustMarker=L.marker([geoLat,geoLng],{draggable:true,icon:previewIcon}).addTo(adjustMap);
-    function _updateAdjPos(latlng){
-      geoLat=latlng.lat; geoLng=latlng.lng;
+    var _pv=document.createElement('div');
+    _pv.innerHTML='<div style="width:32px;height:32px;background:#f59e0b;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>';
+    adjustMarker=new _AGM.AdvancedMarkerElement({
+      map:adjustMap,position:{lat:geoLat,lng:geoLng},content:_pv.firstElementChild,gmpDraggable:true
+    });
+    function _updateAdjPos(lat,lng){
+      geoLat=lat; geoLng=lng;
       var el=document.getElementById('adj-latlng');
       if(el) el.textContent='緯度: '+geoLat.toFixed(6)+' / 経度: '+geoLng.toFixed(6);
     }
-    adjustMarker.on('drag',function(){ _updateAdjPos(adjustMarker.getLatLng()); });
-    adjustMap.on('click',function(e){
-      adjustMarker.setLatLng(e.latlng);
-      _updateAdjPos(e.latlng);
+    adjustMarker.addListener('drag',function(ev){ _updateAdjPos(ev.latLng.lat(),ev.latLng.lng()); });
+    adjustMarker.addListener('dragend',function(ev){ _updateAdjPos(ev.latLng.lat(),ev.latLng.lng()); });
+    adjustMap.addListener('click',function(e){
+      adjustMarker.position=e.latLng;
+      _updateAdjPos(e.latLng.lat(),e.latLng.lng());
     });
-    adjustMap.invalidateSize();
-    setTimeout(function(){adjustMap.invalidateSize();},150);
   },60);
 }
 
