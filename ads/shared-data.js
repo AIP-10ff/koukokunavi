@@ -152,7 +152,7 @@ function pinInnerHtml(s){
   return html;
 }
 
-// Leaflet 用ピンアイコン（admin.html が使用）。Google Maps 版は koukokunavi.html 側で pinInnerHtml を直接利用する。
+// ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
 function pinIcon(s){
   return L.divIcon({html:pinInnerHtml(s),iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});
 }
