@@ -2322,6 +2322,39 @@ async function submitInq(){
   };
   if(btn){btn.disabled=true;btn.textContent='送信中...';}
   const mailBody=_buildInqMailBody(inqData);
+  // まずサーバー（/api/v1/contact/）へ。DB に保存し SES で通知する。
+  // サーバー未配置・通信失敗のとき、またはサーバーが通知できなかったときは従来の EmailJS で通知する。
+  let srv=null;
+  try{
+    srv=await knSendContact(inqData,mailBody);
+    inqData.serverId=srv&&srv.id;
+  }catch(se){
+    if(se&&se.status===400&&se.data){
+      const map={name:'inq-name',email:'inq-email',company:'inq-company'};
+      let shown=false;
+      Object.keys(se.data).forEach(function(k){
+        const m=Array.isArray(se.data[k])?se.data[k][0]:se.data[k];
+        if(map[k]){_setFieldErr(map[k],true,m);shown=true;}
+        else if(!shown){toast(m);shown=true;}
+      });
+      localStorage.removeItem('kn_cd_inq');
+      if(btn){btn.disabled=false;btn.textContent='お問い合わせを送信';}
+      return;
+    }
+    if(se&&se.status===429){
+      localStorage.removeItem('kn_cd_inq');
+      if(btn){btn.disabled=false;btn.textContent='お問い合わせを送信';}
+      toast('送信が続いています。しばらくしてからお試しください');
+      return;
+    }
+    srv=null;
+  }
+  if(srv&&srv.notified){
+    inqData.mailStatus='sent';
+    _saveInquiryRecord(inqData);
+    closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
+    return;
+  }
   try{
     await emailjs.send(EJ_SVC,EJ_TPL_CONTACT,{
       to_email:SECURITY_NOTIFY_EMAIL,
@@ -2345,6 +2378,10 @@ async function submitInq(){
     inqData.mailStatus='failed';
     inqData.mailError=_errMsg(e);
     _saveInquiryRecord(inqData);
+    if(srv){ // サーバーの DB には保存済みなので受付扱い
+      closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
+      return;
+    }
     localStorage.removeItem('kn_cd_inq');
     if(btn){btn.disabled=false;btn.textContent='お問い合わせを送信';}
     toast('メール送信に失敗しましたが、お問い合わせ履歴には保存しました');
