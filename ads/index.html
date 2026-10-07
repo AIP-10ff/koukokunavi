@@ -667,6 +667,10 @@ let SG = loadSG().map(s => ({
 }));
 
 
+// サーバー（/api/v1/signages/）の掲載情報を表示中なら true（_loadSgFromServer で設定）
+let _sgFromServer = false;
+let _sgServerSig = '';
+
 // ===== リアルタイム同期（管理者画面 ↔ 広告ナビ） =====
 // 管理者画面で保存されたタイムスタンプを保持し、変更検知に使用
 let _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
@@ -678,6 +682,7 @@ let _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
  * visibilitychange イベントの両方からここを呼ぶことで処理を一元化している。
  */
 function _reloadSgFromStorage(showToast){
+  if(_sgFromServer) return; // サーバーの掲載情報を表示中は、端末内（管理者画面の localStorage）で上書きしない
   const saved = localStorage.getItem('kokoknavi_sg');
   if(!saved) return;
   try{
@@ -714,6 +719,45 @@ document.addEventListener('visibilitychange', function(){
   if(ts === _sgTs) return; // タイムスタンプが同じなら変更なし → スキップ
   _sgTs = ts;
   _reloadSgFromStorage(true);
+});
+
+// ===== サーバーの掲載情報（Phase2 管理系 API） =====
+// 管理者画面でサーバーに保存したピンを、全利用者の画面に出す。
+// サーバーに 1 件以上あればそれを正とし、取得失敗・0 件のときは従来どおり（localStorage → shared-data.js の既定データ）のまま。
+function _loadSgFromServer(showToast){
+  if(typeof knFetchSignages !== 'function') return;
+  knFetchSignages().then(function(list){
+    if(!list.length) return;
+    const sig = JSON.stringify(list.map(s => [s.id, s.updated_at]));
+    if(sig === _sgServerSig) return; // 変更なし
+    const first = !_sgFromServer;
+    _sgServerSig = sig;
+    _sgFromServer = true;
+    const prev = {}; SG.forEach(s => { prev[s.id] = s; });
+    SG = list.map(s => ({
+      ...s,
+      e: (prev[s.id] && prev[s.id].e) || '📺',
+      favCount: (prev[s.id] && prev[s.id].favCount) || 0,
+      plans: (s.plans || []).map(normalizePlan)
+    }));
+    preloadMediaCache(SG, function(){
+      if(map){
+        putMarkers(SG);
+        _loadTrafficForViewer(); // 通行量・交通量を新しい SG に載せ直す
+      }
+      if(cur && $('detail-panel').classList.contains('open')){
+        const updated = SG.find(x => x.id === cur.id);
+        if(updated) openDetail(updated.id); else closeDetail();
+      }
+    });
+    if(showToast && !first) toast('掲載情報を更新しました');
+  }).catch(function(){ /* API 未設置・通信失敗は静かに従来表示のまま */ });
+}
+_loadSgFromServer(false);
+// 開いたまま放置されている画面にも反映する（5 分ごと＋タブに戻ったとき）
+setInterval(function(){ if(document.visibilityState === 'visible') _loadSgFromServer(true); }, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible') _loadSgFromServer(true);
 });
 
 // ===== 交通量・通行量データの自動取得（全訪問者向け） =====

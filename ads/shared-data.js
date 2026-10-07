@@ -666,3 +666,48 @@ function _migrateOldPhotos(sg,cb){
   });
   if(pending===0&&cb)cb();
 }
+
+// ===== サーバー API（Phase2 管理系 API） =====
+// 掲載情報（サイネージ）はサーバーの DB を正とする。利用者画面・管理画面の両方から使う。
+// file:// で開いたときや API が無いときは fetch が失敗し、呼び出し側が従来の動き（localStorage／DEFAULT_SG）に戻る。
+var KN_API_BASE = '/api/v1';
+var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs'];
+
+function knApi(method, path, body, token){
+  var h = {'Accept':'application/json'};
+  if(body !== undefined) h['Content-Type'] = 'application/json';
+  if(token) h['Authorization'] = 'Token ' + token;
+  return fetch(KN_API_BASE + path, {
+    method: method, headers: h, cache: 'no-cache',
+    body: body === undefined ? undefined : JSON.stringify(body)
+  }).then(function(r){
+    if(r.status === 204) return null;
+    return r.json().catch(function(){ return null; }).then(function(d){
+      if(!r.ok){
+        var e = new Error((d && d.detail) || ('HTTP ' + r.status));
+        e.status = r.status; e.data = d; throw e;
+      }
+      return d;
+    });
+  });
+}
+window.knApi = knApi;
+
+// 利用者向け：公開中のピン一覧（ログイン不要）
+function knFetchSignages(){
+  return knApi('GET', '/signages/').then(function(d){ return Array.isArray(d) ? d : []; });
+}
+window.knFetchSignages = knFetchSignages;
+
+// 画面の SG 1 件 → サーバーに送る形（画面だけで使う項目 e / favCount / _xxxEdited は送らない）
+function knToServerSignage(s){
+  var o = {};
+  KN_SIGNAGE_KEYS.forEach(function(k){ if(s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
+  o.lat = Number(s.lat); o.lng = Number(s.lng);
+  o.plans = (s.plans || []).map(function(p){ return {n: String(p.n || ''), p: String(p.p || '')}; });
+  o.photos = (s.photos || []).map(function(p){ return {id: p.id, name: p.name || '', isMain: !!p.isMain}; });
+  o.docs = (s.docs || []).map(function(d){ return {id: d.id, name: d.name || '', size: d.size || 0, type: d.type || ''}; });
+  if(['ON','EMPTY','MAINT'].indexOf(o.status) < 0) o.status = 'EMPTY';
+  return o;
+}
+window.knToServerSignage = knToServerSignage;
