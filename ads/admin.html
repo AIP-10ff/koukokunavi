@@ -2461,7 +2461,8 @@ function _srvErr(e){
   if(e&&e.data&&typeof e.data==='object'&&!e.data.detail){
     var k=Object.keys(e.data)[0]; var v=e.data[k]; return k+'：'+(Array.isArray(v)?v.join(' '):JSON.stringify(v));
   }
-  return (e&&e.message)||'通信に失敗しました';
+  if(!e||!e.status) return 'サーバーに接続できませんでした（通信を確認してください）';
+  return e.message||'通信に失敗しました';
 }
 function openSrvModal(){
   document.getElementById('srv-err').textContent='';
@@ -2477,7 +2478,13 @@ function openSrvModal(){
     document.getElementById('srv-count').textContent='…';
     knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){
       document.getElementById('srv-count').textContent=list.length;
-    }).catch(function(e){document.getElementById('srv-err').textContent=_srvErr(e);openSrvModal();});
+    }).catch(function(e){
+      // 401/403 なら _srvErr がトークンを消すので、ログイン欄に切り替えてから文言を出す。
+      // それ以外（通信失敗など）は再取得せず文言だけ出す（openSrvModal を呼び直すと取得を繰り返すため）
+      var m=_srvErr(e);
+      if(!_srvToken()) openSrvModal();
+      document.getElementById('srv-err').textContent=m;
+    });
   }
   document.getElementById('srv-modal').style.display='flex';
 }
