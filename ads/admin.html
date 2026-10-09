@@ -10,7 +10,6 @@
 ({key:"AIzaSyDdYpOzy6kX1LV49MjqfL0opYjVDLRAPtY",v:"weekly",language:"ja",region:"JP"});
 </script>
 <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
 <script src="shared-data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -209,18 +208,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .locked-title{font-size:17px;font-weight:900;color:#ef4444;margin-bottom:6px}
 .locked-msg{font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:16px}
 .locked-msg strong{color:#e2e8f0}
-.btn-locked-contact{display:inline-block;background:var(--org);color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;margin-bottom:8px;width:100%}
-.btn-locked-contact:hover{background:var(--org2)}
 .locked-note{font-size:10px;color:#475569;margin-top:6px}
-.locked-form{display:none;text-align:left;margin-top:10px;width:100%}
-.locked-form.open{display:block}
-.locked-form input,.locked-form textarea{width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:12px;padding:7px 10px;margin-bottom:6px;outline:none;font-family:inherit;resize:vertical}
-.locked-form input:focus,.locked-form textarea:focus{border-color:var(--org)}
-.locked-form textarea{min-height:60px}
-.locked-form-err{font-size:12px;color:#f87171;margin-bottom:6px;min-height:16px}
-.locked-form-ok{font-size:12px;color:#34d399;margin-bottom:6px;min-height:16px}
-.btn-locked-send{width:100%;background:var(--org);color:#fff;border:none;border-radius:6px;padding:11px;font-size:14px;font-weight:700;cursor:pointer}
-.btn-locked-send:disabled{opacity:.5;cursor:default}
 .unlock-divider{display:flex;align-items:center;gap:8px;margin:12px 0 8px;color:#334155;font-size:11px}
 .unlock-divider::before,.unlock-divider::after{content:'';flex:1;height:1px;background:#334155}
 .unlock-form{display:none;text-align:left;width:100%}
@@ -232,19 +220,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .btn-unlock:hover{background:#dc2626}
 .unlock-err{font-size:12px;color:#f87171;margin-top:6px;min-height:16px}
 /* 解除コード入力セクション */
-#code-unlock-section{display:none;width:100%;margin-top:10px;text-align:left}
-#code-unlock-section.show{display:block}
-.code-unlock-title{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#34d399;font-size:12px;font-weight:700}
-.code-unlock-title::before,.code-unlock-title::after{content:'';flex:1;height:1px;background:#334155}
-.code-unlock-desc{font-size:12px;color:#94a3b8;line-height:1.7;margin-bottom:10px}
-.code-unlock-row{display:flex;gap:8px}
-.code-unlock-row input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:18px;font-weight:700;padding:10px 14px;outline:none;font-family:inherit;letter-spacing:6px;text-align:center;box-sizing:border-box}
-.code-unlock-row input:focus{border-color:#34d399}
-.btn-code-unlock{background:#34d399;color:#064e3b;border:none;border-radius:6px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
-.btn-code-unlock:hover{background:#6ee7b7}
-.btn-code-unlock:disabled{opacity:.5;cursor:default}
-.code-unlock-err{font-size:12px;color:#f87171;margin-top:6px;min-height:16px}
-.code-unlock-ok{font-size:12px;color:#34d399;margin-top:6px;min-height:16px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 
 /* 問い合わせ管理パネル */
@@ -303,27 +278,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
     <div class="locked-msg">
       パスワードを<strong>5回連続</strong>で間違えたため、<br>
       セキュリティ保護のためアカウントをロックしました。<br><br>
-      ログインを再開するには<strong>サイト運営者</strong>にお問い合わせください。<br>
-      運営者がロックを解除します。
-    </div>
-    <button class="btn-locked-contact" onclick="toggleLockedForm()">✉ 運営者に問い合わせる</button>
-    <div id="locked-form" class="locked-form">
-      <input id="lc-name"  type="text"  placeholder="お名前" />
-      <input id="lc-email" type="email" placeholder="返信先メールアドレス" />
-      <textarea id="lc-msg" placeholder="お問い合わせ内容（例：ロック解除をお願いします）">ロック解除をお願いします。</textarea>
-      <div id="lc-err" class="locked-form-err"></div>
-      <div id="lc-ok"  class="locked-form-ok"></div>
-      <button id="lc-send-btn" class="btn-locked-send" onclick="sendLockedContact()">送信する</button>
-    </div>
-    <div id="code-unlock-section">
-      <div class="code-unlock-title">解除コードで解除</div>
-      <div class="code-unlock-desc">運営者から届いた<strong style="color:#34d399">6桁の解除コード</strong>を入力してください。</div>
-      <div class="code-unlock-row">
-        <input id="unlock-code-input" type="text" maxlength="6" placeholder="000000" onkeydown="if(event.key==='Enter')doCodeUnlock()" />
-        <button id="btn-code-unlock" class="btn-code-unlock" onclick="doCodeUnlock()">解除する</button>
-      </div>
-      <div id="unlock-code-err" class="code-unlock-err"></div>
-      <div id="unlock-code-ok" class="code-unlock-ok"></div>
+      ログインを再開するには、<strong>管理者</strong>に社内の連絡手段（LINE WORKS など）でご連絡ください。<br>
+      管理者が下の「運営者の方はこちら」からロックを解除します。
     </div>
     <div class="locked-note">心当たりのない場合はセキュリティ侵害の可能性があります。至急ご連絡ください。</div>
     <div class="unlock-divider">運営者によるロック解除</div>
@@ -581,9 +537,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 
 <script>
 // ===== セキュリティ設定（要変更） =====
-// SECURITY_NOTIFY_EMAIL / EJ_PUBLIC_KEY / EJ_SVC は shared-data.js で定義
 var LOGIN_MAX_FAILS = 5;
-emailjs.init({publicKey: EJ_PUBLIC_KEY});
 
 // ===== DATA =====
 var SG = window.getKokokunaviDefaultSG();
@@ -1559,93 +1513,6 @@ function showLockedScreen(){
   ls.style.display='flex';
 }
 
-// 問い合わせフォームの開閉
-function toggleLockedForm(){
-  var form=document.getElementById('locked-form');
-  form.classList.toggle('open');
-}
-
-// ロック解除問い合わせをEmailJSで送信（解除コード付き）
-function sendLockedContact(){
-  var name=document.getElementById('lc-name').value.trim();
-  var email=document.getElementById('lc-email').value.trim();
-  var msg=document.getElementById('lc-msg').value.trim();
-  var errEl=document.getElementById('lc-err');
-  var okEl=document.getElementById('lc-ok');
-  var btn=document.getElementById('lc-send-btn');
-  errEl.textContent=''; okEl.textContent='';
-  if(!name){errEl.textContent='お名前を入力してください';return;}
-  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){errEl.textContent='正しいメールアドレスを入力してください';return;}
-  if(!msg){errEl.textContent='お問い合わせ内容を入力してください';return;}
-  // 6桁の解除コードを生成して保存
-  var unlockCode=String(Math.floor(100000+Math.random()*900000));
-  var mailBody='【ロック解除依頼】\n\n'
-    +'お名前: '+name+'\n'
-    +'返信先: '+email+'\n\n'
-    +msg+'\n\n'
-    +'━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-    +'🔑 ロック解除コード: '+unlockCode+'\n'
-    +'━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
-    +'上記の解除コードをこの方（'+email+'）にお伝えください。\n'
-    +'解除コードを入力するとロックが自動解除され、\n'
-    +'解除完了のメールが自動送信されます。';
-  localStorage.setItem('kokoknavi_unlock_code',unlockCode);
-  localStorage.setItem('kokoknavi_unlock_email',email);
-  btn.disabled=true; btn.textContent='送信中…';
-  emailjs.send(EJ_SVC, EJ_TPL_AUTH, {
-    to_email: SECURITY_NOTIFY_EMAIL,
-    reply_to: email,
-    from_name: name,
-    name: name,
-    email: email,
-    subject: '【広告ナビ】ロック解除依頼',
-    message: mailBody,
-    body: mailBody,
-    code: mailBody
-  }).then(function(){
-    okEl.textContent='✅ 送信しました。運営者から解除コードが届くまでお待ちください。';
-    btn.textContent='送信済み';
-    // 解除コード入力欄を表示
-    document.getElementById('code-unlock-section').classList.add('show');
-  }).catch(function(e){
-    errEl.textContent='送信に失敗しました。時間をおいて再度お試しください。';
-    btn.disabled=false; btn.textContent='送信する';
-    localStorage.removeItem('kokoknavi_unlock_code');
-    localStorage.removeItem('kokoknavi_unlock_email');
-    console.warn('問い合わせ送信失敗:',e);
-  });
-}
-
-// 解除コード入力によるロック解除
-async function doCodeUnlock(){
-  var inputCode=document.getElementById('unlock-code-input').value.trim();
-  var errEl=document.getElementById('unlock-code-err');
-  var okEl=document.getElementById('unlock-code-ok');
-  var btn=document.getElementById('btn-code-unlock');
-  errEl.textContent=''; okEl.textContent='';
-  if(!inputCode){errEl.textContent='解除コードを入力してください';return;}
-  var storedCode=localStorage.getItem('kokoknavi_unlock_code');
-  if(!storedCode||inputCode!==storedCode){
-    errEl.textContent='解除コードが正しくありません';
-    document.getElementById('unlock-code-input').value='';
-    return;
-  }
-  btn.disabled=true; btn.textContent='解除中…';
-  // ロック解除
-  localStorage.removeItem('kokoknavi_admin_locked');
-  localStorage.removeItem('kokoknavi_admin_fail_count');
-  localStorage.removeItem('kokoknavi_unlock_code');
-  localStorage.removeItem('kokoknavi_unlock_email');
-  okEl.textContent='✅ ロックを解除しました';
-  toast('✅ ロックを解除しました');
-  // 2秒後にログイン画面へ
-  setTimeout(function(){
-    document.getElementById('locked-screen').style.display='none';
-    showCenteredFlex(document.getElementById('login-screen'));
-    resetLoginForm();
-  },2000);
-}
-
 // 運営者解除フォームの開閉
 function toggleUnlockForm(e){
   var form=document.getElementById('unlock-form');
@@ -1675,11 +1542,10 @@ async function doUnlockAdmin(){
 document.addEventListener('DOMContentLoaded',function(){
   if(localStorage.getItem('kokoknavi_admin_locked')==='1'){
     showLockedScreen();
-    // 以前に発行済みの解除コードがあれば入力欄を表示
-    if(localStorage.getItem('kokoknavi_unlock_code')){
-      document.getElementById('code-unlock-section').classList.add('show');
-    }
   }
+  // 旧方式（メールの解除コード）の残りを消す
+  localStorage.removeItem('kokoknavi_unlock_code');
+  localStorage.removeItem('kokoknavi_unlock_email');
 });
 
 async function doLogin(){

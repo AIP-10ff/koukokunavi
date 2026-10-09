@@ -325,14 +325,6 @@ function _fmtInqDate(value){
 }
 function getFavIds(){try{return JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]');}catch(e){return[];}}
 
-// ===== 通知先メール =====
-var SECURITY_NOTIFY_EMAIL = 'h.mano@10-ff.com';
-
-// ===== EmailJS 設定定数 =====
-var EJ_PUBLIC_KEY  = '0Clg3RbnfDE5hK7XS';
-var EJ_SVC         = 'service_q9riskq';
-var EJ_TPL_AUTH    = 'template_ae5nrdo';
-
 // ===== Cookie 操作 =====
 function _setCookie(name,val,days){var d=new Date();d.setTime(d.getTime()+days*864e5);document.cookie=name+'='+val+';expires='+d.toUTCString()+';path=/;SameSite=Lax';}
 function _getCookie(name){var m=document.cookie.match('(?:^|; )'+name+'=([^;]*)');return m?m[1]:null;}
