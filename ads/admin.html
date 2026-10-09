@@ -368,8 +368,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <button class="hdr-btn" id="list-toggle-btn" onclick="toggleList()">📋 一覧</button>
   <button class="hdr-btn active" id="add-mode-btn" onclick="toggleAddModal()">＋ 新規追加</button>
   <button class="hdr-btn" onclick="confirmClearAll()" style="border-color:#ef4444;color:#ef4444">🗑 全削除</button>
+  <button class="hdr-btn" id="srv-btn" onclick="openSrvModal()" style="border-color:#64748b;color:#cbd5e1" title="サーバーに接続すると、保存・削除が利用者の画面にも反映されます">☁ サーバー未接続</button>
   <button class="hdr-btn" id="inq-toggle-btn" onclick="toggleInqPanel()">📩 問い合わせ<span id="inq-hdr-badge" class="iq-count-badge" style="display:none">0</span></button>
-  <button class="hdr-btn" onclick="openTrafficModal()" style="border-color:#3b82f6;color:#93c5fd">📊 交通量同期</button>
   <span id="admin-name" style="margin-left:auto;color:#94a3b8;font-size:12px;white-space:nowrap">👤 <span id="admin-id-display"></span></span>
   <button class="hdr-btn" onclick="showChangePwModal()" style="flex-shrink:0">🔑 PW変更</button>
   <button class="hdr-btn" onclick="showLogoutModal()" style="border-color:#ef4444;color:#ef4444;flex-shrink:0">ログアウト</button>
@@ -458,6 +458,34 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 </div>
 
 <!-- CHANGE PASSWORD MODAL -->
+<div id="srv-modal" style="display:none" class="m-overlay" onclick="closeSrvModal()">
+  <div class="m-box" style="max-width:380px" onclick="event.stopPropagation()">
+    <h3>☁ サーバーに接続</h3>
+    <div id="srv-login-area">
+      <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;line-height:1.7">接続すると、ピンの保存・削除がサーバーの DB に記録され、<b>利用者の画面にも反映</b>されます。サーバーの管理者アカウントでログインしてください。</p>
+      <div class="fg"><label>ユーザー名</label><input class="fi" id="srv-user" type="text" autocomplete="username" placeholder="ユーザー名"></div>
+      <div class="fg"><label>パスワード</label>
+        <div class="pw-wrap">
+          <input class="fi" id="srv-pw" type="password" autocomplete="current-password" placeholder="パスワード" onkeydown="if(event.key==='Enter')doSrvLogin()">
+          <button type="button" class="pw-toggle" onclick="togglePw('srv-pw',this)" tabindex="-1">👁</button>
+        </div>
+      </div>
+    </div>
+    <div id="srv-connected-area" style="display:none;font-size:12px;color:#cbd5e1;line-height:1.8">
+      <div>接続中：<b id="srv-who"></b></div>
+      <div>サーバーのピン：<b id="srv-count">-</b> 件 ／ この端末のピン：<b id="srv-local-count">-</b> 件</div>
+      <div style="margin-top:8px;color:#94a3b8">この端末にしか無いピンをサーバーへ送るときは「取り込み」を押してください（同じ ID は上書き）。</div>
+    </div>
+    <div id="srv-err" style="font-size:12px;color:#ef4444;min-height:16px;margin:8px 0"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="closeSrvModal()" class="btn-cancel-edit" style="flex:1;padding:10px;font-size:13px">閉じる</button>
+      <button id="srv-login-btn" onclick="doSrvLogin()" class="btn-save" style="flex:2;padding:10px;font-size:13px">接続する</button>
+      <button id="srv-import-btn" onclick="srvImportLocal()" class="btn-save" style="flex:2;padding:10px;font-size:13px;display:none">この端末のピンを取り込み</button>
+      <button id="srv-logout-btn" onclick="doSrvLogout()" class="btn-cancel-edit" style="flex:1;padding:10px;font-size:13px;display:none">切断</button>
+    </div>
+  </div>
+</div>
+
 <div id="changepw-modal" style="display:none" class="m-overlay">
   <div class="m-box" style="max-width:360px" onclick="event.stopPropagation()">
     <h3>🔑 パスワード変更</h3>
@@ -487,36 +515,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <button onclick="closeChangePwModal()" class="btn-cancel-edit" style="flex:1;padding:10px;font-size:13px">キャンセル</button>
       <button onclick="doChangePw()" class="btn-save" style="flex:2;padding:10px;font-size:13px">変更する</button>
     </div>
-  </div>
-</div>
-
-<!-- TRAFFIC SYNC MODAL -->
-<div id="traffic-modal" style="display:none" class="m-overlay" onclick="closeTrafficModal()">
-  <div class="m-box" style="max-width:560px;width:92vw;max-height:88vh;overflow-y:auto" onclick="event.stopPropagation()">
-    <h3>📊 交通量・通行量データ同期</h3>
-    <p style="font-size:12px;color:#94a3b8;margin:-4px 0 12px;line-height:1.6">
-      交通量測定システムが出力するGoogleスプレッドシート（公開リンク）から、地点ごとの
-      <b style="color:#93c5fd">通行量（人）</b>と<b style="color:#93c5fd">交通量（車）</b>を読み取り、各ピンへ反映します。<br>
-      ※ シートは「<b>リンクを知っている全員が閲覧可</b>」に共有してください。
-    </p>
-    <div class="fg">
-      <label>スプレッドシート URL または ID</label>
-      <input class="fi" id="tf-id" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
-    </div>
-    <div class="fg">
-      <label>シート名（タブ名）<span style="color:#64748b;font-size:10px">空欄＝先頭シート / 例: 日次</span></label>
-      <input class="fi" id="tf-sheet" placeholder="日次">
-    </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;margin-bottom:12px;cursor:pointer">
-      <input type="checkbox" id="tf-auto" style="width:16px;height:16px;cursor:pointer">
-      この画面を開いている間、30分ごとに自動で同期する
-    </label>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-      <button onclick="trafficSyncNow()" class="btn-save" style="flex:1;padding:10px;font-size:13px">🔄 今すぐ同期</button>
-      <button onclick="closeTrafficModal()" class="btn-cancel-edit" style="padding:10px 16px;font-size:13px">閉じる</button>
-    </div>
-    <div id="tf-last" style="font-size:11px;color:#64748b;margin-bottom:6px">最終同期: なし</div>
-    <div id="tf-result" style="font-size:13px"></div>
   </div>
 </div>
 
@@ -766,7 +764,6 @@ function popupHtml(s){
     +'<span class="pp-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
     +'<div class="pp-row">🏠 '+s.addr+'</div>'
     +'<div class="pp-row">👟 '+s.ped+'</div>'
-    +'<div class="pp-row">🚗 '+s.trf+'</div>'
     +'<div class="pp-price">¥'+_planPrice+'/月〜</div>'
     +'<button class="btn-edit-popup" onclick="openAdmin('+s.id+')">✏️ 編集する</button>'
     +'</div></div>';
@@ -831,18 +828,6 @@ function openAdmin(id){
       xlBtn.textContent='📊 Excelから';
       xlBtn.onclick=function(){openExcelImport('a-ped');};
       row.appendChild(pedInp);row.appendChild(xlBtn);
-      wrap.appendChild(lbl);wrap.appendChild(row);
-      return wrap;
-    })(),
-    (function(){
-      var wrap=document.createElement('div');wrap.className='fg';
-      var lbl=document.createElement('label');lbl.textContent='交通量';
-      var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
-      var trfInp=inp('a-trf',s.trf);trfInp.style.flex='1';
-      var xlBtn=document.createElement('button');xlBtn.type='button';xlBtn.className='btn-xl-import';
-      xlBtn.textContent='📊 Excelから';
-      xlBtn.onclick=function(){openExcelImport('a-trf');};
-      row.appendChild(trfInp);row.appendChild(xlBtn);
       wrap.appendChild(lbl);wrap.appendChild(row);
       return wrap;
     })(),
@@ -1151,7 +1136,6 @@ function saveSign(){
   s.lng    =parseFloat(gv('a-lng'))||s.lng;
   s.target =gv('a-target');
   s.ped    =gv('a-ped');
-  s.trf    =gv('a-trf');
   s.e      =s.e||'🏢'; // 絵文字はphotoに置き換わるが後方互換で保持
 
   var activeBtn=document.querySelector('.status-btn.on');
@@ -1181,6 +1165,7 @@ function saveSign(){
     localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));
     localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());
     toast('「'+s.name+'」を保存しました ✓');
+    _srvSaveOne(s);
   }catch(e){
     toast('⚠ データが大きすぎて保存できませんでした。写真を減らしてください。');
   }
@@ -1209,8 +1194,10 @@ function deleteSign(){
         (toDelete.photos||[]).forEach(function(p){if(p.id){idbDelete('photos',p.id);delete photoCache[p.id];}});
         (toDelete.docs||[]).forEach(function(d){if(d.id){idbDelete('docs',d.id);delete docCache[d.id];}});
       }
-      SG=SG.filter(function(x){return x.id!==editingId;});
+      var _delId=editingId;
+      SG=SG.filter(function(x){return x.id!==_delId;});
       render(); renderList(SG); closeAdmin();
+      _srvDeleteOne(_delId, name);
       try{ localStorage.setItem('kokoknavi_sg',JSON.stringify(SG)); localStorage.setItem('kokoknavi_sg_ts',Date.now().toString()); }catch(e){}
       toast('削除しました');
     };
@@ -1220,6 +1207,7 @@ function deleteSign(){
 
 // ===== CLEAR ALL =====
 function confirmClearAll(){
+  if(_srvToken()){toast('サーバー接続中は全削除できません。ピンを個別に削除するか、切断してから操作してください');return;}
   if(!SG.length){toast('ピンはありません');return;}
   if(!confirm('全てのピン（'+SG.length+'件）を削除しますか？\nこの操作は元に戻せません。')) return;
   idbClearStore('photos',function(){photoCache={};});
@@ -1228,153 +1216,6 @@ function confirmClearAll(){
   try{localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());}catch(e){}
   render(); renderList(SG);
   toast('全ピンを削除しました');
-}
-
-// ===== 交通量・通行量 スプレッドシート同期 =====
-var TF_LS={id:'kn_traffic_sheet_id', name:'kn_traffic_sheet_name', auto:'kn_traffic_auto', map:'kn_traffic_map', last:'kn_traffic_last'};
-var _tfTimer=null;
-
-function _tfGet(k,def){var v=localStorage.getItem(k);return v==null?def:v;}
-function _tfGetMap(){try{return JSON.parse(localStorage.getItem(TF_LS.map)||'{}')||{};}catch(e){return{};}}
-function _tfSetMap(m){try{localStorage.setItem(TF_LS.map,JSON.stringify(m));}catch(e){}}
-function _tfEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-
-function openTrafficModal(){
-  var m=document.getElementById('traffic-modal'); if(!m)return;
-  document.getElementById('tf-id').value=_tfGet(TF_LS.id, TRAFFIC_SHEET_ID_DEFAULT);
-  document.getElementById('tf-sheet').value=_tfGet(TF_LS.name,'');
-  document.getElementById('tf-auto').checked=_tfGet(TF_LS.auto,'1')==='1';
-  document.getElementById('tf-result').innerHTML='';
-  _tfRenderLast();
-  m.style.display='flex';
-}
-function closeTrafficModal(){var m=document.getElementById('traffic-modal');if(m)m.style.display='none';}
-
-function _tfRenderLast(){
-  var el=document.getElementById('tf-last'); if(!el)return;
-  var t=_tfGet(TF_LS.last,'');
-  el.textContent='最終同期: '+(t?new Date(Number(t)).toLocaleString('ja-JP'):'なし');
-}
-
-// モーダルの入力内容をlocalStorageへ保存
-function _tfSaveConfig(){
-  var idEl=document.getElementById('tf-id');
-  var id=idEl?trafficExtractSheetId(idEl.value):_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT);
-  if(!id) id=TRAFFIC_SHEET_ID_DEFAULT;
-  localStorage.setItem(TF_LS.id,id);
-  if(idEl) idEl.value=id;
-  var nm=document.getElementById('tf-sheet');
-  if(nm) localStorage.setItem(TF_LS.name, nm.value.trim());
-  var au=document.getElementById('tf-auto');
-  if(au) localStorage.setItem(TF_LS.auto, au.checked?'1':'0');
-  _tfSetupAuto();
-}
-
-// 1地点の最新行 → 対応するピンを解決（手動マップ→名前一致→緯度経度近接）
-function _tfMatch(rec){
-  var map=_tfGetMap();
-  if(map[rec.loc]!=null){var byId=find(Number(map[rec.loc]));if(byId)return byId;}
-  var key=_nrmS(rec.loc).replace(/\s/g,'');
-  for(var i=0;i<SG.length;i++){if(_nrmS(SG[i].name).replace(/\s/g,'')===key)return SG[i];}
-  if(rec.lat!=null&&rec.lng!=null&&!isNaN(rec.lat)&&!isNaN(rec.lng)){
-    for(var j=0;j<SG.length;j++){
-      if(SG[j].lat==null||SG[j].lng==null)continue;
-      if(trafficHaversineKm(rec.lat,rec.lng,SG[j].lat,SG[j].lng)<=0.05)return SG[j]; // 約50m以内
-    }
-  }
-  return null;
-}
-
-// 1地点の値をピンへ反映
-function _tfApply(sg,rec){
-  if(rec.ped!=='') sg.ped=rec.ped;   // 通行量_合計 → 通行者数（人）
-  if(rec.trf!=='') sg.trf=rec.trf;   // 交通量_合計 → 交通量（車）
-  sg.traffic={date:rec.date, ped:rec.ped, trf:rec.trf, detail:rec.detail, updatedAt:Date.now()}; // 付帯情報
-}
-
-// 手動／ボタン同期（結果表示あり）
-async function trafficSyncNow(){
-  _tfSaveConfig();
-  var id=_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT), name=_tfGet(TF_LS.name,'');
-  var res=document.getElementById('tf-result');
-  res.innerHTML='<div style="color:#94a3b8">⏳ 取得中…</div>';
-  try{
-    var recs=await fetchTrafficDaily(id,name);
-    if(!recs.length){res.innerHTML='<div style="color:#f59e0b">⚠ データ行が見つかりませんでした。<br>シートの共有設定（リンクを知っている全員が閲覧可）とシート名をご確認ください。</div>';return;}
-    var updated=0, unmatched=[];
-    recs.forEach(function(rec){
-      var sg=_tfMatch(rec);
-      if(!sg){unmatched.push(rec);return;}
-      _tfApply(sg,rec); updated++;
-    });
-    _tfPersist();
-    render(); renderList(SG); _tfRenderLast();
-    _tfRenderResult(updated, recs.length, unmatched);
-    toast('交通量データを同期しました（'+updated+'件更新）');
-  }catch(e){
-    res.innerHTML='<div style="color:#ef4444">⚠ 取得に失敗しました: '+_tfEsc(_errMsg(e))+'<br>シートが「リンクを知っている全員が閲覧可」になっているかご確認ください。</div>';
-  }
-}
-
-function _tfPersist(){
-  try{
-    localStorage.setItem('kokoknavi_sg',JSON.stringify(SG));
-    localStorage.setItem('kokoknavi_sg_ts',Date.now().toString());
-  }catch(e){}
-  localStorage.setItem(TF_LS.last,Date.now().toString());
-}
-
-function _tfRenderResult(updated,total,unmatched){
-  var res=document.getElementById('tf-result');
-  var html='<div style="color:#10b981;font-weight:700;margin-bottom:6px">✓ '+updated+' / '+total+' 地点をピンへ反映しました</div>';
-  if(unmatched.length){
-    html+='<div style="color:#f59e0b;font-size:12px;margin:10px 0 6px">未マッチの地点（'+unmatched.length+'件）— ピンを手動で割り当ててください:</div>';
-    var opts='<option value="">— 割り当てない —</option>'+SG.map(function(s){return '<option value="'+s.id+'">'+_tfEsc(s.name)+'</option>';}).join('');
-    unmatched.forEach(function(rec,idx){
-      html+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;flex-wrap:wrap">'
-        +'<span style="flex:1 1 160px;color:#e2e8f0;min-width:0">'+_tfEsc(rec.loc)+' <span style="color:#64748b;white-space:nowrap">(人'+(rec.ped||'-')+'/車'+(rec.trf||'-')+')</span></span>'
-        +'<select id="tf-map-'+idx+'" class="fi" style="flex:1 1 160px;padding:5px;font-size:12px">'+opts+'</select>'
-        +'<button onclick="trafficAssign('+idx+',\''+encodeURIComponent(rec.loc)+'\')" style="background:var(--org);color:#fff;border:none;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">割当</button>'
-        +'</div>';
-    });
-  }
-  res.innerHTML=html;
-}
-
-// 未マッチ地点を手動でピンに割り当て→保存→再同期
-function trafficAssign(idx,locEnc){
-  var loc=decodeURIComponent(locEnc);
-  var sel=document.getElementById('tf-map-'+idx);
-  if(!sel||!sel.value){toast('ピンを選択してください');return;}
-  var map=_tfGetMap(); map[loc]=Number(sel.value); _tfSetMap(map);
-  toast('「'+loc+'」を割り当てました。再同期します');
-  trafficSyncNow();
-}
-
-// 自動同期（バックグラウンド・通知最小）
-function trafficSyncSilent(){
-  var id=_tfGet(TF_LS.id,TRAFFIC_SHEET_ID_DEFAULT), name=_tfGet(TF_LS.name,'');
-  return fetchTrafficDaily(id,name).then(function(recs){
-    var updated=0;
-    recs.forEach(function(rec){var sg=_tfMatch(rec);if(sg){_tfApply(sg,rec);updated++;}});
-    if(updated){_tfPersist();render();renderList(SG);}
-    else{localStorage.setItem(TF_LS.last,Date.now().toString());}
-    _tfRenderLast();
-  }).catch(function(){});
-}
-
-function _tfSetupAuto(){
-  if(_tfTimer){clearInterval(_tfTimer);_tfTimer=null;}
-  if(_tfGet(TF_LS.auto,'1')==='1'){
-    _tfTimer=setInterval(trafficSyncSilent, 30*60*1000);
-  }
-}
-
-// ログイン成功後に1回だけ初回同期＋自動同期セットアップ
-function _tfInitAfterLogin(){
-  if(localStorage.getItem(TF_LS.id)==null) localStorage.setItem(TF_LS.id, TRAFFIC_SHEET_ID_DEFAULT);
-  _tfSetupAuto();
-  trafficSyncSilent();
 }
 
 // ===== SHARED HELPERS =====
@@ -1849,7 +1690,6 @@ async function doLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('admin-id-display').textContent='管理者';
     err.textContent='';
-    try{_tfInitAfterLogin();}catch(e){}
   } else {
     // 失敗カウントを更新
     var fails=parseInt(localStorage.getItem('kokoknavi_admin_fail_count')||'0')+1;
@@ -2406,6 +2246,122 @@ function reLogin(){
   showCenteredFlex(document.getElementById('login-screen'));
   resetLoginForm();
 }
+// ===== サーバー接続（Phase2 管理系 API） =====
+// 接続中は、保存・削除をサーバーの DB（/api/v1/admin/signages/）にも送る。利用者の画面はサーバーの一覧を読むので、そこで全員に反映される。
+// トークンはこのタブだけ（sessionStorage）。タブを閉じると切断。未接続なら従来どおり端末内（localStorage）だけに保存する。
+var SRV_TOKEN_KEY='kn_admin_api_token', SRV_USER_KEY='kn_admin_api_user';
+function _srvToken(){ try{return sessionStorage.getItem(SRV_TOKEN_KEY)||'';}catch(e){return '';} }
+function _srvSetToken(t,u){
+  try{ if(t){sessionStorage.setItem(SRV_TOKEN_KEY,t);sessionStorage.setItem(SRV_USER_KEY,u||'');}
+       else {sessionStorage.removeItem(SRV_TOKEN_KEY);sessionStorage.removeItem(SRV_USER_KEY);} }catch(e){}
+  _srvRenderBtn();
+}
+function _srvRenderBtn(){
+  var b=document.getElementById('srv-btn'); if(!b) return;
+  var on=!!_srvToken();
+  b.textContent=on?'☁ サーバー接続中':'☁ サーバー未接続';
+  b.style.borderColor=on?'#22c55e':'#64748b';
+  b.style.color=on?'#86efac':'#cbd5e1';
+}
+function _srvErr(e){
+  if(e&&e.status===401||e&&e.status===403){_srvSetToken('');return 'サーバーの接続が切れました。もう一度接続してください';}
+  if(e&&e.data&&typeof e.data==='object'&&!e.data.detail){
+    var k=Object.keys(e.data)[0]; var v=e.data[k]; return k+'：'+(Array.isArray(v)?v.join(' '):JSON.stringify(v));
+  }
+  if(!e||!e.status) return 'サーバーに接続できませんでした（通信を確認してください）';
+  return e.message||'通信に失敗しました';
+}
+function openSrvModal(){
+  document.getElementById('srv-err').textContent='';
+  var on=!!_srvToken();
+  document.getElementById('srv-login-area').style.display=on?'none':'';
+  document.getElementById('srv-connected-area').style.display=on?'':'none';
+  document.getElementById('srv-login-btn').style.display=on?'none':'';
+  document.getElementById('srv-import-btn').style.display=on?'':'none';
+  document.getElementById('srv-logout-btn').style.display=on?'':'none';
+  if(on){
+    document.getElementById('srv-who').textContent=sessionStorage.getItem(SRV_USER_KEY)||'';
+    document.getElementById('srv-local-count').textContent=SG.length;
+    document.getElementById('srv-count').textContent='…';
+    knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){
+      document.getElementById('srv-count').textContent=list.length;
+    }).catch(function(e){
+      // 401/403 なら _srvErr がトークンを消すので、ログイン欄に切り替えてから文言を出す。
+      // それ以外（通信失敗など）は再取得せず文言だけ出す（openSrvModal を呼び直すと取得を繰り返すため）
+      var m=_srvErr(e);
+      if(!_srvToken()) openSrvModal();
+      document.getElementById('srv-err').textContent=m;
+    });
+  }
+  document.getElementById('srv-modal').style.display='flex';
+}
+function closeSrvModal(){ document.getElementById('srv-modal').style.display='none'; }
+function doSrvLogin(){
+  var u=document.getElementById('srv-user').value.trim(), pw=document.getElementById('srv-pw').value;
+  var err=document.getElementById('srv-err');
+  if(!u||!pw){err.textContent='ユーザー名とパスワードを入力してください';return;}
+  err.textContent='接続中…';
+  knApi('POST','/admin/login/',{username:u,password:pw}).then(function(d){
+    document.getElementById('srv-pw').value='';
+    _srvSetToken(d.auth_token,d.username);
+    return _srvLoadFromServer(true);
+  }).then(function(){ openSrvModal(); })
+  .catch(function(e){ err.textContent=_srvErr(e); });
+}
+function doSrvLogout(){
+  var t=_srvToken();
+  if(t) knApi('POST','/admin/logout/',undefined,t).catch(function(){});
+  _srvSetToken('');
+  closeSrvModal();
+  toast('サーバーから切断しました（以後の保存はこの端末だけ）');
+}
+// サーバーにピンがあれば、それを管理画面の一覧として表示する（端末内データは上書き保存しない）
+function _srvLoadFromServer(showToast){
+  return knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){
+    if(!list.length){ if(showToast) toast('サーバーにはまだピンがありません。「この端末のピンを取り込み」で送れます'); return; }
+    var prev={}; SG.forEach(function(s){prev[s.id]=s;});
+    SG=list.map(function(s){ var o=prev[s.id]||{}; s.e=o.e||'📺'; s.favCount=o.favCount||0; return s; });
+    render(); renderList(SG); try{updateStats();}catch(e){}
+    if(showToast) toast('サーバーのピン '+list.length+' 件を表示しています');
+  });
+}
+function _srvSaveOne(s){
+  var t=_srvToken(); if(!t) return;
+  var body=knToServerSignage(s);
+  knApi('PUT','/admin/signages/'+s.id+'/',body,t).catch(function(e){
+    if(e.status===404) return knApi('POST','/admin/signages/',body,t);
+    throw e;
+  }).then(function(){ toast('☁ サーバーにも保存しました（利用者の画面に反映）'); })
+  .catch(function(e){ toast('⚠ サーバーへの保存に失敗：'+_srvErr(e)+'（この端末には保存済み）'); });
+}
+function _srvDeleteOne(id,name){
+  var t=_srvToken(); if(!t) return;
+  knApi('DELETE','/admin/signages/'+id+'/',undefined,t).then(function(){
+    toast('☁ サーバーからも削除しました');
+  }).catch(function(e){
+    if(e.status===404) return; // サーバーには元々無い
+    toast('⚠ サーバーからの削除に失敗：'+_srvErr(e));
+  });
+}
+function srvImportLocal(){
+  var t=_srvToken(); if(!t) return;
+  if(!SG.length){toast('この端末にピンがありません');return;}
+  if(!confirm('この端末のピン '+SG.length+' 件をサーバーへ送ります。\n同じ ID のピンはこの端末の内容で上書きされます。よろしいですか？')) return;
+  var err=document.getElementById('srv-err'); err.textContent='取り込み中…';
+  knApi('POST','/admin/signages/import/',{signages:SG.map(knToServerSignage)},t).then(function(d){
+    err.textContent='';
+    toast('☁ 取り込み完了：新規 '+d.created+' 件・更新 '+d.updated+' 件');
+    return _srvLoadFromServer(false);
+  }).then(function(){ openSrvModal(); })
+  .catch(function(e){
+    var msg=_srvErr(e);
+    if(e&&e.data&&e.data.errors&&e.data.errors.length){ var x=e.data.errors[0]; msg+='（'+(x.index+1)+' 件目 id='+x.id+'：'+JSON.stringify(x.errors)+'）'; }
+    err.textContent=msg;
+  });
+}
+// 再読み込み後も同じタブなら接続を引き継ぎ、サーバーの一覧を表示する
+_srvRenderBtn();
+if(_srvToken()) _srvLoadFromServer(false).catch(function(e){ toast('⚠ '+_srvErr(e)); });
 </script>
 </body>
 </html>

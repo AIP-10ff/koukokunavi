@@ -440,7 +440,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <div id="dp-photo-strip" style="display:none;flex-wrap:wrap;gap:4px;padding:0 2px;margin-top:4px"></div>
       <div class="dp-breadcrumb" id="dp-bc" style="padding:0 2px">名古屋 / 女性</div>
       <div class="dp-data-card" style="flex-shrink:0">
-        <div class="dp-data-head">📊 通行者・交通量データ</div>
+        <div class="dp-data-head">📊 通行者データ</div>
         <div style="padding:8px 12px">
           <div class="chart-title">1日の通行者数（時間別 / 先月比）</div>
           <div class="bar-chart" id="inline-bc"></div>
@@ -573,12 +573,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
         <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
       </div>
       <div>
-        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">交通量</h4>
-        <div class="range-val-display" id="trf-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
-        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="trf-fill" style="left:0%;width:100%"></div></div><input type="range" id="trf-lo" min="0" max="10" value="0" step="1"><input type="range" id="trf-hi" min="0" max="10" value="10" step="1"></div>
-        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
-      </div>
-      <div>
         <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">予算</h4>
         <div class="range-val-display" id="bgt-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
         <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="bgt-fill" style="left:0%;width:100%"></div></div><input type="range" id="bgt-lo" min="0" max="10" value="0" step="1"><input type="range" id="bgt-hi" min="0" max="10" value="10" step="1"></div>
@@ -667,6 +661,10 @@ let SG = loadSG().map(s => ({
 }));
 
 
+// サーバー（/api/v1/signages/）の掲載情報を表示中なら true（_loadSgFromServer で設定）
+let _sgFromServer = false;
+let _sgServerSig = '';
+
 // ===== リアルタイム同期（管理者画面 ↔ 広告ナビ） =====
 // 管理者画面で保存されたタイムスタンプを保持し、変更検知に使用
 let _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
@@ -678,6 +676,7 @@ let _sgTs = localStorage.getItem('kokoknavi_sg_ts') || '0';
  * visibilitychange イベントの両方からここを呼ぶことで処理を一元化している。
  */
 function _reloadSgFromStorage(showToast){
+  if(_sgFromServer) return; // サーバーの掲載情報を表示中は、端末内（管理者画面の localStorage）で上書きしない
   const saved = localStorage.getItem('kokoknavi_sg');
   if(!saved) return;
   try{
@@ -716,36 +715,43 @@ document.addEventListener('visibilitychange', function(){
   _reloadSgFromStorage(true);
 });
 
-// ===== 交通量・通行量データの自動取得（全訪問者向け） =====
-// 管理者の同期に依存せず、各訪問者のブラウザが公開スプレッドシート（読み取り専用）
-// から直接、地点ごとの最新の通行量(人)・交通量(車)を取得してピンへ反映する。
-// 表示用に ped/trf のみマージし、他のサイネージ情報は壊さない。
-let _trafficViewerTimer=null;
-function _loadTrafficForViewer(){
-  if(typeof fetchTrafficDaily!=='function') return;        // shared-data.js 未読込なら何もしない
-  const id=localStorage.getItem('kn_traffic_sheet_id')||TRAFFIC_SHEET_ID_DEFAULT;
-  const name=localStorage.getItem('kn_traffic_sheet_name')||'';
-  let mapObj={}; try{mapObj=JSON.parse(localStorage.getItem('kn_traffic_map')||'{}')||{};}catch(e){}
-  fetchTrafficDaily(id,name).then(function(recs){
-    let changed=0;
-    recs.forEach(function(rec){
-      const sg=trafficMatchSignage(rec, SG, mapObj);
-      if(!sg) return;
-      if(rec.ped!=='' && sg.ped!==rec.ped){ sg.ped=rec.ped; changed++; }
-      if(rec.trf!=='' && sg.trf!==rec.trf){ sg.trf=rec.trf; changed++; }
-    });
-    if(changed && map){
-      putMarkers(SG); // ピン（人/車アイコン・ポップアップ）を再描画
-      if(cur && $('detail-panel').classList.contains('open')){
-        const u=SG.find(x=>x.id===cur.id); if(u) openDetail(u.id);
+// ===== サーバーの掲載情報（Phase2 管理系 API） =====
+// 管理者画面でサーバーに保存したピンを、全利用者の画面に出す。
+// サーバーに 1 件以上あればそれを正とし、取得失敗・0 件のときは従来どおり（localStorage → shared-data.js の既定データ）のまま。
+function _loadSgFromServer(showToast){
+  if(typeof knFetchSignages !== 'function') return;
+  knFetchSignages().then(function(list){
+    if(!list.length) return;
+    const sig = JSON.stringify(list.map(s => [s.id, s.updated_at]));
+    if(sig === _sgServerSig) return; // 変更なし
+    const first = !_sgFromServer;
+    _sgServerSig = sig;
+    _sgFromServer = true;
+    const prev = {}; SG.forEach(s => { prev[s.id] = s; });
+    SG = list.map(s => ({
+      ...s,
+      e: (prev[s.id] && prev[s.id].e) || '📺',
+      favCount: (prev[s.id] && prev[s.id].favCount) || 0,
+      plans: (s.plans || []).map(normalizePlan)
+    }));
+    preloadMediaCache(SG, function(){
+      if(map){
+        putMarkers(SG);
       }
-    }
-  }).catch(function(){ /* 取得失敗時は静かにスキップ（既存表示のまま） */ });
-  // 提供側の更新間隔(30分)に合わせて定期再取得（ページを開いている間）
-  if(!_trafficViewerTimer){
-    _trafficViewerTimer=setInterval(_loadTrafficForViewer, 30*60*1000);
-  }
+      if(cur && $('detail-panel').classList.contains('open')){
+        const updated = SG.find(x => x.id === cur.id);
+        if(updated) openDetail(updated.id); else closeDetail();
+      }
+    });
+    if(showToast && !first) toast('掲載情報を更新しました');
+  }).catch(function(){ /* API 未設置・通信失敗は静かに従来表示のまま */ });
 }
+_loadSgFromServer(false);
+// 開いたまま放置されている画面にも反映する（5 分ごと＋タブに戻ったとき）
+setInterval(function(){ if(document.visibilityState === 'visible') _loadSgFromServer(true); }, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible') _loadSgFromServer(true);
+});
 
 // ===== メール認証（EmailJS） =====
 // EJ_PUBLIC_KEY / EJ_SVC / EJ_TPL_AUTH は shared-data.js で定義
@@ -845,18 +851,17 @@ function endSession(){sessionStorage.removeItem('kokoknavi_session');loggedIn=fa
 let favs=(()=>{try{return new Set(JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]'));}catch(e){return new Set();}})();
 
 // ===== デュアルレンジスライダー =====
-// 絞り込みフィルターの「歩行者通行量 / 車通行量 / 予算」に使う範囲指定UI。
+// 絞り込みフィルターの「通行者数 / 予算」に使う範囲指定UI。
 // 2本のinput[type=range]を重ね、lower/upper の値で塗りつぶし幅を制御する。
 const RC={
   ped:{steps:['下限なし','1万人','2万人','3万人','4万人','5万人','6万人','7万人','8万人','9万人','上限なし']},
-  trf:{steps:['下限なし','3,000台','1万台','2万台','3万台','3.5万台','4万台','4.5万台','5万台','6万台','上限なし']},
   bgt:{steps:['下限なし','30万円','40万円','50万円','60万円','70万円','80万円','90万円','100万円','120万円','上限なし']}
 };
 
 /**
  * レンジスライダーの表示を更新する（塗りつぶし位置・ラベルテキスト）。
  * lo > hi になった場合は互いを入れ替えて逆転を防ぐ。
- * @param {string} key - 'ped' / 'trf' / 'bgt' のいずれか
+ * @param {string} key - 'ped' / 'bgt' のいずれか
  */
 function updateRange(key){
   const lo=document.getElementById(key+'-lo'),hi=document.getElementById(key+'-hi');
@@ -867,9 +872,9 @@ function updateRange(key){
   disp.textContent=(lv===0?'下限なし':RC[key].steps[lv])+' 〜 '+(hv===10?'上限なし':RC[key].steps[hv]);
 }
 
-/** 3つのレンジスライダーにイベントリスナーを設定し初期表示を行う（ページロード時に1回呼ぶ） */
+/** レンジスライダーにイベントリスナーを設定し初期表示を行う（ページロード時に1回呼ぶ） */
 function initRanges(){
-  ['ped','trf','bgt'].forEach(k=>{
+  ['ped','bgt'].forEach(k=>{
     const lo=document.getElementById(k+'-lo'),hi=document.getElementById(k+'-hi');
     lo.addEventListener('input',()=>updateRange(k));hi.addEventListener('input',()=>updateRange(k));updateRange(k);
   });
@@ -893,7 +898,6 @@ async function initMap(lat,lng){
   });
   _infoWin=new InfoWindow();
   putMarkers(SG);
-  _loadTrafficForViewer(); // 公開スプレッドシートから最新の通行量・交通量を取得して反映
   addFacilityControl();    // 🏪 周辺施設ボタン（フェーズ2）
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
   facilityLayer=null;
@@ -1299,7 +1303,12 @@ function focusPin(id){
   _setView(s.lat,s.lng,16);
   if(m)_openInfo(s,m);
 }
-/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・通行量・料金・詳細ボタン）*/
+// 人流の出典（D-1）。数値が入っている拠点だけに出す（「準備中」や空欄には出さない）
+const PED_SOURCE='出典：国土交通省 人流オープンデータ（2021年10月・平日・1kmメッシュの滞在人口）';
+function _pedSourceHtml(ped){
+  return (ped && /\d/.test(ped)) ? `<div class="row" style="font-size:11px;color:#888">${PED_SOURCE}</div>` : '';
+}
+/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・人流・料金・詳細ボタン）*/
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
   return `<div>
@@ -1307,7 +1316,6 @@ function popupHtml(s){
     <div class="pp-body">
       <div class="pp-row">🏠 ${(s.addr||'').slice(0,18)}…</div>
       <div class="pp-row">👟 ${s.ped||'—'}</div>
-      <div class="pp-row">🚗 ${s.trf||'—'}</div>
       <div class="pp-price">${price}〜</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>
@@ -1366,7 +1374,7 @@ function openDetail(id){
   if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
   const _st=s.status||'';
   const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
-  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div><div class="row">👟 歩行者通行量　<span>${s.ped||'—'}</span></div><div class="row">🚗 車通行量　<span>${s.trf||'—'}</span></div>`;
+  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div><div class="row">👟 人流　<span>${s.ped||'—'}</span></div>${_pedSourceHtml(s.ped)}`;
   $('memo-wrap').style.display=loggedIn?'flex':'none';$('memo-wrap').style.flexDirection='column';
   $('memo-ta').value=loggedIn?(getMemos()[s.id]||''):'';
   setTimeout(()=>{
@@ -1472,7 +1480,7 @@ function pie(id,data,colors){
 }
 function clearFilter(){
   document.querySelectorAll('#filter-panel .tag.on').forEach(t=>t.classList.remove('on'));
-  ['ped','trf','bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
+  ['ped','bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
   const areaAllBtn=document.querySelector('#filter-panel .btn-select-all[onclick*="selectAllArea"]');
   if(areaAllBtn)areaAllBtn.textContent='全都道府県を選択';
   document.querySelectorAll('#area-grid .btn-select-all').forEach(b=>b.textContent='すべて選択');
@@ -1839,7 +1847,7 @@ function showList(items,label){
     const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
     const mpUrl=mp?photoCache[mp.id]||'':'';
     const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:(s.e||'🏢');
-    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}<br>👟 ${s.ped||'—'}<br>🚗 ${s.trf||'—'}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
+    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}<br>👟 ${s.ped||'—'}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
   }).join('');
   $('list-panel').classList.add('open');
   $('lp-items').scrollTop=0;
