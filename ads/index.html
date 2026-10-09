@@ -754,58 +754,9 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible') _loadSgFromServer(true);
 });
 
-// ===== メール認証（EmailJS） =====
-// EJ_PUBLIC_KEY / EJ_SVC / EJ_TPL_AUTH は shared-data.js で定義
+// ===== EmailJS =====
+// 問い合わせの予備送信（サーバーに届かないとき）でだけ使う。会員の確認コードは SMS（Firebase）に切り替えた
 emailjs.init({publicKey:EJ_PUBLIC_KEY});
-
-// 認証コードの一時保存領域 {code: 6桁コード, expiry: 有効期限ms, email, pw, type}
-let authCode=null;
-
-/** ランダムな6桁の数字コードを生成する */
-function genCode(){return String(Math.floor(100000+Math.random()*900000));}
-async function resendAuthCode(){
-  if(!authCode||!authCode.email||!authCode.pw){toast("情報が見つかりません。最初からやり直してください");showAuth('register');return;}
-  var _cd=_checkSendCooldown('kn_cd_auth',60);
-  if(!_cd.ok){toast("再送信は"+_cd.remaining+"秒後にお試しください");return;}
-  const code=genCode();
-  authCode={code,expiry:Date.now()+5*60*1000,email:authCode.email,pw:authCode.pw};
-  try{
-    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:authCode.email,code});
-    document.getElementById('a-code').value='';
-    toast("確認コードを再送信しました");
-  }catch(e){
-    const msg=_errMsg(e);
-    toast("送信失敗："+msg);
-  }
-}
-async function sendAuthCode(){
-  const email=($('a-id')?.value||'').trim();
-  const pw=$('a-pw')?.value||'';
-  const pw2=$('a-pw2')?.value||'';
-  if(!email||!pw||!pw2){toast("すべての項目を入力してください");return;}
-  var _cd=_checkSendCooldown('kn_cd_auth',60);
-  if(!_cd.ok){toast("送信は"+_cd.remaining+"秒後にお試しください");return;}
-  if(pw!==pw2){toast("パスワードが一致しません");return;}
-  if(pw.length<6){toast("パスワードは6文字以上にしてください");return;}
-  const accs=getAccounts();
-  const emailKey=_emailKey(email);
-  if(accs[emailKey]){toast("このメールアドレスはすでに登録されています");return;}
-  const code=genCode();
-  authCode={code,expiry:Date.now()+5*60*1000,email,pw};
-  const btn=document.getElementById('btn-send-code');
-  if(btn){btn.disabled=true;btn.textContent='送信中...';}
-  try{
-    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:email,code});
-    document.getElementById('auth-step1').style.display='none';
-    document.getElementById('auth-step2').style.display='block';
-    toast("確認コードを送信しました");
-  }catch(e){
-    console.error('EmailJS error:',e);
-    const msg=_errMsg(e);
-    toast("送信失敗："+msg);
-    if(btn){btn.disabled=false;btn.textContent='確認コードを送信';}
-  }
-}
 
 // ===== グローバル変数 =====
 let map,           // Google Maps マップインスタンス
@@ -827,26 +778,207 @@ let map,           // Google Maps マップインスタンス
     _facilityCacheBounds=null, // キャッシュ済みデータの取得範囲
     _facilityCacheCats=null;   // キャッシュ済みデータのカテゴリSet文字列
 
-// ===== 認証ヘルパー =====
-// hashPw / verifyPw は shared-data.js で定義（Argon2id使用）
+// ===== 会員（電話番号＋SMS、Phase2 ⑥15・16・17） =====
+// 本人確認は Firebase（SMS の 6 桁コード）、ログイン状態はサーバー（/api/v1/auth/*）が持つ。
+//   ログイン・新規登録は同じ流れ：電話番号 → SMS コード → Firebase の IDトークン → POST auth/login/ → auth_token
+//   auth_token は localStorage の kokoknavi_token。次に開いたときは POST auth/refresh/ で自動ログイン
+//   初回ログイン時、この端末に残っているお気に入り・メモを POST migrate/local-data/ で引き上げ、成功したら端末から消す
+// 旧方式（メール＋パスワード、端末内のみ）の会員は Firebase へ移せないため、電話番号で作り直してもらう。
+const KN_TOKEN_KEY='kokoknavi_token';
+let _knToken=(()=>{try{return localStorage.getItem(KN_TOKEN_KEY)||'';}catch(e){return '';}})();
+let _knProfile=null;   // {firebase_uid, phone_number, email}
+let _smsState=null;    // SMS 送信中の状態 {purpose, phone, confirmation|verificationId, verifier}
 
-/** localStorageからアカウント情報（メール→ハッシュ）を取得する */
-function getAccounts(){try{return JSON.parse(localStorage.getItem('kokoknavi_accounts')||'{}');}catch(e){return{};}}
+// Firebase は使うときだけ読み込む（ログインしない利用者には読み込ませない）
+let _fbPromise=null;
+function knFirebase(){
+  if(_fbPromise) return _fbPromise;
+  const base='https://www.gstatic.com/firebasejs/11.0.1/';
+  _fbPromise=Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js')]).then(([a,m])=>{
+    const app=a.initializeApp(KN_FIREBASE_CONFIG);
+    const auth=m.getAuth(app); auth.languageCode='ja';
+    return {auth,m};
+  });
+  _fbPromise.catch(()=>{_fbPromise=null;});
+  return _fbPromise;
+}
+function _fbErrMsg(e){
+  const c=(e&&e.code)||'';
+  if(c==='auth/invalid-phone-number')return '電話番号の形が正しくありません';
+  if(c==='auth/too-many-requests'||c==='auth/quota-exceeded')return '送信が多すぎます。しばらくしてからお試しください';
+  if(c==='auth/invalid-verification-code')return '確認コードが違います';
+  if(c==='auth/code-expired'||c==='auth/session-expired')return '確認コードの有効期限が切れました。もう一度送信してください';
+  if(c==='auth/captcha-check-failed'||c==='auth/internal-error')return 'ロボットでないことの確認に失敗しました。ページを再読み込みしてお試しください';
+  if(c==='auth/network-request-failed')return '通信に失敗しました。電波の良い場所でお試しください';
+  if(c==='auth/credential-already-in-use'||c==='auth/account-exists-with-different-credential')return 'この電話番号は別のアカウントで使われています';
+  if(c==='auth/requires-recent-login')return '安全のため、もう一度ログインしてからお試しください';
+  return (e&&e.message)||'エラーが発生しました';
+}
+// 090-1234-5678 / 09012345678 / +81 90 1234 5678 → +819012345678（日本の番号のみ。SMS の地域設定も日本のみ）
+function knNormalizePhone(v){
+  let s=String(v||'').replace(/＋/g,'+').replace(/[‐－ー−\-\s()（）]/g,'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  if(s.startsWith('+81'))s=s.slice(3); else if(s.startsWith('81')&&s.length>=11)s=s.slice(2);
+  if(s.startsWith('0'))s=s.slice(1);
+  return /^\d{9,10}$/.test(s)?'+81'+s:'';
+}
+function knPhoneLabel(e164){ // +819012345678 → 090-1234-5678
+  const m=String(e164||'').match(/^\+81(\d{2})(\d{4})(\d{4})$/);
+  return m?`0${m[1]}-${m[2]}-${m[3]}`:String(e164||'').replace(/^\+81/,'0');
+}
+function _knDeviceLabel(){
+  const ua=navigator.userAgent||'';
+  const os=/iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'Mac':'端末';
+  const br=/Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':/Firefox\//.test(ua)?'Firefox':'ブラウザ';
+  return br+'（'+os+'）';
+}
+function _knSetToken(t){_knToken=t||'';try{t?localStorage.setItem(KN_TOKEN_KEY,t):localStorage.removeItem(KN_TOKEN_KEY);}catch(e){}}
+function _knApiErr(e){return (e&&e.status===429)?'操作が多すぎます。しばらくしてからお試しください':((e&&e.message)||'通信に失敗しました');}
 
-/** アカウント情報をlocalStorageに保存する */
-function saveAccounts(a){localStorage.setItem('kokoknavi_accounts',JSON.stringify(a));}
+// ログイン状態の切り替え（画面の表示はここに集める）
+function _knApplyLogin(profile,favorites){
+  _knProfile=profile||null;
+  loggedIn=!!profile; uName=profile?profile.phone_number:'';
+  if(profile&&Array.isArray(favorites)) favs=new Set(favorites.map(Number).filter(n=>!isNaN(n)));
+  if(!profile) favs=new Set();
+  updateAuthBtn();
+  try{putMarkers(SG);}catch(e){}
+}
+/** 開いたときに前回のログインを引き継ぐ（auth/refresh/）。失敗しても画面はそのまま使える */
+function restoreSession(){
+  if(!_knToken) return;
+  knApi('POST','/auth/refresh/',{},_knToken).then(d=>{
+    _knApplyLogin(d.profile,d.favorites||[]);
+  }).catch(e=>{
+    if(e&&(e.status===401||e.status===403)){_knSetToken('');_knApplyLogin(null);}
+  });
+}
+// 端末に残っているお気に入り・メモ（旧方式）を読む
+function _knLocalFavs(){try{return JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]');}catch(e){return[];}}
+function _knLocalMemos(){
+  try{const raw=JSON.parse(localStorage.getItem('kokoknavi_memos')||'{}');const out={};
+    for(const k in raw){const v=_decMemo(raw[k]);if(String(v).trim())out[k]=v;}return out;}catch(e){return{};}
+}
+// 初回ログイン時：端末のお気に入り・メモをサーバーへ引き上げ、成功したら端末から消す
+async function _knMigrateLocal(){
+  const lf=_knLocalFavs(), lm=_knLocalMemos();
+  if(!lf.length&&!Object.keys(lm).length) return;
+  try{
+    const r=await knApi('POST','/migrate/local-data/',{favorites:lf,memos:lm},_knToken);
+    try{localStorage.removeItem('kokoknavi_favs');localStorage.removeItem('kokoknavi_memos');}catch(e){}
+    if(r.favorites_added||r.memos_saved) toast(`この端末のお気に入り ${r.favorites_added} 件・メモ ${r.memos_saved} 件を引き継ぎました`);
+  }catch(e){ /* 失敗したら端末に残しておき、次のログインで再挑戦 */ }
+}
+async function _knReloadFavs(){
+  try{const list=await knApi('GET','/favorites/',undefined,_knToken);favs=new Set(list.map(Number));try{putMarkers(SG);}catch(e){}}catch(e){}
+}
+function endSession(){
+  const t=_knToken;
+  if(t) knApi('POST','/auth/logout/',{},t).catch(()=>{});
+  _knSetToken('');
+  knFirebase().then(({auth,m})=>m.signOut(auth)).catch(()=>{});
+  _knApplyLogin(null);
+}
 
-/** sessionStorageからログインセッションを復元する（ページリロード時） */
-function restoreSession(){try{const s=JSON.parse(sessionStorage.getItem('kokoknavi_session')||'null');if(s&&s.key){loggedIn=true;uName=s.key;updateAuthBtn();}}catch(e){}}
-
-/** メールアドレスを小文字に正規化してストレージキーとして使用する */
-function _emailKey(email){return email.toLowerCase().trim();}
-
-/** ログイン成功時にsessionStorageへセッションを保存し状態を更新する */
-async function startSession(email){const key=_emailKey(email);sessionStorage.setItem('kokoknavi_session',JSON.stringify({key}));loggedIn=true;uName=key;updateAuthBtn();}
-
-/** ログアウト時にセッションをクリアする */
-function endSession(){sessionStorage.removeItem('kokoknavi_session');loggedIn=false;uName='';}
+// ----- SMS の画面（ログイン・退会前の本人確認・電話番号の変更で共用） -----
+// purpose: 'login' | 'delete' | 'change'
+function showAuth(){ _smsDialog('login'); }
+function _smsDialog(purpose){
+  const titles={login:'📱 ログイン／新規登録',delete:'⚠️ 退会の前に本人確認',change:'📱 電話番号の変更'};
+  const fixed=purpose==='delete'&&_knProfile?knPhoneLabel(_knProfile.phone_number):'';
+  const lead={
+    login:'電話番号に届く 6 桁のコードでログインします。初めての方はそのまま登録になります（パスワードは不要です）。',
+    delete:'安全のため、登録中の電話番号に届くコードで本人確認をしてから退会します。',
+    change:'新しい電話番号に届くコードで確認します。アカウント・お気に入り・メモはそのまま引き継がれます。'}[purpose];
+  openModal(`<h3>${titles[purpose]}</h3>
+    <div class="auth-note">${lead}</div>
+    <div id="sms-step1">
+      <div class="fg"><label>${purpose==='change'?'新しい電話番号':'電話番号'}<span class="req">必須</span></label>
+        <input class="fi" id="sms-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="090-1234-5678" value="${fixed}" ${fixed?'readonly style="background:#f8f8f8"':''} onkeydown="if(event.key==='Enter'){event.preventDefault();smsSend('${purpose}')}">
+        <div id="sms-phone-err" class="input-err"></div>
+      </div>
+      <button id="btn-sms-send" class="btn-org" style="margin-top:14px;width:100%" onclick="smsSend('${purpose}')">確認コードを送信</button>
+      ${purpose==='login'?'<div style="font-size:11px;color:#999;margin-top:10px;line-height:1.7">SMS の受信に通信料がかかる場合があります。メールアドレスとパスワードで登録していた方は、電話番号で新しく登録してください。この端末のお気に入り・メモは引き継がれます。</div>':''}
+    </div>
+    <div id="sms-step2" style="display:none">
+      <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📱 <span id="sms-sent-to"></span> に届いた 6 桁のコードを入力してください</p>
+      <div class="fg"><label>確認コード<span class="req">必須</span></label>
+        <input class="fi code-input" id="sms-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="6" oninput="if(this.value.replace(/\\D/g,'').length===6){this.value=this.value.replace(/\\D/g,'');smsVerify()}" onkeydown="if(event.key==='Enter'){event.preventDefault();smsVerify()}">
+      </div>
+      <button id="btn-sms-verify" class="btn-org" style="margin-top:14px;width:100%" onclick="smsVerify()">${purpose==='login'?'ログイン':purpose==='delete'?'確認して退会する':'電話番号を変更'}</button>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">届かない場合は <a style="color:var(--org);cursor:pointer" onclick="smsBack()">番号を確認して再送信</a></div>
+    </div>
+    <div id="sms-recaptcha"></div>`,null,false,true);
+}
+function smsBack(){ if($('sms-step1')){$('sms-step1').style.display='block';$('sms-step2').style.display='none';const b=$('btn-sms-send');if(b){b.disabled=false;b.textContent='確認コードを送信';}} }
+async function smsSend(purpose){
+  const phone=knNormalizePhone($('sms-phone')?.value);
+  if(!phone){_setFieldErr('sms-phone',true,'電話番号を正しく入力してください（例：090-1234-5678）');return;}
+  _setFieldErr('sms-phone',false);
+  if(purpose==='change'&&_knProfile&&phone===_knProfile.phone_number){_setFieldErr('sms-phone',true,'今と同じ電話番号です');return;}
+  const btn=$('btn-sms-send'); if(btn){btn.disabled=true;btn.textContent='送信中...';}
+  try{
+    const {auth,m}=await knFirebase();
+    if(_smsState&&_smsState.verifier){try{_smsState.verifier.clear();}catch(e){}}
+    const box=$('sms-recaptcha'); if(box) box.innerHTML='<div id="sms-recaptcha-in"></div>';
+    const verifier=new m.RecaptchaVerifier(auth,'sms-recaptcha-in',{size:'invisible'});
+    _smsState={purpose,phone,verifier};
+    if(purpose==='change'){
+      await auth.authStateReady();
+      if(!auth.currentUser){throw {code:'auth/requires-recent-login'};}
+      _smsState.verificationId=await new m.PhoneAuthProvider(auth).verifyPhoneNumber(phone,verifier);
+    }else{
+      _smsState.confirmation=await m.signInWithPhoneNumber(auth,phone,verifier);
+    }
+    $('sms-step1').style.display='none'; $('sms-step2').style.display='block';
+    $('sms-sent-to').textContent=knPhoneLabel(phone);
+    setTimeout(()=>{const c=$('sms-code');if(c)c.focus();},50);
+    toast('確認コードを送信しました');
+  }catch(e){
+    toast('送信できませんでした：'+_fbErrMsg(e));
+    if(btn){btn.disabled=false;btn.textContent='確認コードを送信';}
+  }
+}
+async function smsVerify(){
+  const code=($('sms-code')?.value||'').replace(/\D/g,'');
+  if(code.length!==6){toast('6 桁の確認コードを入力してください');return;}
+  if(!_smsState){toast('もう一度、確認コードを送信してください');smsBack();return;}
+  const btn=$('btn-sms-verify'); if(btn&&btn.disabled) return; if(btn){btn.disabled=true;btn.textContent='確認中...';}
+  const st=_smsState;
+  try{
+    const {auth,m}=await knFirebase();
+    if(st.purpose==='change'){
+      const cred=m.PhoneAuthProvider.credential(st.verificationId,code);
+      await m.updatePhoneNumber(auth.currentUser,cred);
+      const idToken=await auth.currentUser.getIdToken(true);
+      const d=await knApi('POST','/auth/mobile-number/',{id_token:idToken},_knToken);
+      _knProfile=Object.assign({},_knProfile,{phone_number:d.phone_number}); uName=d.phone_number;
+      closeModal(); toast('電話番号を '+knPhoneLabel(d.phone_number)+' に変更しました');
+    }else{
+      const userCred=await st.confirmation.confirm(code);
+      const idToken=await userCred.user.getIdToken();
+      if(st.purpose==='delete'){
+        await knApi('DELETE','/auth/account/',{id_token:idToken},_knToken);
+        _knSetToken(''); try{await m.signOut(auth);}catch(e){}
+        try{localStorage.removeItem('kokoknavi_favs');localStorage.removeItem('kokoknavi_memos');}catch(e){}
+        _knApplyLogin(null); closeModal(); toast('退会しました。ご利用ありがとうございました');
+      }else{
+        const d=await knApi('POST','/auth/login/',{id_token:idToken,platform:'web',device_label:_knDeviceLabel()});
+        _knSetToken(d.auth_token);
+        _knApplyLogin(d.profile,[]);
+        closeModal();
+        toast(d.is_new?'登録が完了しました。ようこそ！':'ログインしました');
+        await _knMigrateLocal();
+        await _knReloadFavs();
+        if(cur&&$('detail-panel').classList.contains('open')) openDetail(cur.id);
+      }
+    }
+    _smsState=null;
+  }catch(e){
+    const msg=(e&&e.code&&String(e.code).startsWith('auth/'))?_fbErrMsg(e):_knApiErr(e);
+    toast(msg);
+    if(btn){btn.disabled=false;btn.textContent=st.purpose==='login'?'ログイン':st.purpose==='delete'?'確認して退会する':'電話番号を変更';}
+  }
+}
 
 // お気に入りIDのSet。localStorageから起動時に読み込む
 let favs=(()=>{try{return new Set(JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]'));}catch(e){return new Set();}})();
@@ -1377,7 +1509,7 @@ function openDetail(id){
   const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
   $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div><div class="row">👟 人流　<span>${s.ped||'—'}</span></div>${_pedSourceHtml(s.ped)}`;
   $('memo-wrap').style.display=loggedIn?'flex':'none';$('memo-wrap').style.flexDirection='column';
-  $('memo-ta').value=loggedIn?(getMemos()[s.id]||''):'';
+  _knLoadMemo(s.id);
   setTimeout(()=>{
     const vals=[3,2,5,18,45,62,72,68,75,82,70,45],hrs=['0','2','4','6','8','10','12','14','16','18','20','22'];
     const bc=$('inline-bc');
@@ -1400,13 +1532,23 @@ function showTop(){
   if(mOpen) toggleMenu();
   if(_histOpen){_histOpen=false;$('hist-wrap').classList.remove('open');}
 }
-function toggleFav(){
-  if(!loggedIn){toast("お気に入り登録にはログインが必要です");showAuth('login');return;}
+async function toggleFav(){
+  if(!loggedIn){toast("お気に入り登録にはログインが必要です");showAuth();return;}
   if(!cur)return;
-  favs.has(cur.id)?favs.delete(cur.id):favs.add(cur.id);
-  $('fav-btn').textContent=favs.has(cur.id)?'❤️':'🤍';
-  toast(favs.has(cur.id)?'お気に入りに追加しました':'お気に入りを解除しました');
-  try{localStorage.setItem('kokoknavi_favs',JSON.stringify([...favs]));}catch(e){}
+  // サーバー（favorites/）に保存。別の端末でも同じお気に入りが見える。失敗したら表示を元に戻す
+  const id=cur.id, on=!favs.has(id);
+  on?favs.add(id):favs.delete(id);
+  $('fav-btn').textContent=on?'❤️':'🤍';
+  try{
+    if(on) await knApi('POST','/favorites/',{signage_id:String(id)},_knToken);
+    else await knApi('DELETE','/favorites/'+id+'/',undefined,_knToken);
+    toast(on?'お気に入りに追加しました':'お気に入りを解除しました');
+  }catch(e){
+    on?favs.delete(id):favs.add(id);
+    if(cur&&cur.id===id) $('fav-btn').textContent=favs.has(id)?'❤️':'🤍';
+    toast('保存できませんでした：'+_knApiErr(e));
+    if(e&&e.status===401){_knSetToken('');_knApplyLogin(null);}
+  }
   putMarkers(SG);
 }
 function _encMemo(s){try{return btoa(encodeURIComponent(s));}catch(e){return s;}}
@@ -1417,13 +1559,19 @@ function getMemos(){
     const out={};for(const k in raw)out[k]=_decMemo(raw[k]);return out;
   }catch(e){return{};}
 }
-function saveMemo(){
-  if(!cur)return;
-  const val=$('memo-ta').value;
-  let raw={};try{raw=JSON.parse(localStorage.getItem('kokoknavi_memos')||'{}');}catch(e){}
-  if(val.trim()){raw[cur.id]=_encMemo(val);}else{delete raw[cur.id];}
-  localStorage.setItem('kokoknavi_memos',JSON.stringify(raw));
-  toast("メモを保存しました");
+async function saveMemo(){
+  if(!cur||!loggedIn)return;
+  // サーバー（memos/<id>/）に保存。空で保存するとメモを消す
+  const id=cur.id, val=$('memo-ta').value;
+  try{
+    await knApi('PUT','/memos/'+id+'/',{body:val},_knToken);
+    toast(val.trim()?"メモを保存しました":"メモを削除しました");
+  }catch(e){ toast('保存できませんでした：'+_knApiErr(e)); }
+}
+function _knLoadMemo(id){
+  $('memo-ta').value='';
+  if(!loggedIn||!_knToken) return;
+  knApi('GET','/memos/'+id+'/',undefined,_knToken).then(d=>{ if(cur&&cur.id===id) $('memo-ta').value=(d&&d.body)||''; }).catch(()=>{});
 }
 // ===== フォトビューア =====
 // 詳細パネルのサムネイルをタップすると openPV(idx) でフルスクリーン表示。
@@ -1874,74 +2022,46 @@ function gotoTop(){
 }
 function showFavList(){toggleMenu();if(!loggedIn){showAuth('login');return;}showList(SG.filter(s=>favs.has(s.id)),"お気に入り一覧");}
 function showAccSettings(){
-  toggleMenu();if(!loggedIn){showAuth('login');return;}
-  openModal(`<h3>👤 アカウント設定</h3><p style="font-size:12px;color:#aaa;margin-bottom:14px">ようこそ！</p>
-    <div class="fg"><label>メールアドレス</label><input class="fi" value="（保護済み）" disabled style="color:#aaa;background:#f8f8f8"></div>
-    <p style="font-size:12px;font-weight:700;color:#555;margin:14px 0 8px">パスワード変更</p>
-    <div class="fg"><label>現在のパスワード<span class="req">必須</span></label>
-      <div style="position:relative">
-        <input class="fi" id="acc-cur-pw" type="password" placeholder="現在のパスワード" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('acc-new-pw').focus()}">
-        <button type="button" onclick="togglePw('acc-cur-pw',this)" class="pw-toggle">👁</button>
+  toggleMenu();if(!loggedIn){showAuth();return;}
+  const p=_knProfile||{};
+  openModal(`<h3>👤 アカウント設定</h3>
+    <div class="fg"><label>電話番号（ログインに使います）</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="fi" value="${knPhoneLabel(p.phone_number)}" disabled style="color:#555;background:#f8f8f8;flex:1">
+        <button type="button" onclick="closeModal();setTimeout(()=>_smsDialog('change'),100)" style="flex-shrink:0;background:#fff;color:var(--org);border:1px solid var(--org);border-radius:4px;padding:8px 12px;font-size:12px;cursor:pointer;font-weight:700">変更</button>
       </div>
     </div>
-    <div class="fg" style="margin-top:10px"><label>新しいパスワード<span class="req">必須</span></label>
-      <div style="position:relative">
-        <input class="fi" id="acc-new-pw" type="password" placeholder="新しいパスワード（6文字以上）" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('acc-new-pw2').focus()}">
-        <button type="button" onclick="togglePw('acc-new-pw',this)" class="pw-toggle">👁</button>
-      </div>
-    </div>
-    <div class="fg" style="margin-top:10px"><label>新しいパスワード（確認）<span class="req">必須</span></label>
-      <div style="position:relative">
-        <input class="fi" id="acc-new-pw2" type="password" placeholder="もう一度入力" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();saveAccSettings()}">
-        <button type="button" onclick="togglePw('acc-new-pw2',this)" class="pw-toggle">👁</button>
-      </div>
+    <div class="fg" style="margin-top:10px"><label>連絡先メールアドレス（任意）</label>
+      <input class="fi" id="acc-email" type="email" placeholder="例：xxx@email.com" value="${(p.email||'').replace(/"/g,'&quot;')}" onkeydown="if(event.key==='Enter'){event.preventDefault();saveAccSettings()}">
+      <div id="acc-email-err" class="input-err"></div>
+      <div style="font-size:11px;color:#999;margin-top:4px">電話番号が使えなくなったときの連絡に使います</div>
     </div>
     <button class="btn-org" style="margin-top:14px;width:100%" onclick="saveAccSettings()">保存する</button>
     <button onclick="closeModal();setTimeout(confirmLogout,100)" style="display:block;width:100%;background:#f0f0f0;color:#666;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px">ログアウト</button>
     <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
-    <button onclick="closeModal();setTimeout(confirmDeleteAccount,100)" style="display:block;width:100%;background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;border-radius:4px;padding:10px;font-size:13px;cursor:pointer">アカウントを削除する</button>`,null,false,true);
+    <button onclick="closeModal();setTimeout(confirmDeleteAccount,100)" style="display:block;width:100%;background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;border-radius:4px;padding:10px;font-size:13px;cursor:pointer">退会する（アカウントを削除）</button>`,null,false,true);
 }
 async function saveAccSettings(){
-  const curPw=$('acc-cur-pw')?.value||'';
-  const newPw=$('acc-new-pw')?.value||'';
-  const newPw2=$('acc-new-pw2')?.value||'';
-  if(!curPw){toast("現在のパスワードを入力してください");return;}
-  if(!newPw||!newPw2){toast("新しいパスワードを入力してください");return;}
-  if(newPw.length<6){toast("新しいパスワードは6文字以上にしてください");return;}
-  if(newPw!==newPw2){toast("新しいパスワードが一致しません");return;}
-  const accs=getAccounts();
-  if(!accs[uName]){toast("アカウント情報が見つかりません");return;}
-  const ok=await verifyPw(curPw,accs[uName]);
-  if(!ok){toast("現在のパスワードが違います");return;}
-  if(await verifyPw(newPw,accs[uName])){toast("現在と同じパスワードは使用できません");return;}
-  accs[uName]=await hashPw(newPw);
-  saveAccounts(accs);
-  closeModal();
-  toast("パスワードを変更しました");
+  const email=($('acc-email')?.value||'').trim();
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){_setFieldErr('acc-email',true,'正しいメールアドレスを入力してください');return;}
+  try{
+    const d=await knApi('PATCH','/auth/profile/',{email:email||null},_knToken);
+    _knProfile=Object.assign({},_knProfile,d);
+    closeModal(); toast('保存しました');
+  }catch(e){
+    if(e&&e.data&&e.data.email){_setFieldErr('acc-email',true,[].concat(e.data.email)[0]);return;}
+    toast('保存できませんでした：'+_knApiErr(e));
+  }
 }
-function logout(){endSession();updateAuthBtn();toast("ログアウトしました");}
-// togglePw は shared-data.js で定義
-function validateRegEmail(){
-  const el=$('a-id');if(!el)return;
-  const valid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim());
-  const err=$('a-email-err');
-  if(err)err.style.display=(el.value.trim()&&!valid)?'block':'none';
-}
+function logout(){endSession();toast("ログアウトしました");}
 function confirmDeleteAccount(){
-  openModal(`<h3 style="color:#c0392b">⚠️ アカウント削除</h3>
-    <p style="font-size:13px;color:#555;margin:12px 0 4px">アカウントを削除すると、お気に入りなどのデータもすべて削除されます。</p>
-    <p style="font-size:12px;color:#e74c3c;margin-bottom:16px;font-weight:700">この操作は元に戻せません。</p>
+  openModal(`<h3 style="color:#c0392b">⚠️ 退会（アカウント削除）</h3>
+    <p style="font-size:13px;color:#555;margin:12px 0 4px">退会すると、お気に入り・メモなどのデータがすべて削除されます。</p>
+    <p style="font-size:12px;color:#e74c3c;margin-bottom:16px;font-weight:700">この操作は元に戻せません。次の画面で、登録中の電話番号に届くコードで本人確認をします。</p>
     <div style="display:flex;gap:10px">
       <button onclick="closeModal()" style="flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">キャンセル</button>
-      <button onclick="deleteAccount();closeModal()" style="flex:1;background:#c0392b;color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">削除する</button>
+      <button onclick="closeModal();setTimeout(()=>_smsDialog('delete'),100)" style="flex:1;background:#c0392b;color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">本人確認へ進む</button>
     </div>`,null,true);
-}
-function deleteAccount(){
-  const accs=getAccounts();
-  if(uName&&accs[uName]){delete accs[uName];saveAccounts(accs);}
-  localStorage.removeItem('kokoknavi_favs');
-  endSession();updateAuthBtn();
-  toast("アカウントを削除しました");
 }
 function confirmLogout(){
   openModal(`<h3>ログアウト</h3>
@@ -1951,180 +2071,8 @@ function confirmLogout(){
       <button onclick="logout();closeModal()" style="flex:1;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">はい</button>
     </div>`,null,true);
 }
-function showResetPw(){
-  openModal(`<h3>🔑 パスワードリセット</h3>
-    <div id="reset-step1">
-      <p style="font-size:12px;color:#555;margin-bottom:12px">登録済みのメールアドレスに確認コードを送信します。</p>
-      <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
-        <input class="fi" id="r-email" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();sendResetCode()}">
-      </div>
-      <button id="btn-send-reset" class="btn-org" style="margin-top:14px;width:100%" onclick="sendResetCode()">確認コードを送信</button>
-    </div>
-    <div id="reset-step2" style="display:none">
-      <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📧 メールに送られた6桁のコードを入力してください（有効期限：5分）</p>
-      <div class="fg"><label>認証コード<span class="req">必須</span></label>
-        <input class="fi code-input" id="r-code" type="text" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('r-pw').focus()}">
-      </div>
-      <div class="fg" style="margin-top:10px"><label>新しいパスワード<span class="req">必須</span></label>
-        <div style="position:relative">
-          <input class="fi" id="r-pw" type="password" placeholder="新しいパスワード（6文字以上）" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('r-pw2').focus()}">
-          <button type="button" onclick="togglePw('r-pw',this)" class="pw-toggle">👁</button>
-        </div>
-      </div>
-      <div class="fg" style="margin-top:10px"><label>新しいパスワード（確認）<span class="req">必須</span></label>
-        <div style="position:relative">
-          <input class="fi" id="r-pw2" type="password" placeholder="もう一度入力" style="padding-right:40px" onkeydown="if(event.key==='Enter'){event.preventDefault();doResetPw()}">
-          <button type="button" onclick="togglePw('r-pw2',this)" class="pw-toggle">👁</button>
-        </div>
-      </div>
-      <button class="btn-org" style="margin-top:14px;width:100%" onclick="doResetPw()">パスワードを変更</button>
-      <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">届かない場合は <a style="color:var(--org);cursor:pointer" onclick="resendResetCode()">再送信</a></div>
-    </div>
-    <div class="auth-switch">ログインに戻る場合は <a onclick="closeModal();showAuth('login')">こちら</a></div>`);
-}
-async function resendResetCode(){
-  if(!authCode||!authCode.email||authCode.type!=='reset'){toast("情報が見つかりません。最初からやり直してください");showResetPw();return;}
-  var _cd=_checkSendCooldown('kn_cd_reset',60);
-  if(!_cd.ok){toast("再送信は"+_cd.remaining+"秒後にお試しください");return;}
-  const code=genCode();
-  authCode={code,expiry:Date.now()+5*60*1000,email:authCode.email,type:'reset'};
-  try{
-    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:authCode.email,code});
-    document.getElementById('r-code').value='';
-    toast("確認コードを再送信しました");
-  }catch(e){
-    toast("送信失敗："+_errMsg(e));
-  }
-}
-async function sendResetCode(){
-  const email=($('r-email')?.value||'').trim();
-  if(!email){toast("メールアドレスを入力してください");return;}
-  var _cd=_checkSendCooldown('kn_cd_reset',60);
-  if(!_cd.ok){toast("送信は"+_cd.remaining+"秒後にお試しください");return;}
-  const accs=getAccounts();
-  const emailKey=_emailKey(email);
-  if(!accs[emailKey]){toast("このメールアドレスは登録されていません");return;}
-  const code=genCode();
-  authCode={code,expiry:Date.now()+5*60*1000,email,type:'reset'};
-  const btn=document.getElementById('btn-send-reset');
-  if(btn){btn.disabled=true;btn.textContent='送信中...';}
-  try{
-    await emailjs.send(EJ_SVC,EJ_TPL_AUTH,{to_email:email,code});
-    document.getElementById('reset-step1').style.display='none';
-    document.getElementById('reset-step2').style.display='block';
-    toast("確認コードを送信しました");
-  }catch(e){
-    const msg=_errMsg(e);
-    toast("送信失敗："+msg);
-    if(btn){btn.disabled=false;btn.textContent='確認コードを送信';}
-  }
-}
-async function doResetPw(){
-  const entered=($('r-code')?.value||'').trim();
-  const pw=$('r-pw')?.value||'';
-  const pw2=$('r-pw2')?.value||'';
-  if(!entered){toast("認証コードを入力してください");return;}
-  if(!pw||!pw2){toast("新しいパスワードを入力してください");return;}
-  if(pw!==pw2){toast("パスワードが一致しません");return;}
-  if(pw.length<6){toast("パスワードは6文字以上にしてください");return;}
-  if(!authCode||authCode.type!=='reset'){toast("コードが見つかりません。再送信してください");return;}
-  if(Date.now()>authCode.expiry){toast("コードの有効期限が切れました。再送信してください");authCode=null;showResetPw();return;}
-  if(entered!==authCode.code){toast("認証コードが違います");return;}
-  const accs=getAccounts();
-  const emailKey=_emailKey(authCode.email);
-  if(accs[emailKey]&&await verifyPw(pw,accs[emailKey])){toast("現在と同じパスワードは使用できません");return;}
-  accs[emailKey]=await hashPw(pw);
-  saveAccounts(accs);
-  closeModal();authCode=null;
-  toast("パスワードを変更しました");
-  setTimeout(()=>showAuth('login'),800);
-}
 // ===== 認証フロー =====
-// showAuth(mode) : 'login' または 'register' を受け取りモーダルを表示。
-//   login    → メール＋パスワード入力 → doAuth('login') で Argon2id 照合
-//   register → メール＋PW入力 → sendAuthCode() でメール認証コード送信
-//              → 6桁コード入力 → doAuth('register') でアカウント作成・セッション開始
-// sendAuthCode() / resendAuthCode() : EmailJS でコードを送信。60秒クールダウン付き。
-// doAuth()       : ログイン時は verifyPw()（Argon2id）でハッシュ照合。
-//                  登録時は認証コード有効期限（5分）・一致確認後 hashPw() でハッシュ保存。
-// showResetPw()  : パスワードリセット画面。sendResetCode() でメール認証後に新パスワード設定。
-// confirmDeleteAccount() / deleteAccount() : アカウント削除（favs・memos も消去）。
-// updateAuthBtn() : ヘッダーのログインボタンのテキスト・挙動をセッション状態に同期。
-function showAuth(mode){
-  const isL=mode==='login';
-  openModal(`<h3>${isL?'🔑 ログイン':'📝 アカウント作成'}</h3>
-    <div class="auth-note">アカウントの作成で資料のダウンロード / お気に入り登録が使用可能になります！</div>
-    ${isL?`
-      <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
-        <input class="fi" id="a-id" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw').focus();}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('正しい形式で入力して下さい')">
-        <div id="email-hint" style="font-size:12px;color:#e74c3c;margin-top:4px;min-height:16px"></div>
-      </div>
-      <div class="fg" style="margin-top:10px"><label>パスワード<span class="req">必須</span></label>
-        <div style="position:relative">
-          <input class="fi" id="a-pw" type="password" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter'){event.preventDefault();doAuth('login')}" style="padding-right:40px">
-          <button type="button" onclick="togglePw('a-pw',this)" class="pw-toggle">👁</button>
-        </div>
-      </div>
-      <button class="btn-org" style="margin-top:14px;width:100%" onclick="doAuth('login')">ログイン</button>
-      <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">パスワードをお忘れの方は <a style="color:var(--org);cursor:pointer" onclick="closeModal();showResetPw()">こちら</a></div>
-    `:`
-      <div id="auth-step1">
-        <div class="fg"><label>メールアドレス<span class="req">必須</span></label>
-          <input class="fi" id="a-id" type="email" placeholder="例：xxx@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw').focus();}" oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('正しい形式で入力して下さい')">
-        </div>
-        <div class="fg" style="margin-top:10px"><label>パスワード<span class="req">必須</span></label>
-          <div style="position:relative">
-            <input class="fi" id="a-pw" type="password" placeholder="パスワード（6文字以上）" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('a-pw2').focus();}" style="padding-right:40px">
-            <button type="button" onclick="togglePw('a-pw',this)" class="pw-toggle">👁</button>
-          </div>
-        </div>
-        <div class="fg" style="margin-top:10px"><label>パスワード（確認）<span class="req">必須</span></label>
-          <div style="position:relative">
-            <input class="fi" id="a-pw2" type="password" placeholder="もう一度入力" onkeydown="if(event.key==='Enter'){event.preventDefault();sendAuthCode()}" style="padding-right:40px">
-            <button type="button" onclick="togglePw('a-pw2',this)" class="pw-toggle">👁</button>
-          </div>
-        </div>
-        <button id="btn-send-code" class="btn-org" style="margin-top:14px;width:100%" onclick="sendAuthCode()">確認コードを送信</button>
-      </div>
-      <div id="auth-step2" style="display:none">
-        <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📧 メールに送られた6桁のコードを入力してください（有効期限：5分）</p>
-        <div class="fg"><label>認証コード<span class="req">必須</span></label>
-          <input class="fi code-input" id="a-code" type="text" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter'){event.preventDefault();doAuth('register')}" oninput="if(this.value.replace(/\D/g,'').length===6){this.value=this.value.replace(/\D/g,'');doAuth('register')}">
-        </div>
-        <button class="btn-org" style="margin-top:14px;width:100%" onclick="doAuth('register')">アカウントを作成</button>
-        <div style="text-align:center;margin-top:8px;font-size:12px;color:#aaa">届かない場合は <a style="color:var(--org);cursor:pointer" onclick="resendAuthCode()">再送信</a></div>
-      </div>
-    `}
-    <div class="auth-switch">${isL?'アカウントをお持ちでない方は <a onclick="closeModal();showAuth(\'register\')">会員登録</a>':'すでにアカウントをお持ちの方は <a onclick="closeModal();showAuth(\'login\')">ログイン</a>'}</div>`,null,false,true);
-}
-async function doAuth(mode){
-  try{
-  const accs=getAccounts();
-  if(mode==='login'){
-    const email=($('a-id')?.value||'').trim();
-    const pw=$('a-pw')?.value||'';
-    if(!email||!pw){toast("メールアドレスとパスワードを入力してください");return;}
-    if(pw.length<6){toast("パスワードは6文字以上です");return;}
-    const emailKey=_emailKey(email);
-    if(!accs[emailKey]){toast("アカウントが見つかりません");return;}
-    const ok=await verifyPw(pw,accs[emailKey]);
-    if(!ok){toast("パスワードが違います");return;}
-    closeModal();await startSession(email);toast(`ようこそ、${email}さん！`);
-  }else{
-    const entered=($('a-code')?.value||'').trim();
-    if(!entered){toast("認証コードを入力してください");return;}
-    if(!authCode){toast("コードが見つかりません。再送信してください");return;}
-    if(Date.now()>authCode.expiry){toast("コードの有効期限が切れました。再送信してください");authCode=null;showAuth('register');return;}
-    if(entered!==authCode.code){toast("認証コードが違います");return;}
-    const hash=await hashPw(authCode.pw);
-    const emailKey=_emailKey(authCode.email);
-    accs[emailKey]=hash;saveAccounts(accs);
-    const regEmail=authCode.email;
-    closeModal();await startSession(regEmail);authCode=null;
-    toast(`登録完了！ようこそ、${regEmail}さん！`);
-  }
-  }catch(e){toast("認証処理中にエラーが発生しました："+_errMsg(e));}
-}
+// 会員まわりは「会員（電話番号＋SMS）」にまとめた（showAuth → _smsDialog → smsSend → smsVerify）
 function updateAuthBtn(){
   const btn=$('hdr-auth-btn');if(!btn)return;
   if(loggedIn){btn.textContent='ログアウト';btn.onclick=()=>confirmLogout();}
