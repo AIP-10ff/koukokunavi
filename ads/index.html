@@ -749,9 +749,10 @@ function _loadSgFromServer(showToast){
 }
 _loadSgFromServer(false);
 // 開いたまま放置されている画面にも反映する（5 分ごと＋タブに戻ったとき）
-setInterval(function(){ if(document.visibilityState === 'visible') _loadSgFromServer(true); }, 5 * 60 * 1000);
+// お気に入りも同じタイミングで読み直す（別の端末で付け外ししたものを反映する）
+setInterval(function(){ if(document.visibilityState === 'visible'){ _loadSgFromServer(true); _knSyncFavs(); } }, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState === 'visible') _loadSgFromServer(true);
+  if(document.visibilityState === 'visible'){ _loadSgFromServer(true); _knSyncFavs(); }
 });
 
 // ===== EmailJS =====
@@ -870,6 +871,10 @@ async function _knMigrateLocal(){
 }
 async function _knReloadFavs(){
   try{const list=await knApi('GET','/favorites/',undefined,_knToken);favs=new Set(list.map(Number));try{putMarkers(SG);}catch(e){}}catch(e){}
+}
+function _knSyncFavs(){
+  if(!loggedIn||!_knToken) return;
+  _knReloadFavs().then(()=>{ if(cur&&$('detail-panel').classList.contains('open')) $('fav-btn').textContent=favs.has(cur.id)?'❤️':'🤍'; });
 }
 function endSession(){
   const t=_knToken;
