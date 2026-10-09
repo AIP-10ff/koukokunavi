@@ -796,8 +796,8 @@ function openAdmin(id){
   var s=find(id); if(!s) return;
   editingId=id;
   // tmpコピー（保存済みフラグを付与、dataUrlはphotoCache/docCacheから参照）
-  tmpPhotos=(s.photos||[]).map(function(p){return {id:p.id,name:p.name,isMain:p.isMain,_saved:true};});
-  tmpDocs=(s.docs||[]).map(function(d){return {id:d.id,name:d.name,size:d.size,type:d.type,_saved:true};});
+  tmpPhotos=(s.photos||[]).map(function(p){return {id:p.id,name:p.name,isMain:p.isMain,key:p.key,_saved:true};});
+  tmpDocs=(s.docs||[]).map(function(d){return {id:d.id,name:d.name,size:d.size,type:d.type,key:d.key,_saved:true};});
 
   document.getElementById('ap-title').textContent='編集：'+s.name;
   var body=document.getElementById('ap-body');
@@ -937,8 +937,10 @@ function handlePhotoFiles(files){
         var id=idbGenId();
         idbPut('photos',id,compressed,function(){
           photoCache[id]=compressed;
-          tmpPhotos.push({id:id,name:file.name,isMain:tmpPhotos.length===0,_saved:false});
+          var item={id:id,name:file.name,isMain:tmpPhotos.length===0,_saved:false};
+          tmpPhotos.push(item);
           refreshPhotoPreview();
+          _srvUploadMedia(item, knDataUrlToBlob(compressed), file.name.replace(/\.[^.]+$/,'')+'.jpg', 'photo');
         });
       });
     };
@@ -1015,8 +1017,10 @@ function handleDocFiles(files){
       var id=idbGenId();
       idbPut('docs',id,e.target.result,function(){
         docCache[id]=e.target.result;
-        tmpDocs.push({id:id,name:file.name,size:file.size,type:file.type,_saved:false});
+        var item={id:id,name:file.name,size:file.size,type:file.type,_saved:false};
+        tmpDocs.push(item);
         refreshDocList();
+        _srvUploadMedia(item, file, file.name, 'doc');
       });
     };
     reader.readAsDataURL(file);
@@ -1119,6 +1123,8 @@ function closeAdmin(){
 // ===== SAVE =====
 function saveSign(){
   if(editingId===null) return;
+  // 写真・資料をサーバー（S3）に上げている途中なら、終わるまで待ってもらう（key が付く前に保存すると他の人に見えない）
+  if(tmpPhotos.concat(tmpDocs).some(function(x){return x._uploading;})){toast('写真・資料をサーバーに上げています。数秒後にもう一度保存してください');return;}
   var s=find(editingId); if(!s) return;
   // 削除されたメディアのIDを記録（IDB削除用）
   var _oldPhotoIds=(s.photos||[]).map(function(p){return p.id;}).filter(Boolean);
@@ -1155,8 +1161,9 @@ function saveSign(){
   var _newDocIds=tmpDocs.map(function(d){return d.id;}).filter(Boolean);
   _oldDocIds.forEach(function(id){if(_newDocIds.indexOf(id)<0){idbDelete('docs',id);delete docCache[id];}});
   // 写真・資料はIDと名前のみSGに保存（dataUrlはIDB）
-  s.photos=tmpPhotos.map(function(p){return {id:p.id,name:p.name,isMain:p.isMain};});
-  s.docs  =tmpDocs.map(function(d){return {id:d.id,name:d.name,size:d.size,type:d.type};});
+  // key（S3 の置き場所）があれば残す。サーバー接続中に追加した写真・資料は S3 にも上がっている（⑥ 9c）
+  s.photos=tmpPhotos.map(function(p){var x={id:p.id,name:p.name,isMain:p.isMain}; if(p.key) x.key=p.key; return x;});
+  s.docs  =tmpDocs.map(function(d){var x={id:d.id,name:d.name,size:d.size,type:d.type}; if(d.key) x.key=d.key; return x;});
 
   render();
   renderList(SG);
@@ -2316,8 +2323,22 @@ function doSrvLogout(){
   toast('サーバーから切断しました（以後の保存はこの端末だけ）');
 }
 // サーバーにピンがあれば、それを管理画面の一覧として表示する（端末内データは上書き保存しない）
+// サーバー接続中なら、追加した写真・資料を S3 にも上げて key を付ける（⑥ 9c）。
+// 未接続・失敗のときは従来どおりこの端末の中だけに残る（他の人の画面には出ない）
+function _srvUploadMedia(item, blob, filename, kind){
+  var t=_srvToken(); if(!t||typeof knUploadMedia!=='function') return;
+  item._uploading=true;
+  knUploadMedia(blob, filename, kind, t).then(function(d){
+    item.key=d.key; delete item._uploading;
+    toast('☁ '+(kind==='doc'?'資料':'写真')+'をサーバーに上げました（保存すると利用者の画面にも出ます）');
+  }).catch(function(e){
+    delete item._uploading;
+    toast('⚠ '+(kind==='doc'?'資料':'写真')+'をサーバーに上げられませんでした：'+_srvErr(e)+'（この端末には保存済み）');
+  });
+}
 function _srvLoadFromServer(showToast){
   return knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){
+    if(typeof knApplyMediaUrls==='function') knApplyMediaUrls(list);
     if(!list.length){ if(showToast) toast('サーバーにはまだピンがありません。「この端末のピンを取り込み」で送れます'); return; }
     var prev={}; SG.forEach(function(s){prev[s.id]=s;});
     SG=list.map(function(s){ var o=prev[s.id]||{}; s.e=o.e||'📺'; s.favCount=o.favCount||0; return s; });

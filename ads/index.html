@@ -722,6 +722,7 @@ function _loadSgFromServer(showToast){
   if(typeof knFetchSignages !== 'function') return;
   knFetchSignages().then(function(list){
     if(!list.length) return;
+    if(typeof knApplyMediaUrls === 'function') knApplyMediaUrls(list); // 写真の一時 URL は毎回入れ直す（変更が無くても）
     const sig = JSON.stringify(list.map(s => [s.id, s.updated_at]));
     if(sig === _sgServerSig) return; // 変更なし
     const first = !_sgFromServer;

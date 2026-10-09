@@ -497,9 +497,46 @@ function knToServerSignage(s){
   KN_SIGNAGE_KEYS.forEach(function(k){ if(s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
   o.lat = Number(s.lat); o.lng = Number(s.lng);
   o.plans = (s.plans || []).map(function(p){ return {n: String(p.n || ''), p: String(p.p || '')}; });
-  o.photos = (s.photos || []).map(function(p){ return {id: p.id, name: p.name || '', isMain: !!p.isMain}; });
-  o.docs = (s.docs || []).map(function(d){ return {id: d.id, name: d.name || '', size: d.size || 0, type: d.type || ''}; });
+  // key は S3 の置き場所（⑥ 9c）。url は一時的なものなので送らない
+  o.photos = (s.photos || []).map(function(p){ var x = {id: p.id, name: p.name || '', isMain: !!p.isMain}; if(p.key) x.key = p.key; return x; });
+  o.docs = (s.docs || []).map(function(d){ var x = {id: d.id, name: d.name || '', size: d.size || 0, type: d.type || ''}; if(d.key) x.key = d.key; return x; });
   if(['ON','EMPTY','MAINT'].indexOf(o.status) < 0) o.status = 'EMPTY';
   return o;
 }
 window.knToServerSignage = knToServerSignage;
+
+// ===== 写真・資料（S3、⑥ 9c） =====
+// サーバーが返す photos / docs の url（1 時間ほど有効な一時 URL）を、表示用のキャッシュに入れる。
+// 画面は従来どおり photoCache[id] / docCache[id] を見るだけで、S3 の写真が出る。一覧を取り直すたびに呼ぶ（URL の期限切れ対策）
+function knApplyMediaUrls(list){
+  (list || []).forEach(function(s){
+    (s.photos || []).forEach(function(p){ if(p && p.id && p.url) photoCache[p.id] = p.url; });
+    (s.docs || []).forEach(function(d){ if(d && d.id && d.url) docCache[d.id] = d.url; });
+  });
+}
+window.knApplyMediaUrls = knApplyMediaUrls;
+
+// 管理者用：ファイル（File / Blob）を S3 に上げて {key, url, ...} を受け取る（POST /admin/media/）
+function knUploadMedia(blob, filename, kind, token){
+  var fd = new FormData();
+  fd.append('kind', kind || 'photo');
+  fd.append('file', blob, filename || 'file');
+  return fetch(KN_API_BASE + '/admin/media/', {
+    method: 'POST', headers: {'Accept': 'application/json', 'Authorization': 'Token ' + token}, body: fd
+  }).then(function(r){
+    return r.json().catch(function(){ return null; }).then(function(d){
+      if(!r.ok){ var e = new Error((d && d.detail) || ('HTTP ' + r.status)); e.status = r.status; e.data = d; throw e; }
+      return d;
+    });
+  });
+}
+window.knUploadMedia = knUploadMedia;
+
+// dataURL（圧縮後の写真）を、アップロード用の Blob にする
+function knDataUrlToBlob(dataUrl){
+  var parts = String(dataUrl).split(','), mime = (parts[0].match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+  var bin = atob(parts[1] || ''), arr = new Uint8Array(bin.length);
+  for(var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type: mime});
+}
+window.knDataUrlToBlob = knDataUrlToBlob;
