@@ -463,6 +463,18 @@ function _migrateOldPhotos(sg,cb){
 // 掲載情報（サイネージ）はサーバーの DB を正とする。利用者画面・管理画面の両方から使う。
 // file:// で開いたときや API が無いときは fetch が失敗し、呼び出し側が従来の動き（localStorage／DEFAULT_SG）に戻る。
 var KN_API_BASE = '/api/v1';
+
+// Firebase（電話番号＋SMS の本人確認だけに使う）。Web 用の設定は公開される前提の値で、
+// 使えるドメインは Firebase 側の「承認済みドメイン」（app・app2・localhost）で絞っている
+var KN_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA75nlsclgEcSkpFXNEXYRvkQdAMEO0WEY',
+  authDomain: 'koukokunavi-e4b90.firebaseapp.com',
+  projectId: 'koukokunavi-e4b90',
+  storageBucket: 'koukokunavi-e4b90.firebasestorage.app',
+  messagingSenderId: '465232241609',
+  appId: '1:465232241609:web:29020d80c7810106c8be18'
+};
+window.KN_FIREBASE_CONFIG = KN_FIREBASE_CONFIG;
 var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs'];
 
 function knApi(method, path, body, token){
