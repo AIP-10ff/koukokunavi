@@ -10,7 +10,6 @@
 ({key:"AIzaSyDdYpOzy6kX1LV49MjqfL0opYjVDLRAPtY",v:"weekly",language:"ja",region:"JP"});
 </script>
 <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
 <script src="shared-data.js"></script>
 <style>
@@ -754,10 +753,6 @@ setInterval(function(){ if(document.visibilityState === 'visible'){ _loadSgFromS
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible'){ _loadSgFromServer(true); _knSyncFavs(); }
 });
-
-// ===== EmailJS =====
-// 問い合わせの予備送信（サーバーに届かないとき）でだけ使う。会員の確認コードは SMS（Firebase）に切り替えた
-emailjs.init({publicKey:EJ_PUBLIC_KEY});
 
 // ===== グローバル変数 =====
 let map,           // Google Maps マップインスタンス
@@ -2091,7 +2086,7 @@ function updateAuthBtn(){
 // showInq() : お問い合わせフォームをモーダルで表示。
 //   「サイネージに関する」「広告に関する」の2種類をタブ切替（setInqMode）。
 // submitInq() : ハニーポット（inq-hp）でBOTを弾き、必須項目・電話番号・メール形式を検証。
-//   120秒クールダウン（kn_cd_inq）後に送信可。EmailJSで運営者宛てに詳細を送信する。
+//   120秒クールダウン（kn_cd_inq）後に送信可。サーバー（/api/v1/contact/）が DB に保存し、SES で担当者に通知する。
 let inqMode='signage';
 function _buildSignageOptions(){
   let opts='<option value="">指定なし</option>';
@@ -2240,8 +2235,8 @@ async function submitInq(){
   };
   if(btn){btn.disabled=true;btn.textContent='送信中...';}
   const mailBody=_buildInqMailBody(inqData);
-  // まずサーバー（/api/v1/contact/）へ。DB に保存し SES で通知する。
-  // サーバー未配置・通信失敗のとき、またはサーバーが通知できなかったときは従来の EmailJS で通知する。
+  // サーバー（/api/v1/contact/）へ送る。サーバーが DB に保存し、SES で担当者に通知する。
+  // EmailJS（公開キーがブラウザに出る）は使わない（構成図 v3 ⑥ 8、Asana「EmailJS を本番から外す」）。
   let srv=null;
   try{
     srv=await knSendContact(inqData,mailBody);
@@ -2265,45 +2260,16 @@ async function submitInq(){
       toast('送信が続いています。しばらくしてからお試しください');
       return;
     }
-    srv=null;
-  }
-  if(srv&&srv.notified){
-    inqData.mailStatus='sent';
-    _saveInquiryRecord(inqData);
-    closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
-    return;
-  }
-  try{
-    await emailjs.send(EJ_SVC,EJ_TPL_CONTACT,{
-      to_email:SECURITY_NOTIFY_EMAIL,
-      reply_to:inqData.email,
-      from_name:inqData.name,
-      name:inqData.name,
-      company:inqData.company,
-      sender_email:inqData.email,
-      sender_phone:inqData.tel,
-      category:inqData.category,
-      signage_name:inqData.signageName,
-      subject:'【広告ナビ お問い合わせ】'+inqData.category,
-      message:mailBody,
-      body:mailBody,
-      code:mailBody
-    });
-    inqData.mailStatus='sent';
-    _saveInquiryRecord(inqData);
-    closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
-  }catch(e){
-    inqData.mailStatus='failed';
-    inqData.mailError=_errMsg(e);
-    _saveInquiryRecord(inqData);
-    if(srv){ // サーバーの DB には保存済みなので受付扱い
-      closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
-      return;
-    }
+    // 通信できない・サーバーの不調：受け付けていないので、入力内容は残したまま再送してもらう
     localStorage.removeItem('kn_cd_inq');
     if(btn){btn.disabled=false;btn.textContent='お問い合わせを送信';}
-    toast('メール送信に失敗しましたが、お問い合わせ履歴には保存しました');
+    toast('送信できませんでした。通信状況をご確認のうえ、しばらくしてからもう一度お試しください');
+    return;
   }
+  // サーバーの DB に保存できた時点で受付とする（通知メールが送れなかった場合も、DB には残っている）
+  inqData.mailStatus=(srv&&srv.notified)?'sent':'pending';
+  _saveInquiryRecord(inqData);
+  closeModal();toast("お問い合わせを受け付けました。担当者よりご連絡します。");
 }
 // ===== お問い合わせ履歴 =====
 const INQ_STATUS_LBL={new:'新着',read:'確認中',replied:'対応済み'};
