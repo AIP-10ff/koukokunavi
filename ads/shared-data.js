@@ -332,7 +332,6 @@ var SECURITY_NOTIFY_EMAIL = 'h.mano@10-ff.com';
 var EJ_PUBLIC_KEY  = '0Clg3RbnfDE5hK7XS';
 var EJ_SVC         = 'service_q9riskq';
 var EJ_TPL_AUTH    = 'template_ae5nrdo';
-var EJ_TPL_CONTACT = 'template_6c6jjv9';
 
 // ===== Cookie 操作 =====
 function _setCookie(name,val,days){var d=new Date();d.setTime(d.getTime()+days*864e5);document.cookie=name+'='+val+';expires='+d.toUTCString()+';path=/;SameSite=Lax';}
