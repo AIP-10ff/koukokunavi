@@ -85,8 +85,10 @@ function _sizeToSqM(raw){
   }
   return null;
 }
-// 編集画面の値整形: 入力 → "1.43㎡" 形式に整える。解析不能なら原文を返す。
+// 編集画面の値整形: 数値だけの入力 → "1.43㎡" 形式に整える。解析不能なら原文を返す。
+// たて×よこ（例 640mm×2240mm）はそのまま残す。面積はピンで計算して出すので、寸法を消すと詳細画面から寸法が分からなくなる
 window.formatSizeFieldValue=function(raw){
+  if(raw!=null&&/[×x*✕✖]/i.test(String(raw))) return String(raw).trim();
   var n=_sizeToSqM(raw);
   return n!=null ? n+'㎡' : (raw==null?'':String(raw));
 };
