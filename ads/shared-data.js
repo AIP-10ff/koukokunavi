@@ -85,12 +85,14 @@ function _sizeToSqM(raw){
   }
   return null;
 }
-// 編集画面の値整形: 入力 → "1.43㎡" 形式に整える。解析不能なら原文を返す。
+// 編集画面の値整形: 数値だけの入力 → "1.43㎡" 形式に整える。解析不能なら原文を返す。
+// たて×よこ（例 640mm×2240mm）はそのまま残す。面積はピンで計算して出すので、寸法を消すと詳細画面から寸法が分からなくなる
 window.formatSizeFieldValue=function(raw){
+  if(raw!=null&&/[×x*✕✖]/i.test(String(raw))) return String(raw).trim();
   var n=_sizeToSqM(raw);
   return n!=null ? n+'㎡' : (raw==null?'':String(raw));
 };
-// ピン表示用: ㎡ 抜きの数値文字列
+// ピン表示用: 面積（㎡ 付き）
 function _pinSizeM2(sz){
   var n=_sizeToSqM(sz);
   // 単位を付けないと何の数字か分からない（10/9 中井さんの指摘）。ピンの下の段＝画面の面積
