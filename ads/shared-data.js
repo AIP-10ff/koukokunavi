@@ -93,7 +93,8 @@ window.formatSizeFieldValue=function(raw){
 // ピン表示用: ㎡ 抜きの数値文字列
 function _pinSizeM2(sz){
   var n=_sizeToSqM(sz);
-  return n!=null ? n : '---';
+  // 単位を付けないと何の数字か分からない（10/9 中井さんの指摘）。ピンの下の段＝画面の面積
+  return n!=null ? n+'㎡' : '---';
 }
 // 先頭プラン(plans[0])の価格を "○万/月" に整形
 function _pinFirstPrice(plans){
