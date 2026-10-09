@@ -711,3 +711,15 @@ function knToServerSignage(s){
   return o;
 }
 window.knToServerSignage = knToServerSignage;
+
+// 利用者向け：問い合わせをサーバーへ（POST /contact/、ログイン不要）。
+// サーバーが DB に保存し、SES で社内へ通知する。戻り値 {id, notified}（notified=false は保存済み・未通知）。
+// 電話番号・希望期間などの項目は body（メール本文と同じ文面）にまとめて送る。
+function knSendContact(inq, bodyText){
+  return knApi('POST', '/contact/', {
+    name: inq.name, email: inq.email, company: inq.company || '',
+    signage_id: inq.signageId ? String(inq.signageId) : '',
+    body: bodyText
+  });
+}
+window.knSendContact = knSendContact;
