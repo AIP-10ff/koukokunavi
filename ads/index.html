@@ -122,9 +122,18 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 
 /* ── SM以下: タブレット横〜スマホ（〜899px）共通 ── */
 @media(max-width:899px){
-  .dp-page-body{flex-direction:column;height:calc(100vh - var(--hdr));overflow-y:auto}
-  .dp-left-col{flex:unset;overflow-y:visible}
-  .dp-right-col{overflow-y:visible}
+  /* 詳細画面は縦 1 列にして、画面全体を 1 本でスクロールする。
+     高さはパネル（ヘッダーの下〜画面下端）から上の帯 44px を引いた分。100vh だとスマホのアドレスバー等のぶん下が切れる */
+  .dp-page-body{flex-direction:column;height:calc(100% - 44px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* 左右の列は縮めない（縮むと中身がはみ出したまま、ページのスクロールで届かなくなる）。
+     右列は overflow:hidden を外す（片方向だけ visible にすると auto 扱いになり、列の中で別スクロールになる） */
+  .dp-left-col{flex:none;overflow-y:visible}
+  .dp-right-col{flex:none;overflow:visible}
+  /* 右列の中の枠（詳細情報・メモ・プラン）はデスクトップでは自前でスクロールするが、縦 1 列では高さ 0 に潰れて見えなくなるため外す */
+  .dp-right-col>div:first-child{flex:none!important;overflow:visible!important;min-height:auto!important}
+  /* メモ欄は詳細情報の横（幅 220px）だと狭いので下に回す */
+  .dp-right-col .dp-card>div:nth-child(2){flex-wrap:wrap}
+  #memo-wrap{flex:1 1 100%!important;border-left:none!important;border-top:1px solid #f0f0f0!important}
   #fp-grid{display:block;height:calc(100% - 88px)}
   .fp-tab-bar{display:flex;border-bottom:2px solid #f0f0f0;background:#fff;flex-shrink:0}
   .fp-tab-btn{flex:1;padding:10px 4px;font-size:12px;border:none;background:transparent;cursor:pointer;color:#aaa;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:600;white-space:nowrap}
