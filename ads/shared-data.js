@@ -106,11 +106,9 @@ function _pinFirstPrice(plans){
   }
   return n.toLocaleString()+'円/月';
 }
-// 通行者数 vs 交通量 比較: 'ped'(人) / 'car'(車) / null(両方未入力)
+// ピンの通行アイコン: 'ped'(人) / null(未入力)。交通量（車）はデータ元が無いため 10/8 に表示をやめた
 function _pinTrafficKind(s){
-  var p=_pinNum(s&&s.ped),t=_pinNum(s&&s.trf);
-  if(p===0&&t===0) return null;
-  return p>=t?'ped':'car';
+  return _pinNum(s&&s.ped)>0?'ped':null;
 }
 var _PIN_PERSON_SVG='<svg width="22" height="24" viewBox="0 0 22 24" style="display:block">'
   +'<circle cx="11" cy="6" r="4" fill="none" stroke="#222" stroke-width="1.8"/>'
@@ -152,7 +150,7 @@ function pinInnerHtml(s){
   return html;
 }
 
-// Leaflet 用ピンアイコン（admin.html が使用）。Google Maps 版は koukokunavi.html 側で pinInnerHtml を直接利用する。
+// ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
 function pinIcon(s){
   return L.divIcon({html:pinInnerHtml(s),iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});
 }
@@ -424,212 +422,6 @@ function find(id){for(var i=0;i<SG.length;i++) if(SG[i].id===id) return SG[i]; r
 // DOM要素の値を取得
 function gv(id){var el=document.getElementById(id);return el?el.value:'';}
 
-// =============================================================
-//  SHARED — 交通量・通行量データ連携（Googleスプレッドシート）
-//  別システム（交通量測定システム）が出力する公開スプレッドシートの
-//  「日次」シートを gviz CSV で読み取り、地点ごとの最新値を返す。
-//  通行量_合計 → ピンの ped（人）/ 交通量_合計 → ピンの trf（車）。
-// =============================================================
-
-// 既定のスプレッドシートID（管理画面で変更可。localStorage: kn_traffic_sheet_id）
-var TRAFFIC_SHEET_ID_DEFAULT = '1md2mIjyfw5K85oBwJa0d-yaZlkkE7mHNXGoCTXl2DH8';
-
-// 入力（URL or ID）からスプレッドシートIDを抽出
-function trafficExtractSheetId(input){
-  if(!input) return '';
-  var s=String(input).trim();
-  var m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  if(m) return m[1];
-  return s; // ID直書き
-}
-
-// gviz CSV エンドポイントURL（sheetName 空なら先頭シート）
-function trafficGvizUrl(sheetId, sheetName){
-  var u='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/gviz/tq?tqx=out:csv';
-  if(sheetName) u+='&sheet='+encodeURIComponent(sheetName);
-  return u;
-}
-
-// CSVパーサ（ダブルクォート・改行内包・"" エスケープ対応）→ 行配列（各行=セル文字列配列）
-function _parseCsv(text){
-  var rows=[], row=[], field='', i=0, inQ=false;
-  text=String(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-  for(;i<text.length;i++){
-    var c=text[i];
-    if(inQ){
-      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else {inQ=false;} }
-      else field+=c;
-    }else{
-      if(c==='"') inQ=true;
-      else if(c===',') {row.push(field);field='';}
-      else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
-      else field+=c;
-    }
-  }
-  if(field!==''||row.length){row.push(field);rows.push(row);}
-  return rows;
-}
-
-// 年月日 → 比較用整数 YYYYMMDD。gvizの "Date(2026,5,25)"（月0始まり）・"2026-06-25"・"2026/6/25" 等に対応
-function _trafficDateKey(v){
-  if(v==null) return 0;
-  var s=String(v).trim(); if(!s) return 0;
-  var m=s.match(/Date\((\d+),(\d+),(\d+)/);
-  if(m) return Number(m[1])*10000+(Number(m[2])+1)*100+Number(m[3]);
-  var n=s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
-  if(n) return Number(n[1])*10000+Number(n[2])*100+Number(n[3]);
-  return 0;
-}
-
-// 数値抽出（全角・カンマ・"1200.0" 対応）→ 整数文字列 or ''
-function _trafficNum(v){
-  if(v==null) return '';
-  var s=String(v).replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).replace(/[,，\s]/g,'');
-  var m=s.match(/-?\d+(?:\.\d+)?/);
-  if(!m) return '';
-  var num=parseFloat(m[0]);
-  return isNaN(num)?'':String(Math.round(num));
-}
-
-// gviz CSVテキスト → 地点ごとの「最新日付の行」配列
-// 返り値: [{loc, date, dateKey, ped, trf, lat, lng, detail:{各内訳}}]
-var _TRAFFIC_DETAIL_COLS=['男性','女性','性別不明','子ども(0-14)','若年(15-24)','現役(25-39)','中年(40-64)','高齢(65+)','不明'];
-function parseTrafficDaily(csvText){
-  var rows=_parseCsv(csvText).filter(function(r){return r.some(function(c){return String(c).trim()!=='';});});
-  if(rows.length<2) return [];
-  var head=rows[0].map(function(h){return String(h).trim();});
-  function col(name){return head.indexOf(name);}
-  var iDate=col('年月日'), iLoc=col('地点名'), iLat=col('緯度'), iLng=col('経度'),
-      iPed=col('通行量_合計'), iTrf=col('交通量_合計');
-  if(iLoc<0) return []; // 地点名列が無ければ不正なシート
-  var byLoc={};
-  for(var r=1;r<rows.length;r++){
-    var row=rows[r];
-    var loc=String(row[iLoc]||'').trim();
-    if(!loc) continue;
-    var dk=iDate>=0?_trafficDateKey(row[iDate]):0;
-    var cur=byLoc[loc];
-    if(cur && cur.dateKey>=dk) continue; // 既により新しい（or同日）の行がある＝最新優先
-    var detail={};
-    _TRAFFIC_DETAIL_COLS.forEach(function(name){var ci=col(name);if(ci>=0)detail[name]=_trafficNum(row[ci]);});
-    byLoc[loc]={
-      loc:loc,
-      date:iDate>=0?String(row[iDate]||'').trim():'',
-      dateKey:dk,
-      ped:iPed>=0?_trafficNum(row[iPed]):'',
-      trf:iTrf>=0?_trafficNum(row[iTrf]):'',
-      lat:iLat>=0?parseFloat(row[iLat]):null,
-      lng:iLng>=0?parseFloat(row[iLng]):null,
-      detail:detail
-    };
-  }
-  return Object.keys(byLoc).map(function(k){return byLoc[k];});
-}
-
-// gviz JSON（responseHandler）レスポンス → 地点ごとの「最新日付の行」配列
-// CSV版(parseTrafficDaily)と同じ形 [{loc,date,dateKey,ped,trf,lat,lng,detail}] を返す
-function _dateKeyToStr(dk){
-  if(!dk) return '';
-  var y=Math.floor(dk/10000), m=Math.floor((dk%10000)/100), d=dk%100;
-  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-}
-function parseTrafficDailyJson(resp){
-  if(!resp || !resp.table){
-    if(resp && resp.status==='error'){
-      var er=(resp.errors&&resp.errors[0])||{};
-      throw new Error(er.detailed_message||er.message||'シート取得エラー（公開設定・シート名をご確認ください）');
-    }
-    return [];
-  }
-  var table=resp.table;
-  var cols=(table.cols||[]).map(function(c){return (c&&c.label!=null)?String(c.label).trim():'';});
-  var rows=table.rows||[];
-  var head, dataRows;
-  if(cols.indexOf('地点名')>=0){            // 通常: 1行目がヘッダーとして認識されている
-    head=cols; dataRows=rows.map(function(r){return (r&&r.c)||[];});
-  }else{                                     // 予備: 1行目がデータ扱い → それをヘッダーにする
-    if(!rows.length) return [];
-    head=((rows[0].c)||[]).map(function(c){return (c&&c.v!=null)?String(c.v).trim():'';});
-    dataRows=rows.slice(1).map(function(r){return (r&&r.c)||[];});
-  }
-  function col(name){return head.indexOf(name);}
-  function cellV(cells,idx){ if(idx<0||!cells||idx>=cells.length) return ''; var c=cells[idx]; if(c==null) return ''; if(c.v!=null) return c.v; return c.f!=null?c.f:''; }
-  function cellDate(cells,idx){ if(idx<0||!cells||idx>=cells.length) return ''; var c=cells[idx]; if(c==null) return ''; return (c.f!=null&&c.f!=='')?c.f:(c.v!=null?c.v:''); }
-  var iDate=col('年月日'), iLoc=col('地点名'), iLat=col('緯度'), iLng=col('経度'), iPed=col('通行量_合計'), iTrf=col('交通量_合計');
-  if(iLoc<0) return [];
-  var byLoc={};
-  for(var r=0;r<dataRows.length;r++){
-    var cells=dataRows[r];
-    var loc=String(cellV(cells,iLoc)||'').trim();
-    if(!loc) continue;
-    var dk=_trafficDateKey(cellDate(cells,iDate));
-    var cur=byLoc[loc];
-    if(cur && cur.dateKey>=dk) continue;     // 最新日付優先
-    var detail={};
-    _TRAFFIC_DETAIL_COLS.forEach(function(nm){var ci=col(nm); if(ci>=0) detail[nm]=_trafficNum(cellV(cells,ci));});
-    byLoc[loc]={
-      loc:loc, date:_dateKeyToStr(dk), dateKey:dk,
-      ped:_trafficNum(cellV(cells,iPed)),
-      trf:_trafficNum(cellV(cells,iTrf)),
-      lat:iLat>=0?parseFloat(cellV(cells,iLat)):null,
-      lng:iLng>=0?parseFloat(cellV(cells,iLng)):null,
-      detail:detail
-    };
-  }
-  return Object.keys(byLoc).map(function(k){return byLoc[k];});
-}
-
-// JSONP取得（<script>タグ経由＝CORS非対象）。file:// でも localhost でも公開URLでも動く。
-var _trafficJsonpSeq=0;
-function fetchTrafficDailyJsonp(sheetId, sheetName){
-  return new Promise(function(resolve, reject){
-    var cb='__knTrafficCb_'+(++_trafficJsonpSeq)+'_'+Math.floor(Math.random()*1e9);
-    var url='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/gviz/tq?tqx=out:json;responseHandler:'+cb;
-    if(sheetName) url+='&sheet='+encodeURIComponent(sheetName);
-    var script=document.createElement('script');
-    var done=false, timer;
-    function cleanup(){ try{delete window[cb];}catch(e){window[cb]=undefined;} if(script.parentNode)script.parentNode.removeChild(script); if(timer)clearTimeout(timer); }
-    timer=setTimeout(function(){ if(done)return; done=true; cleanup(); reject(new Error('タイムアウト（シートの公開設定をご確認ください）')); }, 15000);
-    window[cb]=function(resp){ if(done)return; done=true; try{ var recs=parseTrafficDailyJson(resp); cleanup(); resolve(recs); }catch(e){ cleanup(); reject(e); } };
-    script.onerror=function(){ if(done)return; done=true; cleanup(); reject(new Error('読み込みに失敗しました（ネットワーク／シートの公開設定をご確認ください）')); };
-    script.src=url;
-    (document.head||document.documentElement).appendChild(script);
-  });
-}
-
-// 公開取得の標準入口。JSONP方式（file://含めどこでも動作）。
-window.fetchTrafficDaily=fetchTrafficDailyJsonp;
-
-// 2地点間の距離（km）— ピンの緯度経度マッチ用
-function trafficHaversineKm(lat1,lng1,lat2,lng2){
-  function rad(d){return d*Math.PI/180;}
-  var R=6371, dLat=rad(lat2-lat1), dLng=rad(lng2-lng1);
-  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-// 1地点の最新行 → SG配列内の対応サイネージを解決
-// 優先順: 手動マップ(mapObj[地点名]=id) → 地点名一致(正規化) → 緯度経度50m以内
-// admin/user 両画面共用。見つからなければ null。
-function trafficMatchSignage(rec, sgList, mapObj){
-  if(!sgList||!sgList.length) return null;
-  mapObj=mapObj||{};
-  if(mapObj[rec.loc]!=null){
-    var wantId=Number(mapObj[rec.loc]);
-    for(var k=0;k<sgList.length;k++){ if(sgList[k].id===wantId) return sgList[k]; }
-  }
-  var key=_nrmS(rec.loc).replace(/\s/g,'');
-  for(var i=0;i<sgList.length;i++){ if(_nrmS(sgList[i].name).replace(/\s/g,'')===key) return sgList[i]; }
-  if(rec.lat!=null&&rec.lng!=null&&!isNaN(rec.lat)&&!isNaN(rec.lng)){
-    for(var j=0;j<sgList.length;j++){
-      if(sgList[j].lat==null||sgList[j].lng==null) continue;
-      if(trafficHaversineKm(rec.lat,rec.lng,sgList[j].lat,sgList[j].lng)<=0.05) return sgList[j];
-    }
-  }
-  return null;
-}
-window.trafficMatchSignage=trafficMatchSignage;
-
 // IDBからキャッシュ読み込み + 旧localStorage形式を自動移行
 // sg: SGデータ配列（各ページのSGをそのまま渡す）
 function preloadMediaCache(sg,cb){
@@ -666,3 +458,97 @@ function _migrateOldPhotos(sg,cb){
   });
   if(pending===0&&cb)cb();
 }
+
+// ===== サーバー API（Phase2 管理系 API） =====
+// 掲載情報（サイネージ）はサーバーの DB を正とする。利用者画面・管理画面の両方から使う。
+// file:// で開いたときや API が無いときは fetch が失敗し、呼び出し側が従来の動き（localStorage／DEFAULT_SG）に戻る。
+var KN_API_BASE = '/api/v1';
+var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs'];
+
+function knApi(method, path, body, token){
+  var h = {'Accept':'application/json'};
+  if(body !== undefined) h['Content-Type'] = 'application/json';
+  if(token) h['Authorization'] = 'Token ' + token;
+  return fetch(KN_API_BASE + path, {
+    method: method, headers: h, cache: 'no-cache',
+    body: body === undefined ? undefined : JSON.stringify(body)
+  }).then(function(r){
+    if(r.status === 204) return null;
+    return r.json().catch(function(){ return null; }).then(function(d){
+      if(!r.ok){
+        var e = new Error((d && d.detail) || ('HTTP ' + r.status));
+        e.status = r.status; e.data = d; throw e;
+      }
+      return d;
+    });
+  });
+}
+window.knApi = knApi;
+
+// 利用者向け：公開中のピン一覧（ログイン不要）
+function knFetchSignages(){
+  return knApi('GET', '/signages/').then(function(d){ return Array.isArray(d) ? d : []; });
+}
+window.knFetchSignages = knFetchSignages;
+
+// 画面の SG 1 件 → サーバーに送る形（画面だけで使う項目 e / favCount / _xxxEdited は送らない）
+function knToServerSignage(s){
+  var o = {};
+  KN_SIGNAGE_KEYS.forEach(function(k){ if(s[k] !== undefined && s[k] !== null) o[k] = s[k]; });
+  o.lat = Number(s.lat); o.lng = Number(s.lng);
+  o.plans = (s.plans || []).map(function(p){ return {n: String(p.n || ''), p: String(p.p || '')}; });
+  // key は S3 の置き場所（⑥ 9c）。url は一時的なものなので送らない
+  o.photos = (s.photos || []).map(function(p){ var x = {id: p.id, name: p.name || '', isMain: !!p.isMain}; if(p.key) x.key = p.key; return x; });
+  o.docs = (s.docs || []).map(function(d){ var x = {id: d.id, name: d.name || '', size: d.size || 0, type: d.type || ''}; if(d.key) x.key = d.key; return x; });
+  if(['ON','EMPTY','MAINT'].indexOf(o.status) < 0) o.status = 'EMPTY';
+  return o;
+}
+window.knToServerSignage = knToServerSignage;
+
+// ===== 写真・資料（S3、⑥ 9c） =====
+// サーバーが返す photos / docs の url（1 時間ほど有効な一時 URL）を、表示用のキャッシュに入れる。
+// 画面は従来どおり photoCache[id] / docCache[id] を見るだけで、S3 の写真が出る。一覧を取り直すたびに呼ぶ（URL の期限切れ対策）
+function knApplyMediaUrls(list){
+  (list || []).forEach(function(s){
+    (s.photos || []).forEach(function(p){ if(p && p.id && p.url) photoCache[p.id] = p.url; });
+    (s.docs || []).forEach(function(d){ if(d && d.id && d.url) docCache[d.id] = d.url; });
+  });
+}
+window.knApplyMediaUrls = knApplyMediaUrls;
+
+// 管理者用：ファイル（File / Blob）を S3 に上げて {key, url, ...} を受け取る（POST /admin/media/）
+function knUploadMedia(blob, filename, kind, token){
+  var fd = new FormData();
+  fd.append('kind', kind || 'photo');
+  fd.append('file', blob, filename || 'file');
+  return fetch(KN_API_BASE + '/admin/media/', {
+    method: 'POST', headers: {'Accept': 'application/json', 'Authorization': 'Token ' + token}, body: fd
+  }).then(function(r){
+    return r.json().catch(function(){ return null; }).then(function(d){
+      if(!r.ok){ var e = new Error((d && d.detail) || ('HTTP ' + r.status)); e.status = r.status; e.data = d; throw e; }
+      return d;
+    });
+  });
+}
+window.knUploadMedia = knUploadMedia;
+
+// dataURL（圧縮後の写真）を、アップロード用の Blob にする
+function knDataUrlToBlob(dataUrl){
+  var parts = String(dataUrl).split(','), mime = (parts[0].match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+  var bin = atob(parts[1] || ''), arr = new Uint8Array(bin.length);
+  for(var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type: mime});
+}
+window.knDataUrlToBlob = knDataUrlToBlob;
+
+// 利用者向け：問い合わせをサーバーへ（POST /contact/、ログイン不要）。
+// サーバーが DB に保存し、SES で社内へ通知する。戻り値 {id, notified}（notified=false は保存済み・未通知）。
+// 電話番号・希望期間などの項目は body（メール本文と同じ文面）にまとめて送る。
+function knSendContact(inq, bodyText){
+  return knApi('POST', '/contact/', {
+    name: inq.name, email: inq.email, company: inq.company || '',
+    signage_id: inq.signageId ? String(inq.signageId) : '',
+    body: bodyText
+  });
+}
+window.knSendContact = knSendContact;
