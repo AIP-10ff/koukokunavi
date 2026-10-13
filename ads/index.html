@@ -2373,6 +2373,40 @@ function openModal(html,cb,noClose,noBackdrop){
   if(cb)setTimeout(cb,60);
 }
 function closeModal(){$('mc').innerHTML='';_setHamburgerDisabled(false);}
+
+// ===== ブラウザ／スマホの「戻る」で画面を閉じる =====
+// 画面（写真・ポップアップ・絞り込み・メニュー・検索履歴・詳細・一覧）が新しく開いたら履歴に 1 つ積み、
+// 「戻る」（PC の戻るボタン・Android の戻る操作・iPhone の右スワイプ）で、いちばん上の 1 つだけを閉じる。
+// 何も開いていなければ、そのままページを戻る（✕ や「◀ 戻る」で閉じた分の履歴は読み飛ばす）。
+let _navIdx=(history.state&&history.state.i)||0; // 履歴に積んだ番号（ページを開いた時点が 0。再読み込み時は引き継ぐ）。戻る／進むの見分けに使う
+function _navPush(){ history.pushState({kn:1,i:++_navIdx},''); }
+const _navLayers=[
+  {open:()=>$('photo-viewer').classList.contains('open'), close:()=>$('photo-viewer').classList.remove('open')},
+  {open:()=>$('mc').innerHTML!=='',                       close:()=>{ if($('mc').querySelector('.btn-m-close')) closeModal(); else _navPush(); }}, // 閉じるボタンの無い処理中のポップアップは閉じない
+  {open:()=>fpOpen,                                       close:()=>closeFilter()},
+  {open:()=>mOpen,                                        close:()=>toggleMenu()},
+  {open:()=>_histOpen,                                    close:()=>toggleHistPanel()},
+  {open:()=>$('detail-panel').classList.contains('open'), close:()=>closeDetail()},
+  {open:()=>$('list-panel').classList.contains('open'),   close:()=>closeList()},
+];
+function _navOpenStates(){ return _navLayers.map(l=>l.open()); }
+['openPV','openModal','toggleFilter','toggleMenu','toggleHistPanel','openDetail','showList'].forEach(name=>{
+  const orig=window[name];
+  window[name]=function(){
+    const before=_navOpenStates();
+    const r=orig.apply(this,arguments);
+    if(_navOpenStates().some((o,k)=>o&&!before[k])) _navPush(); // 新しく開いた画面があれば積む（一覧 → 詳細のように入れ替わる場合も）
+    return r;
+  };
+});
+window.addEventListener('popstate',function(e){
+  const i=(e.state&&e.state.i)||0, isBack=i<_navIdx;
+  _navIdx=i;
+  if(!isBack) return; // 「進む」では何もしない
+  const top=_navLayers.find(l=>l.open());
+  if(top) top.close(); else history.back(); // 何も開いていなければ、残っている分を読み飛ばしてページを戻る
+});
+
 function $(id){return document.getElementById(id);}
 // toast は shared-data.js で定義
 </script>
