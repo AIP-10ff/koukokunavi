@@ -344,6 +344,9 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .ad-table th{background:#f7f7f7;padding:12px 14px;text-align:left;border-bottom:1px solid #e8e8e8;color:#666;font-weight:700}
 .ad-table td{padding:13px 14px;border-bottom:1px solid #f2f2f2;color:#333}
 .ad-table td.price{font-weight:700;color:var(--org)}
+/* 見出し・掲載期間・回数は折り返さない（スマホで 1 文字ずつ縦に並んで読めなかった）。プラン名と料金の列で幅を調整する */
+.ad-table th,.ad-table td:nth-child(2),.ad-table td:nth-child(3){white-space:nowrap}
+@media(max-width:479px){.ad-table{font-size:13px}.ad-table th,.ad-table td{padding:10px 6px}}
 .inq-type-row{display:flex;gap:8px;margin-bottom:12px}
 .inq-type-btn{flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;background:#fff;color:#555;transition:all .15s;font-family:inherit}
 .inq-type-btn.on{background:var(--org);color:#fff;border-color:var(--org);font-weight:700}
@@ -503,6 +506,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
               <tbody></tbody>
             </table>
             <p style="font-size:10px;color:#bbb;margin-top:8px">※表示価格は税別です</p>
+            <p style="font-size:10px;color:#bbb;margin-top:2px">※回数は 24 時間放映の場合です（15 秒の広告が 5 分に 1 回）。設置先の都合で夜間は放映しないことがあります</p>
           </div>
         </div>
       </div>
@@ -1529,9 +1533,10 @@ function openDetail(id){
     pie('inline-pg',[55,45],['#e8650a','#2196F3']);
     pie('inline-pa',[15,30,25,18,12],['#ff6384','#ff9f40','#36a2eb','#4bc0c0','#9966ff']);
     const tbl=$('inline-ad-table');
-    // 掲載期間はプラン名から出す（提案書 p13：年間契約＝12か月、月次契約＝1か月）。回数は中井さんに確認中のため従来のまま
+    // 掲載期間はプラン名から出す（提案書 p13：年間契約＝12か月、月次契約＝1か月）。
+    // 回数は 15 秒枠が 5 分に 1 回 → 24 時間で 288 回（10/13 中井さん）。夜間に消灯する設置先もあるため表の下に注釈
     const term=p=>/年間/.test(p.n||'')?'12か月':'1か月';
-    if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>${term(p)}</td><td>1万回</td><td class="price">${p.p}</td></tr>`).join('');}
+    if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>${term(p)}</td><td>1日288回※</td><td class="price">${p.p}</td></tr>`).join('');}
   },60);
   $('detail-panel').classList.add('open');
   document.querySelectorAll('.dp-left-col,.dp-right-col,.dp-page-body').forEach(el=>el.scrollTop=0);
