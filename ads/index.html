@@ -2378,20 +2378,25 @@ function closeModal(){$('mc').innerHTML='';_setHamburgerDisabled(false);}
 // 画面（写真・ポップアップ・絞り込み・メニュー・検索履歴・詳細・一覧）が新しく開いたら履歴に 1 つ積み、
 // 「戻る」（PC の戻るボタン・Android の戻る操作・iPhone の右スワイプ）で、いちばん上の 1 つだけを閉じる。
 // 何も開いていなければ、そのままページを戻る（✕ や「◀ 戻る」で閉じた分の履歴は読み飛ばす）。
+// 「進む」（PC の Alt＋→ など）では、「戻る」で閉じた画面をもう一度開く。PC の Alt＋← はブラウザの「戻る」と同じなので、そのまま効く。
 let _navIdx=(history.state&&history.state.i)||0; // 履歴に積んだ番号（ページを開いた時点が 0。再読み込み時は引き継ぐ）。戻る／進むの見分けに使う
-function _navPush(){ history.pushState({kn:1,i:++_navIdx},''); }
+let _navRedo=[]; // 「戻る」で閉じた画面（「進む」で開き直す）
+function _navPush(){ _navRedo=[]; history.pushState({kn:1,i:++_navIdx},''); }
+const _navOrig={}; // 履歴に積まない元の関数（開き直しに使う）
+let _navModalHtml='';
 const _navLayers=[
-  {open:()=>$('photo-viewer').classList.contains('open'), close:()=>$('photo-viewer').classList.remove('open')},
-  {open:()=>$('mc').innerHTML!=='',                       close:()=>{ if($('mc').querySelector('.btn-m-close')) closeModal(); else _navPush(); }}, // 閉じるボタンの無い処理中のポップアップは閉じない
-  {open:()=>fpOpen,                                       close:()=>closeFilter()},
-  {open:()=>mOpen,                                        close:()=>toggleMenu()},
-  {open:()=>_histOpen,                                    close:()=>toggleHistPanel()},
-  {open:()=>$('detail-panel').classList.contains('open'), close:()=>closeDetail()},
-  {open:()=>$('list-panel').classList.contains('open'),   close:()=>closeList()},
+  {open:()=>$('photo-viewer').classList.contains('open'), close:()=>$('photo-viewer').classList.remove('open'), reopen:()=>$('photo-viewer').classList.add('open')},
+  {open:()=>$('mc').innerHTML!=='', close:()=>{ if($('mc').querySelector('.btn-m-close')){ _navModalHtml=$('mc').innerHTML; closeModal(); return true; } _navPush(); return false; }, // 閉じるボタンの無い処理中のポップアップは閉じない
+   reopen:()=>{ $('mc').innerHTML=_navModalHtml; _setHamburgerDisabled(true); }},
+  {open:()=>fpOpen,                                       close:()=>closeFilter(),     reopen:()=>{ if(!fpOpen) _navOrig.toggleFilter(); }},
+  {open:()=>mOpen,                                        close:()=>toggleMenu(),      reopen:()=>{ if(!mOpen) _navOrig.toggleMenu(); }},
+  {open:()=>_histOpen,                                    close:()=>toggleHistPanel(), reopen:()=>{ if(!_histOpen) _navOrig.toggleHistPanel(); }},
+  {open:()=>$('detail-panel').classList.contains('open'), close:()=>closeDetail(),     reopen:()=>$('detail-panel').classList.add('open')},
+  {open:()=>$('list-panel').classList.contains('open'),   close:()=>closeList(),       reopen:()=>$('list-panel').classList.add('open')},
 ];
 function _navOpenStates(){ return _navLayers.map(l=>l.open()); }
 ['openPV','openModal','toggleFilter','toggleMenu','toggleHistPanel','openDetail','showList'].forEach(name=>{
-  const orig=window[name];
+  const orig=window[name]; _navOrig[name]=orig;
   window[name]=function(){
     const before=_navOpenStates();
     const r=orig.apply(this,arguments);
@@ -2402,9 +2407,16 @@ function _navOpenStates(){ return _navLayers.map(l=>l.open()); }
 window.addEventListener('popstate',function(e){
   const i=(e.state&&e.state.i)||0, isBack=i<_navIdx;
   _navIdx=i;
-  if(!isBack) return; // 「進む」では何もしない
+  if(!isBack){ const l=_navRedo.pop(); if(l) l.reopen(); return; } // 「進む」：戻るで閉じた画面を開き直す
   const top=_navLayers.find(l=>l.open());
-  if(top) top.close(); else history.back(); // 何も開いていなければ、残っている分を読み飛ばしてページを戻る
+  if(!top){ history.back(); return; } // 何も開いていなければ、残っている分を読み飛ばしてページを戻る
+  if(top.close()!==false) _navRedo.push(top);
+});
+// PC の Alt＋← ／ Alt＋→ をページ側でも受けて、確実に「戻る／進む」にする（ブラウザ既定の動きは止めて二重にしない）
+document.addEventListener('keydown',function(e){
+  if(!e.altKey||e.ctrlKey||e.metaKey||e.shiftKey) return;
+  if(e.key==='ArrowLeft'){ e.preventDefault(); history.back(); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); history.forward(); }
 });
 
 function $(id){return document.getElementById(id);}
