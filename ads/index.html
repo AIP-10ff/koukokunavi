@@ -394,6 +394,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 /* ズームレベル表示 */
 #zoom-badge{position:absolute;bottom:6px;left:46px;z-index:800;background:rgba(255,255,255,.88);border-radius:4px;padding:3px 7px;font-size:11px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,.2);pointer-events:none;line-height:1.5}
 #zoom-badge.ready{color:#2e7d32;font-weight:700}
+#zoom-badge{display:none} /* 周辺施設ボタンを外したため、施設表示の目安だったズーム表示も出さない（10/13） */
 @keyframes kn-tap-pop{0%,100%{transform:translateY(0) scale(1)}45%{transform:translateY(-4px) scale(1.08)}}
 .kn-tap-badge{display:inline-block;background:#e8650a;color:#fff;font-size:10px;font-weight:800;border-radius:20px;padding:3px 10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);letter-spacing:.4px;line-height:1.4;margin-bottom:4px;animation:kn-tap-pop 1.8s ease-in-out infinite}
 </style>
@@ -1043,11 +1044,13 @@ async function initMap(lat,lng){
   map=new Map(document.getElementById('map'),{
     center:{lat:lat,lng:lng},zoom:13,minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
     mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
+    keyboardShortcuts:!matchMedia('(pointer:coarse)').matches, // タッチ端末（スマホ等）では下部の「キーボード ショートカット」を出さない
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
   });
   _infoWin=new InfoWindow();
   putMarkers(SG);
-  addFacilityControl();    // 🏪 周辺施設ボタン（フェーズ2）
+  // 🏪 周辺施設ボタンは使わない（10/13 眞野判断。PC・スマホとも非表示。戻すときはこの行を有効に）
+  // addFacilityControl();
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
   facilityLayer=null;
   function _updateZoomBadge(){
