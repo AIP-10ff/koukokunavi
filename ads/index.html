@@ -1043,6 +1043,7 @@ async function initMap(lat,lng){
   map=new Map(document.getElementById('map'),{
     center:{lat:lat,lng:lng},zoom:13,minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
     mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
+    keyboardShortcuts:!matchMedia('(pointer:coarse)').matches, // タッチ端末（スマホ等）では下部の「キーボード ショートカット」を出さない
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
   });
   _infoWin=new InfoWindow();
