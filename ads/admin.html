@@ -1634,8 +1634,40 @@ function _saveInqs(arr){
   try{localStorage.setItem('kokoknavi_inquiries',JSON.stringify(arr));}catch(e){}
 }
 
+// サーバー接続中は、サーバーに保存された問い合わせ（admin/inquiries/）を出す。どの端末から送られたものも見られる。
+// ステータスとメモはこの PC に保存する（サーバーの記録は読むだけで、消さない）
+var _srvInqs=null;
+var SRV_INQ_META_KEY='kokoknavi_inq_srv_meta';
+function _inqServerMode(){ return !!(_srvToken()&&_srvInqs); }
+function _inqEsc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function _srvInqMeta(){ try{return JSON.parse(localStorage.getItem(SRV_INQ_META_KEY)||'{}');}catch(e){return {};} }
+function _getInqsView(){
+  if(!_inqServerMode()) return _getInqs();
+  var meta=_srvInqMeta();
+  return _srvInqs.map(function(q){ var m=meta[q.id]||{}; return Object.assign({},q,{status:m.status||'new',adminMemo:m.adminMemo||''}); });
+}
+function _saveInqsView(arr){
+  if(!_inqServerMode()){ _saveInqs(arr); return; }
+  var meta=_srvInqMeta();
+  arr.forEach(function(q){ meta[q.id]={status:q.status,adminMemo:q.adminMemo||''}; });
+  try{localStorage.setItem(SRV_INQ_META_KEY,JSON.stringify(meta));}catch(e){}
+}
+// サーバーの 1 件 → 画面の形。利用者が入力した文字は表示前に無害化する（そのまま innerHTML に入れるため）
+function _srvInqToView(r){
+  return {id:r.id, ts:r.created_at, mode:'', category:'', tel:'',
+    name:_inqEsc(r.name), company:_inqEsc(r.company||'（未記入）'), email:_inqEsc(r.email),
+    signageName:_inqEsc(r.signage_name||(r.signage_id?'（ID '+r.signage_id+'）':'')),
+    message:_inqEsc(r.body), notifiedAt:r.notified_at, _srv:true};
+}
+function _loadSrvInqs(){
+  var t=_srvToken(); if(!t){ _srvInqs=null; return Promise.resolve(); }
+  return knApi('GET','/admin/inquiries/',undefined,t).then(function(list){
+    _srvInqs=(list||[]).map(_srvInqToView);
+  }).catch(function(e){ _srvInqs=null; toast('⚠ 問い合わせの記録を読めませんでした：'+_srvErr(e)); });
+}
+
 function _updateInqCount(){
-  var inqs=_getInqs();
+  var inqs=_getInqsView();
   var newCount=inqs.filter(function(q){return q.status==='new';}).length;
   var badge=document.getElementById('inq-hdr-badge');
   var statEl=document.getElementById('s-inq');
@@ -1654,6 +1686,7 @@ function toggleInqPanel(){
     if(btn)btn.classList.add('active');
     _inqDetailId=null;
     renderInqList();
+    if(_srvToken()) _loadSrvInqs().then(function(){ _updateInqCount(); if(_inqPanelOpen) renderInqList(); });
   }else{
     panel.classList.remove('open');
     if(btn)btn.classList.remove('active');
@@ -1670,7 +1703,7 @@ function setInqFilter(f,btnEl){
 }
 
 function renderInqList(){
-  var inqs=_getInqs();
+  var inqs=_getInqsView();
   var filtered=_inqFilter==='all'?inqs:inqs.filter(function(q){return q.status===_inqFilter;});
   var list=document.getElementById('iq-list');
   var footer=document.getElementById('iq-footer-count');
@@ -1688,7 +1721,7 @@ function renderInqList(){
     _inqDetailId=null;
   }
 
-  if(title) title.textContent='📩 お問い合わせ管理';
+  if(title) title.textContent='📩 お問い合わせ管理'+(_inqServerMode()?'（サーバーの記録）':(_srvToken()?'':'（この端末の記録）'));
   if(footer) footer.textContent=filtered.length+'件'+(inqs.length!==filtered.length?' / 全'+inqs.length+'件':'');
 
   if(!filtered.length){
@@ -1775,6 +1808,10 @@ function _renderInqDetail(q, container){
       '<textarea class="iq-memo-ta" id="iq-memo-ta" placeholder="対応状況や備考をメモ...">'+(q.adminMemo||'')+'</textarea>' +
       '<button onclick="saveInqMemo('+q.id+')" style="margin-top:6px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:700">💾 メモを保存</button>' +
     '</div></div>';
+  if(q._srv){
+    html+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">通知メール：'+(q.notifiedAt?'送信済み（'+_fmtInqDate(q.notifiedAt)+'）':'<span style="color:#f87171;font-weight:700">送れていません</span>')+'。サーバーの記録は削除できません</div>';
+    html+='</div>'; container.innerHTML=html; container.scrollTop=0; return;
+  }
   // 削除ボタン
   html+='<button onclick="deleteInquiry('+q.id+')" style="margin-top:8px;width:100%;background:#7f1d1d;border:none;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:12px;padding:8px;font-weight:600">🗑 この問い合わせを削除</button>';
   html+='</div>';
@@ -1783,11 +1820,11 @@ function _renderInqDetail(q, container){
 }
 
 function changeInqStatus(id,status){
-  var inqs=_getInqs();
+  var inqs=_getInqsView();
   var found=false;
   inqs.forEach(function(q){if(q.id===id){q.status=status;found=true;}});
   if(!found)return;
-  _saveInqs(inqs);
+  _saveInqsView(inqs);
   _updateInqCount();
   renderInqList();
   toast('ステータスを「'+INQ_ST_LBL[status]+'」に変更しました');
@@ -1796,16 +1833,17 @@ function changeInqStatus(id,status){
 function saveInqMemo(id){
   var memo=document.getElementById('iq-memo-ta');
   if(!memo)return;
-  var inqs=_getInqs();
+  var inqs=_getInqsView();
   inqs.forEach(function(q){if(q.id===id) q.adminMemo=memo.value;});
-  _saveInqs(inqs);
+  _saveInqsView(inqs);
   toast('メモを保存しました');
 }
 
 function deleteInquiry(id){
+  if(_inqServerMode()){ toast('サーバーの記録は削除できません'); return; }
   if(!confirm('この問い合わせを削除しますか？'))return;
-  var inqs=_getInqs().filter(function(q){return q.id!==id;});
-  _saveInqs(inqs);
+  var inqs=_getInqsView().filter(function(q){return q.id!==id;});
+  _saveInqsView(inqs);
   _inqDetailId=null;
   _updateInqCount();
   renderInqList();
@@ -1813,10 +1851,11 @@ function deleteInquiry(id){
 }
 
 function confirmClearInquiries(){
-  var inqs=_getInqs();
+  if(_inqServerMode()){ toast('サーバーの記録は削除できません'); return; }
+  var inqs=_getInqsView();
   if(!inqs.length){toast('問い合わせはありません');return;}
   if(!confirm('全ての問い合わせ（'+inqs.length+'件）を削除しますか？\nこの操作は元に戻せません。'))return;
-  _saveInqs([]);
+  _saveInqsView([]);
   _inqDetailId=null;
   _updateInqCount();
   renderInqList();
@@ -1824,7 +1863,7 @@ function confirmClearInquiries(){
 }
 
 function exportInqCSV(){
-  var inqs=_getInqs();
+  var inqs=_getInqsView();
   if(!inqs.length){toast('エクスポートするデータがありません');return;}
   var headers=['ID','送信日時','種別','ステータス','名前','企業名','電話番号','メール','サイネージ','問い合わせ種別','希望掲載期間','希望掲載場所','希望予算','メッセージ','管理者メモ'];
   var rows=[headers.join(',')];
@@ -2177,12 +2216,14 @@ function doSrvLogin(){
   knApi('POST','/admin/login/',{username:u,password:pw}).then(function(d){
     document.getElementById('srv-pw').value='';
     _srvSetToken(d.auth_token,d.username);
+    _loadSrvInqs().then(_updateInqCount);
     return _srvLoadFromServer(true);
   }).then(function(){ openSrvModal(); })
   .catch(function(e){ err.textContent=_srvErr(e); });
 }
 function doSrvLogout(){
   var t=_srvToken();
+  _srvInqs=null; setTimeout(_updateInqCount,0);
   if(t) knApi('POST','/admin/logout/',undefined,t).catch(function(){});
   _srvSetToken('');
   closeSrvModal();
