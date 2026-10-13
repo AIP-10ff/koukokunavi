@@ -1515,7 +1515,7 @@ function openDetail(id){
   closeList();
   if(_histOpen)toggleHistPanel();
   const s=SG.find(x=>x.id===id);if(!s)return;cur=s;
-  $('dp-bc').textContent=(s.area||'')+' / '+(s.target||'');
+  $('dp-bc').textContent=[s.area,s.target].filter(Boolean).join(' / '); // ターゲットが空の拠点で「大阪府 /」と末尾に / が残らないように
   $('dp-nm').textContent=s.name;
   $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
   const photos=s.photos||[];

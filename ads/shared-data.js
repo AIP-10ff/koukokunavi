@@ -404,9 +404,11 @@ function _queryForms(q){
 }
 
 // ===== プラン料金正規化（¥なし→¥付き・/月付きに統一） =====
+// 数字だけの料金（例 "5,000"・"¥5,000/月"）に限って整える。「月額5,000円相当（税別）／…」のような文章はそのまま出す
 function normalizePlan(p){
   if(!p.p) return p;
   var price=String(p.p).replace(/^¥/,'').replace(/\/月$/,'').trim();
+  if(!/^[\d,]+$/.test(price)) return p;
   return {n:p.n, p:'¥'+price+'/月'};
 }
 
