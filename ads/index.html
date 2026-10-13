@@ -448,7 +448,9 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <div class="dp-img-wrap" id="dp-img" onclick="openPV(0)">🏢</div>
       <div id="dp-photo-strip" style="display:none;flex-wrap:wrap;gap:4px;padding:0 2px;margin-top:4px"></div>
       <div class="dp-breadcrumb" id="dp-bc" style="padding:0 2px">名古屋 / 女性</div>
-      <div class="dp-data-card" style="flex-shrink:0">
+      <!-- 通行者データ（時間別・男女比・年代別）は全サイネージ共通の仮の値なので、動画と AI の計測で実データが入るまで出さない（10/13 眞野判断）。
+           出し直すときは display:none を外す（描画処理 openDetail 内はそのまま残してある） -->
+      <div class="dp-data-card" style="flex-shrink:0;display:none">
         <div class="dp-data-head">📊 通行者データ</div>
         <div style="padding:8px 12px">
           <div class="chart-title">1日の通行者数（時間別 / 先月比）</div>
