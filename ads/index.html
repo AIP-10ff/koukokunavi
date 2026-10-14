@@ -744,6 +744,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
   <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
   <div class="menu-row" id="menu-install" onclick="showInstall()"><span class="mi">📲</span>アプリとして使う（ホーム画面に追加）</div>
+  <div class="menu-row" onclick="window.open('./terms.html','_blank','noopener')"><span class="mi">📄</span>利用規約</div>
+  <div class="menu-row" onclick="window.open('./privacy.html','_blank','noopener')"><span class="mi">🔒</span>プライバシーポリシー</div>
   <div class="menu-foot">広告ナビ © テンフィールズファクトリー</div>
 </div>
 
@@ -1017,7 +1019,7 @@ function _smsDialog(purpose){
         <div id="sms-phone-err" class="input-err"></div>
       </div>
       <button id="btn-sms-send" class="btn-org" style="margin-top:14px;width:100%" onclick="smsSend('${purpose}')">確認コードを送信</button>
-      ${purpose==='login'?'<div style="font-size:11px;color:#999;margin-top:10px;line-height:1.7">SMS の受信に通信料がかかる場合があります。メールアドレスとパスワードで登録していた方は、電話番号で新しく登録してください。この端末のお気に入り・メモは引き継がれます。</div>':''}
+      ${purpose==='login'?'<div style="font-size:11px;color:#999;margin-top:10px;line-height:1.7">SMS の受信に通信料がかかる場合があります。メールアドレスとパスワードで登録していた方は、電話番号で新しく登録してください。この端末のお気に入り・メモは引き継がれます。<br>確認コードを送信すると、<a href="./terms.html" target="_blank" rel="noopener" style="color:var(--org)">利用規約</a>と<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に同意したものとみなします。</div>':''}
     </div>
     <div id="sms-step2" style="display:none">
       <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📱 <span id="sms-sent-to"></span> に届いた 6 桁のコードを入力してください</p>
@@ -2471,6 +2473,7 @@ function showInq(){
       <textarea class="fi" id="inq-msg" maxlength="400" style="min-height:70px;resize:vertical"></textarea>
     </div>
     <input id="inq-hp" type="text" name="website" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+    <div style="font-size:11px;color:#999;margin:8px 0 6px;line-height:1.7">送信いただいた内容は、<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に従って取り扱います。</div>
     <button class="btn-org" id="inq-submit-btn" onclick="submitInq()">お問い合わせを送信</button>`,null,false,true);
   _onInqSignageChange(); // 初期表示時にサイネージ情報を更新
 }
