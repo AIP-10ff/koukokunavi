@@ -671,10 +671,7 @@ var _admClusterRenderer={
   render:function(cluster){
     var count=cluster.count, position=cluster.position;
     var wrap=document.createElement('div');
-    wrap.innerHTML='<div style="position:relative;width:110px;height:118px">'
-      +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-      +'<div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+count+'</div>'
-      +'</div>';
+    wrap.innerHTML=pinClusterInnerHtml(count);
     return new _AGM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild});
   }
 };
