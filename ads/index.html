@@ -1396,7 +1396,7 @@ function putMarkers(list){
     content.addEventListener('click',function(ev){ev.stopPropagation();cur=s;if(fpOpen)closeFilter();_openInfo(s,m);});
     markers.push(m);
   });
-  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer});
+  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:pinClusterClick});
 }
 
 // ピンの吹き出し(InfoWindow)を開く

@@ -173,6 +173,19 @@ function pinClusterInnerHtml(count){
     +'</div>';
 }
 
+// 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。
+// 標準はピンの根元の点だけで地図を合わせるため、台紙（高さ約 120px）が画面の外に切れ、
+// ズームも 17 まで寄って「関係ない場所に飛んだ」ように見えた（10/14 眞野さんの指摘）。
+// 上に台紙の高さ分・左右と下にも余白を取り、ズームは 15 までにする
+var PIN_CLUSTER_MAX_ZOOM=15;
+function pinClusterClick(ev, cluster, map){
+  if(!cluster||!cluster.bounds) return;
+  map.fitBounds(cluster.bounds,{top:150,right:70,bottom:50,left:70});
+  google.maps.event.addListenerOnce(map,'idle',function(){
+    if(map.getZoom()>PIN_CLUSTER_MAX_ZOOM) map.setZoom(PIN_CLUSTER_MAX_ZOOM);
+  });
+}
+
 // ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
 function pinIcon(s){
   return L.divIcon({html:pinInnerHtml(s),iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});

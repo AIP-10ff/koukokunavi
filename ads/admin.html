@@ -696,7 +696,7 @@ function render(){
     list.push(m);
   });
   if(!_admCluster){
-    _admCluster=new markerClusterer.MarkerClusterer({map:map,markers:list,renderer:_admClusterRenderer});
+    _admCluster=new markerClusterer.MarkerClusterer({map:map,markers:list,renderer:_admClusterRenderer,onClusterClick:pinClusterClick});
   }else{
     _admCluster.addMarkers(list);
   }
