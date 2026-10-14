@@ -1421,17 +1421,15 @@ function _fitAll(){
   if(!b.isEmpty())map.fitBounds(b,40);else _setView(35.6762,139.6503,6);
 }
 
-// クラスタの見た目（重ねた台紙＋件数＋「重なっています」のバッジ）
+// クラスタの見た目（重ねた台紙に「N件／重なり／タップで拡大」）
 // 「TAP してチェック！」では何がまとまっているのか伝わらなかった（10/14 AD MTG）。押すと地図が拡大して分かれる
 const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;width:122px">'
-      +'<span class="kn-tap-badge" style="text-align:center">'+count+'件が重なっています<br><span style="font-size:9px;font-weight:700">タップで拡大</span></span>'
-      +pinClusterInnerHtml(count)
-      +'</div>';
-    return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild});
+    wrap.innerHTML=pinClusterInnerHtml(count);
+    // 単体のピンの下に隠れて件数が読めなかったため前面に出す
+    return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
 /**

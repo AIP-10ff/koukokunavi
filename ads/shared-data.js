@@ -159,13 +159,17 @@ function pinInnerHtml(s){
   return html;
 }
 
-// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、件数を 1 段目に出す。
+// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
+// 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
 function pinClusterInnerHtml(count){
+  var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
   var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
   return '<div style="position:relative;width:122px;height:130px">'
     +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
-    +'<div style="position:absolute;left:23px;top:21px;width:64px;height:22px;display:flex;align-items:center;justify-content:center;color:#e8650a;font-size:13px;font-weight:900;line-height:1">'+count+'件</div>'
+    +row(21,22,'color:#e8650a;font-size:13px;font-weight:900',count+'件')
+    +row(51,20,'color:#111;font-size:11px;font-weight:700','重なり')
+    +row(78,24,'color:#444;font-size:9.5px;font-weight:700;letter-spacing:-0.3px','タップで拡大')
     +'</div>';
 }
 

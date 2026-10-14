@@ -672,7 +672,8 @@ var _admClusterRenderer={
     var count=cluster.count, position=cluster.position;
     var wrap=document.createElement('div');
     wrap.innerHTML=pinClusterInnerHtml(count);
-    return new _AGM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild});
+    // 単体のピンの下に隠れて件数が読めなかったため前面に出す
+    return new _AGM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
 
