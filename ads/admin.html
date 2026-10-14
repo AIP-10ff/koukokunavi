@@ -656,7 +656,9 @@ async function _admInitGoogleMap(){
     mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
   });
-  _admInfoWin=new InfoWindow();
+  // 自動スクロールは切る（ピンを真ん中に寄せる pinCenterAndOpen と動きがぶつかるため）
+  _admInfoWin=new InfoWindow({disableAutoPan:true});
+  pinCloseInfoOnDrag(map,_admInfoWin); // 吹き出しを開いたまま地図をドラッグしたら閉じる（編集画面には触らない）
 }
 
 // Leafletのpinicon相当（AdvancedMarkerElement用の中身を組み立てる）
@@ -690,7 +692,7 @@ function render(){
     m.addListener('click',function(){
       curId=s.id;
       _admInfoWin.setContent('<div style="max-width:280px">'+popupHtml(s)+'</div>');
-      _admInfoWin.open({map:map,anchor:m});
+      pinCenterAndOpen(map,_admInfoWin,s,m); // 押したピンを真ん中に寄せる（利用者画面と同じ）
     });
     markers[s.id]=m;
     list.push(m);
