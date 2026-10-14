@@ -123,7 +123,11 @@ var _PIN_CAR_SVG='<svg width="28" height="20" viewBox="0 0 28 20" style="display
   +'<circle cx="20" cy="15.5" r="2.2" fill="#222"/>'
   +'</svg>';
 
-// ピンの内側HTML（画像＋価格/サイズ/通行アイコン＋バッジ＋NEW）を生成する。
+// ピンの台紙画像。3 段目の「人」のマークは人流を外したため消した版（10/14 AD MTG）。
+// 画像はブラウザに残りやすいので、同じ名前で上書きせず別名にした（元の「アセット 5.png」は残す）
+var PIN_IMG='pin-base.png';
+
+// ピンの内側HTML（画像＋価格/サイズ/エリア＋バッジ＋NEW）を生成する。
 // Leaflet(divIcon)・Google Maps(AdvancedMarker)の両方から利用する共通関数。
 function pinInnerHtml(s){
   var badge=s&&s.status?PIN_BADGE[s.status]:null;
@@ -143,14 +147,30 @@ function pinInnerHtml(s){
   var rowBase ='position:absolute;left:23px;width:64px;display:flex;align-items:center;justify-content:center;color:#111;line-height:1;z-index:2';
   var priceHtml='<div style="'+rowBase+';top:9px;height:22px;font-size:10.5px;font-weight:900;letter-spacing:-0.5px">'+priceTxt+'</div>';
   var sizeHtml ='<div style="'+rowBase+';top:39px;height:20px;font-size:11px;font-weight:700;letter-spacing:-0.3px">'+sizeTxt+'</div>';
+  // 3 段目（原寸 y 99-139）は都道府県。地図を引いたときにどこの拠点か分かるように
+  var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;font-size:10.5px;font-weight:700;color:#444;letter-spacing:-0.3px">'+((s&&s.area)||'')+'</div>';
 
   var html='<div style="position:relative;width:110px;height:118px">'
-    +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-    +priceHtml+sizeHtml
+    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
+    +priceHtml+sizeHtml+areaHtml
     +badgeHtml
     +newHtml
     +'</div>';
   return html;
+}
+
+// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
+// 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
+// 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
+function pinClusterInnerHtml(count){
+  var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
+  var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
+  return '<div style="position:relative;width:122px;height:130px">'
+    +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
+    +row(21,22,'color:#e8650a;font-size:13px;font-weight:900',count+'件')
+    +row(51,20,'color:#111;font-size:11px;font-weight:700','重なり')
+    +row(78,24,'color:#444;font-size:9.5px;font-weight:700;letter-spacing:-0.3px','タップで拡大')
+    +'</div>';
 }
 
 // ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。

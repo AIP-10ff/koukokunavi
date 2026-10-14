@@ -583,12 +583,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
     <!-- 右列：数値条件・ボタン -->
     <div class="fp-col" style="padding:10px 12px;display:flex;flex-direction:column;gap:10px">
       <div>
-        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">通行者数</h4>
-        <div class="range-val-display" id="ped-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
-        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="ped-fill" style="left:0%;width:100%"></div></div><input type="range" id="ped-lo" min="0" max="10" value="0" step="1"><input type="range" id="ped-hi" min="0" max="10" value="10" step="1"></div>
-        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
-      </div>
-      <div>
         <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">予算</h4>
         <div class="range-val-display" id="bgt-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
         <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="bgt-fill" style="left:0%;width:100%"></div></div><input type="range" id="bgt-lo" min="0" max="10" value="0" step="1"><input type="range" id="bgt-hi" min="0" max="10" value="10" step="1"></div>
@@ -1001,17 +995,17 @@ async function smsVerify(){
 let favs=(()=>{try{return new Set(JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]'));}catch(e){return new Set();}})();
 
 // ===== デュアルレンジスライダー =====
-// 絞り込みフィルターの「通行者数 / 予算」に使う範囲指定UI。
+// 絞り込みフィルターの「予算」に使う範囲指定UI。
+// 「通行者数」は人流を外したため 10/14 に削除（AD MTG：滞在人口は通る人の数ではない）。
 // 2本のinput[type=range]を重ね、lower/upper の値で塗りつぶし幅を制御する。
 const RC={
-  ped:{steps:['下限なし','1万人','2万人','3万人','4万人','5万人','6万人','7万人','8万人','9万人','上限なし']},
   bgt:{steps:['下限なし','30万円','40万円','50万円','60万円','70万円','80万円','90万円','100万円','120万円','上限なし']}
 };
 
 /**
  * レンジスライダーの表示を更新する（塗りつぶし位置・ラベルテキスト）。
  * lo > hi になった場合は互いを入れ替えて逆転を防ぐ。
- * @param {string} key - 'ped' / 'bgt' のいずれか
+ * @param {string} key - 'bgt'
  */
 function updateRange(key){
   const lo=document.getElementById(key+'-lo'),hi=document.getElementById(key+'-hi');
@@ -1024,7 +1018,7 @@ function updateRange(key){
 
 /** レンジスライダーにイベントリスナーを設定し初期表示を行う（ページロード時に1回呼ぶ） */
 function initRanges(){
-  ['ped','bgt'].forEach(k=>{
+  ['bgt'].forEach(k=>{
     const lo=document.getElementById(k+'-lo'),hi=document.getElementById(k+'-hi');
     lo.addEventListener('input',()=>updateRange(k));hi.addEventListener('input',()=>updateRange(k));updateRange(k);
   });
@@ -1427,18 +1421,15 @@ function _fitAll(){
   if(!b.isEmpty())map.fitBounds(b,40);else _setView(35.6762,139.6503,6);
 }
 
-// クラスタの見た目(サイネージ画像＋TAPバッジ＋件数)
+// クラスタの見た目（重ねた台紙に「N件／重なり／タップで拡大」）
+// 「TAP してチェック！」では何がまとまっているのか伝わらなかった（10/14 AD MTG）。押すと地図が拡大して分かれる
 const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;width:110px">'
-      +'<span class="kn-tap-badge">TAP してチェック！</span>'
-      +'<div style="position:relative;width:110px">'
-      +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-      +'<div style="position:absolute;top:4px;right:4px;background:#e8650a;color:#fff;font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+count+'</div>'
-      +'</div></div>';
-    return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild});
+    wrap.innerHTML=pinClusterInnerHtml(count);
+    // 単体のピンの下に隠れて件数が読めなかったため前面に出す
+    return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
 /**
@@ -1455,19 +1446,22 @@ function focusPin(id){
   _setView(s.lat,s.lng,16);
   if(m)_openInfo(s,m);
 }
-// 人流の出典（D-1）。数値が入っている拠点だけに出す（「準備中」や空欄には出さない）
-const PED_SOURCE='出典：国土交通省 人流オープンデータ（2021年10月・平日・1kmメッシュの滞在人口）';
-function _pedSourceHtml(ped){
-  return (ped && /\d/.test(ped)) ? `<div class="row" style="font-size:11px;color:#888">${PED_SOURCE}</div>` : '';
+// 交通量（車）。国交省の道路交通センサスで店の前の道路の値が取れた拠点だけ出す（10/14 AD MTG）。
+// trf は「13,476 台／日」の形。国交省の推定値は「（推定値）」を付けて入れ、画面では注記に回す
+const TRF_SOURCE='出典：国土交通省 令和3年度 全国道路・街路交通情勢調査（24時間・上下合計）';
+function _trfHtml(trf){
+  if(!trf||!/\d/.test(trf)) return '';
+  const est=/推定/.test(trf);
+  const v=trf.replace(/[（(]推定値[）)]/,'').trim();
+  return `<div class="row">🚗 交通量　<span>${v}</span></div><div class="row" style="font-size:11px;color:#888">${est?'※国土交通省による推定値<br>':''}${TRF_SOURCE}</div>`;
 }
-/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・人流・料金・詳細ボタン）*/
+/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・料金・詳細ボタン）*/
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
   return `<div>
     <div class="pp-head">📍 ${s.name}</div>
     <div class="pp-body">
       <div class="pp-row">🏠 ${(s.addr||'').slice(0,18)}…</div>
-      <div class="pp-row">👟 ${s.ped||'—'}</div>
       <div class="pp-price">${price}〜</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>
@@ -1526,7 +1520,8 @@ function openDetail(id){
   if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
   const _st=s.status||'';
   const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
-  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div><div class="row">👟 人流　<span>${s.ped||'—'}</span></div>${_pedSourceHtml(s.ped)}`;
+  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div>${_trfHtml(s.trf)}`;
+  // 人流（滞在人口）は住んでいる人の数で、通る人の数ではないため出さない（10/14 AD MTG）。DB の ped 列は残す
   $('memo-wrap').style.display=loggedIn?'flex':'none';$('memo-wrap').style.flexDirection='column';
   _knLoadMemo(s.id);
   setTimeout(()=>{
@@ -1651,7 +1646,7 @@ function pie(id,data,colors){
 }
 function clearFilter(){
   document.querySelectorAll('#filter-panel .tag.on').forEach(t=>t.classList.remove('on'));
-  ['ped','bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
+  ['bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
   const areaAllBtn=document.querySelector('#filter-panel .btn-select-all[onclick*="selectAllArea"]');
   if(areaAllBtn)areaAllBtn.textContent='全都道府県を選択';
   document.querySelectorAll('#area-grid .btn-select-all').forEach(b=>b.textContent='すべて選択');
@@ -2018,7 +2013,7 @@ function showList(items,label){
     const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
     const mpUrl=mp?photoCache[mp.id]||'':'';
     const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:(s.e||'🏢');
-    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}<br>👟 ${s.ped||'—'}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
+    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
   }).join('');
   $('list-panel').classList.add('open');
   $('lp-items').scrollTop=0;
