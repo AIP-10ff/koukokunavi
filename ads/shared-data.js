@@ -198,6 +198,37 @@ function pinClusterClick(ev, cluster, map){
   map.setCenter({lat:lat,lng:(b.west+b.east)/2});
 }
 
+// ピンを押したとき、ピンの台紙の中心が地図の真ん中に来るよう寄せてから吹き出しを開く（10/14 眞野さん。利用者・管理の両画面）。
+// ピンは根元の点が位置なので、台紙の高さの半分（約 59px）だけ上にずらした点を真ん中にする。
+// 吹き出しは disableAutoPan:true で作ること（自動スクロールとぶつかるため）。
+// スマホなど縦が短く吹き出しの上が切れるときだけ、入る分だけ地図を下げる。中身（setContent）は呼ぶ側で入れておく
+var PIN_HALF_H=59;
+function pinCenter(map, s){
+  var proj=map.getProjection();
+  if(proj){
+    var pt=proj.fromLatLngToPoint(new google.maps.LatLng(s.lat,s.lng));
+    var k=Math.pow(2,map.getZoom());
+    map.panTo(proj.fromPointToLatLng(new google.maps.Point(pt.x,pt.y-PIN_HALF_H/k)));
+  }else{
+    map.panTo({lat:s.lat,lng:s.lng});
+  }
+}
+function pinCenterAndOpen(map, iw, s, anchor){
+  pinCenter(map,s);
+  iw.open({map:map,anchor:anchor});
+  google.maps.event.addListenerOnce(iw,'domready',function(){
+    setTimeout(function(){
+      var el=map.getDiv().querySelector('.gm-style-iw-c'); if(!el) return;
+      var gap=el.getBoundingClientRect().top-map.getDiv().getBoundingClientRect().top-12;
+      if(gap<0) map.panBy(0,gap);
+    },350);
+  });
+}
+// 吹き出しを開いたまま地図をドラッグしたら閉じる（PC で吹き出しが地図を隠して邪魔だった。10/14 眞野さん）
+function pinCloseInfoOnDrag(map, iw){
+  map.addListener('dragstart',function(){ if(iw) iw.close(); });
+}
+
 // ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
 function pinIcon(s){
   return L.divIcon({html:pinInnerHtml(s),iconSize:[110,118],iconAnchor:[55,118],popupAnchor:[0,-118],className:''});
