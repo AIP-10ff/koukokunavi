@@ -715,7 +715,7 @@ function popupHtml(s){
     +'<div class="pp-body">'
     +'<span class="pp-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
     +'<div class="pp-row">🏠 '+s.addr+'</div>'
-    +'<div class="pp-row">👟 '+s.ped+'</div>'
+    +(s.trf?'<div class="pp-row">🚗 '+s.trf+'</div>':'')
     +'<div class="pp-price">¥'+_planPrice+'/月〜</div>'
     +'<button class="btn-edit-popup" onclick="openAdmin('+s.id+')">✏️ 編集する</button>'
     +'</div></div>';
@@ -773,13 +773,14 @@ function openAdmin(id){
     fg('ターゲット',inp('a-target',s.target)),
     (function(){
       var wrap=document.createElement('div');wrap.className='fg';
-      var lbl=document.createElement('label');lbl.textContent='通行者数';
+      // 人流（通行者数）は 10/14 AD MTG で廃止。国交省の交通量を「13,476 台／日」、推定値は「（推定値）」付きで入れる
+      var lbl=document.createElement('label');lbl.textContent='交通量（国交省・台／日。推定値は末尾に（推定値））';
       var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
-      var pedInp=inp('a-ped',s.ped);pedInp.style.flex='1';
+      var trfInp=inp('a-trf',s.trf);trfInp.style.flex='1';trfInp.placeholder='例：13,476 台／日　データなしは空欄';
       var xlBtn=document.createElement('button');xlBtn.type='button';xlBtn.className='btn-xl-import';
       xlBtn.textContent='📊 Excelから';
-      xlBtn.onclick=function(){openExcelImport('a-ped');};
-      row.appendChild(pedInp);row.appendChild(xlBtn);
+      xlBtn.onclick=function(){openExcelImport('a-trf');};
+      row.appendChild(trfInp);row.appendChild(xlBtn);
       wrap.appendChild(lbl);wrap.appendChild(row);
       return wrap;
     })(),
@@ -1093,7 +1094,7 @@ function saveSign(){
   s.lat    =parseFloat(gv('a-lat'))||s.lat;
   s.lng    =parseFloat(gv('a-lng'))||s.lng;
   s.target =gv('a-target');
-  s.ped    =gv('a-ped');
+  s.trf    =gv('a-trf');
   s.e      =s.e||'🏢'; // 絵文字はphotoに置き換わるが後方互換で保持
 
   var activeBtn=document.querySelector('.status-btn.on');
@@ -1463,7 +1464,7 @@ function renderList(items){
       +'<div class="li-thumb">'+thumbContent+'</div>'
       +'<div class="li-body">'
       +'<div class="li-name">'+s.name+'</div>'
-      +'<div class="li-meta">📍 '+s.place+' &nbsp; 👟 '+s.ped+'</div>'
+      +'<div class="li-meta">📍 '+s.place+(s.trf?' &nbsp; 🚗 '+s.trf:'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:6px;margin-top:2px">'
       +'<span class="li-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
       +'<span class="li-price">¥'+_lPlanPrice+'/月〜</span>'
