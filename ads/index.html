@@ -1041,7 +1041,8 @@ async function initMap(lat,lng){
     keyboardShortcuts:!matchMedia('(pointer:coarse)').matches, // タッチ端末（スマホ等）では下部の「キーボード ショートカット」を出さない
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
   });
-  _infoWin=new InfoWindow();
+  // 吹き出しが画面に収まるよう地図を自動でずらす機能は切る（ピンを真ん中に寄せる _openInfo と動きがぶつかるため）
+  _infoWin=new InfoWindow({disableAutoPan:true});
   putMarkers(SG);
   // 🏪 周辺施設ボタンは使わない（10/13 眞野判断。PC・スマホとも非表示。戻すときはこの行を有効に）
   // addFacilityControl();
@@ -1072,6 +1073,8 @@ async function initMap(lat,lng){
     },150);
   });
   _updateZoomBadge();
+  // 吹き出しを開いたまま地図をドラッグしたら閉じる（PC で吹き出しが地図を隠して邪魔だった。10/14 眞野さん）
+  map.addListener('dragstart',function(){if(_infoWin)_infoWin.close();});
   map.addListener('click',function(){if(_histOpen)toggleHistPanel();if(mOpen)toggleMenu();closeList();});
 }
 // ===== 商業施設レイヤー =====
@@ -1399,11 +1402,29 @@ function putMarkers(list){
   _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:pinClusterClick});
 }
 
-// ピンの吹き出し(InfoWindow)を開く
+// ピンの吹き出し(InfoWindow)を開く。押したピンが画面の真ん中に来るよう地図を寄せる（10/14 眞野さん）。
+// ピンは根元の点が位置なので、台紙の高さの半分（約 59px）だけ上にずらした点を真ん中にする
+const PIN_HALF_H=59;
 function _openInfo(s,m){
   if(!_infoWin)return;
+  const proj=map.getProjection();
+  if(proj){
+    const pt=proj.fromLatLngToPoint(new google.maps.LatLng(s.lat,s.lng));
+    const k=Math.pow(2,map.getZoom());
+    map.panTo(proj.fromPointToLatLng(new google.maps.Point(pt.x,pt.y-PIN_HALF_H/k)));
+  }else{
+    map.panTo({lat:s.lat,lng:s.lng});
+  }
   _infoWin.setContent(popupHtml(s));
   _infoWin.open({map:map,anchor:m});
+  // スマホなど縦が短い画面では、ピンを真ん中にすると吹き出しの上が切れる。そのときだけ入る分だけ地図を下げる
+  google.maps.event.addListenerOnce(_infoWin,'domready',function(){
+    setTimeout(function(){
+      const iw=document.querySelector('.gm-style-iw-c'); if(!iw)return;
+      const gap=iw.getBoundingClientRect().top-map.getDiv().getBoundingClientRect().top-12;
+      if(gap<0)map.panBy(0,gap);
+    },350);
+  });
 }
 
 // 地図の中心・ズームを設定(Leaflet setView 相当)
