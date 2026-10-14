@@ -176,14 +176,26 @@ function pinClusterInnerHtml(count){
 // 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。
 // 標準はピンの根元の点だけで地図を合わせるため、台紙（高さ約 120px）が画面の外に切れ、
 // ズームも 17 まで寄って「関係ない場所に飛んだ」ように見えた（10/14 眞野さんの指摘）。
-// 上に台紙の高さ分・左右と下にも余白を取り、ズームは 15 までにする
+// 上に台紙の高さ分・左右と下にも余白を取り、ズームは 15 までにする。
+// fitBounds は使わない：PC の広い画面で引いた状態（ズーム 5〜6）から使うと、経度が元の中心のまま残り
+// 別の場所（九州のピンなのに四国の海上など）に寄った（10/14 眞野さんの指摘・PC で再現）。
+// ズームを先に計算して決め、そのあと中心を置く（Web メルカトルの座標で計算）
 var PIN_CLUSTER_MAX_ZOOM=15;
+var PIN_CLUSTER_PAD={top:150,right:70,bottom:50,left:70};
 function pinClusterClick(ev, cluster, map){
   if(!cluster||!cluster.bounds) return;
-  map.fitBounds(cluster.bounds,{top:150,right:70,bottom:50,left:70});
-  google.maps.event.addListenerOnce(map,'idle',function(){
-    if(map.getZoom()>PIN_CLUSTER_MAX_ZOOM) map.setZoom(PIN_CLUSTER_MAX_ZOOM);
-  });
+  var b=cluster.bounds.toJSON(), P=PIN_CLUSTER_PAD, d=map.getDiv();
+  var W=Math.max(d.clientWidth-P.left-P.right,1), H=Math.max(d.clientHeight-P.top-P.bottom,1);
+  // 緯度経度 → ズーム 0 の世界座標（256px 四方）
+  var wx=function(lng){return (lng+180)/360*256;};
+  var wy=function(lat){var s=Math.sin(lat*Math.PI/180);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*256;};
+  var spanX=Math.max(wx(b.east)-wx(b.west),1e-9), spanY=Math.max(wy(b.south)-wy(b.north),1e-9);
+  var z=Math.min(PIN_CLUSTER_MAX_ZOOM, Math.floor(Math.log(Math.min(W/spanX,H/spanY))/Math.LN2));
+  // 上下の余白の差の半分だけ中心を上へずらす（ピンの台紙が上に伸びるため）
+  var cy=(wy(b.north)+wy(b.south))/2-(P.top-P.bottom)/2/Math.pow(2,z);
+  var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy/256)))*180/Math.PI;
+  map.setZoom(z);
+  map.setCenter({lat:lat,lng:(b.west+b.east)/2});
 }
 
 // ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
