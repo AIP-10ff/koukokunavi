@@ -417,7 +417,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="hdr-spacer"></div>
   <button class="btn-member" onclick="showAuth('register')">会員登録はこちらから</button>
   <button id="hdr-auth-btn" class="btn-login-hdr" onclick="showAuth('login')">ログイン</button>
-  <button id="hamburger" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+  <button id="hamburger" onclick="toggleMenu();_menuRestoreList()"><span></span><span></span><span></span></button>
 </div>
 
 <div id="map"></div>
@@ -2029,10 +2029,15 @@ function closeList(){$('list-panel').classList.remove('open');}
 // メニューの項目は「開いているときだけ閉じる」（if(mOpen)toggleMenu()）。toggleMenu() をそのまま呼ぶと、
 // 1 回のタップが 2 回届く端末でメニューが開き直り、一覧の上に残った（10/15 眞野さんの指摘）
 let mOpen=false;
+let _menuHidList=false; // メニューを開いたときに一覧を隠したか
+function _menuRestoreList(){ if(mOpen) return; if(_menuHidList) $('list-panel').classList.add('open'); _menuHidList=false; } // 閉じたときだけ
 function toggleMenu(){
   // モーダル（ポップアップ）表示中はメニューを開かない
   if(!mOpen && $('mc').innerHTML!=='') return;
   mOpen=!mOpen;
+  // 一覧（お気に入りなど）の上にメニューが重なって見づらいので、メニューを開いたら一覧は隠す（10/15 眞野さん）。
+  // 何も選ばずにメニューを閉じたとき（ハンバーガー・✕・戻る）は _menuRestoreList() で元に戻す
+  if(mOpen){ _menuHidList=$('list-panel').classList.contains('open'); if(_menuHidList) closeList(); }
   $('menu-drawer').classList.toggle('open',mOpen);
   $('hamburger').classList.toggle('open',mOpen);
   // フィルターが開いていてもメニューはそのまま上から表示（closeFilterしない）
@@ -2388,7 +2393,7 @@ const _navLayers=[
   {open:()=>$('mc').innerHTML!=='', close:()=>{ if($('mc').querySelector('.btn-m-close')){ _navModalHtml=$('mc').innerHTML; closeModal(); return true; } _navPush(); return false; }, // 閉じるボタンの無い処理中のポップアップは閉じない
    reopen:()=>{ $('mc').innerHTML=_navModalHtml; _setHamburgerDisabled(true); }},
   {open:()=>fpOpen,                                       close:()=>closeFilter(),     reopen:()=>{ if(!fpOpen) _navOrig.toggleFilter(); }},
-  {open:()=>mOpen,                                        close:()=>toggleMenu(),      reopen:()=>{ if(!mOpen) _navOrig.toggleMenu(); }},
+  {open:()=>mOpen,                                        close:()=>{toggleMenu();_menuRestoreList();}, reopen:()=>{ if(!mOpen) _navOrig.toggleMenu(); }},
   {open:()=>_histOpen,                                    close:()=>toggleHistPanel(), reopen:()=>{ if(!_histOpen) _navOrig.toggleHistPanel(); }},
   {open:()=>$('detail-panel').classList.contains('open'), close:()=>closeDetail(),     reopen:()=>$('detail-panel').classList.add('open')},
   {open:()=>$('list-panel').classList.contains('open'),   close:()=>closeList(),       reopen:()=>$('list-panel').classList.add('open')},
