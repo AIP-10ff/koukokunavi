@@ -2026,6 +2026,8 @@ function closeList(){$('list-panel').classList.remove('open');}
 //   フィルターが開いていれば同時に閉じる。
 // gotoTop()    : 全パネルを閉じ、全物件を地図に再描画してクラスター全体にフィット。
 // showFavList(): お気に入り一覧を showList() に渡す。未ログインなら login 画面へ。
+// メニューの項目は「開いているときだけ閉じる」（if(mOpen)toggleMenu()）。toggleMenu() をそのまま呼ぶと、
+// 1 回のタップが 2 回届く端末でメニューが開き直り、一覧の上に残った（10/15 眞野さんの指摘）
 let mOpen=false;
 function toggleMenu(){
   // モーダル（ポップアップ）表示中はメニューを開かない
@@ -2036,10 +2038,10 @@ function toggleMenu(){
   // フィルターが開いていてもメニューはそのまま上から表示（closeFilterしない）
 }
 function gotoTop(){
-  toggleMenu();closeDetail();closeList();putMarkers(SG);
+  if(mOpen)toggleMenu();closeDetail();closeList();putMarkers(SG);
   _fitAll();
 }
-function showFavList(){toggleMenu();if(!loggedIn){showAuth('login');return;}showList(SG.filter(s=>favs.has(s.id)),"お気に入り一覧");}
+function showFavList(){if(mOpen)toggleMenu();if(!loggedIn){showAuth('login');return;}showList(SG.filter(s=>favs.has(s.id)),"お気に入り一覧");}
 function showAccSettings(){
   toggleMenu();if(!loggedIn){showAuth();return;}
   const p=_knProfile||{};
