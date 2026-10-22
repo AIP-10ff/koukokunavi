@@ -1404,6 +1404,7 @@ function fmtSize(v){if(!v)return'—';return /^\d+(\.\d+)?$/.test(v.trim())?v.tr
  * 各ピンをクリックすると cur にそのサイネージをセットし、フィルター開放中なら閉じる。
  */
 function putMarkers(list){
+  if(list===SG&&pinDemoOn()) PIN_DEMO.forEach(d=>{ if(!SG.some(x=>x.id===d.id)) SG.push(d); }); // 見本ピン（?pindemo のときだけ）
   if(_cluster){_cluster.clearMarkers();}
   markers=[];
   if(!map||!_GM)return;
