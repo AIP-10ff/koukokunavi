@@ -173,8 +173,8 @@ function pinInnerHtml(s){
     +badgeHtml
     +newHtml
     +'</div>';
-  // 設置予定はピン全体を薄く（黒をグレーに。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
-  if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.45) brightness(1.45)">'+html+'</div>'+planRibbon+'</div>';
+  // 設置予定はピン全体を青みのグレーに（黒をグレーに→もう少し濃く青っぽく。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
+  if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.6) brightness(1.1) sepia(.6) hue-rotate(180deg) saturate(2.2)">'+html+'</div>'+planRibbon+'</div>';
   return html;
 }
 
@@ -234,7 +234,7 @@ function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
     // 充電ケーブル（本体の右から下へ）
     +'<svg width="100" height="128" style="position:absolute;left:0;top:0;pointer-events:none"><path d="M86 52 C100 60 100 96 88 112" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/><rect x="82" y="108" width="10" height="8" rx="2" fill="#333"/></svg>'
     // 本体
-    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#1f2937')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
+    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#dc2626')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
     // 画面（3 段）
     +'<div style="position:absolute;left:12px;top:20px;width:68px;height:70px;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111;z-index:2">'
     +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:10.5px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
