@@ -152,7 +152,7 @@ function pinInnerHtml(s){
   var sizeHtml ='<div style="'+rowBase+';top:39px;height:20px;font-size:11px;font-weight:700;letter-spacing:-0.3px">'+sizeTxt+'</div>';
   // 3 段目（原寸 y 99-139）は人／車のアイコン＋都道府県。
   // アイコンで誰に見せる広告かを、都道府県で地図を引いたときにどこの拠点かを示す
-  var kindSvg=(_pinTrafficKind(s)==='car'?_PIN_CAR_SVG:_PIN_PERSON_SVG).replace(/width="\d+" height="\d+"/,'height="14"');
+  var kindSvg=(_pinShape(s)==='flash'||_pinTrafficKind(s)==='car'?_PIN_CAR_SVG:_PIN_PERSON_SVG).replace(/width="\d+" height="\d+"/,'height="14"');
   var areaTxt=(s&&s.area)||'';
   var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;gap:3px;font-size:'+(areaTxt.length>=4?9:10)+'px;font-weight:700;color:#444;letter-spacing:-0.4px;white-space:nowrap">'
     +'<span style="flex:none;display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span></div>';
@@ -163,6 +163,7 @@ function pinInnerHtml(s){
     if(!(s&&s.plans&&s.plans.length)) priceHtml=priceHtml.replace(priceTxt,'設置予定');
   }
   if(_pinShape(s)==='large') return _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+  if(_pinShape(s)==='flash') return _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
 
   var html='<div style="position:relative;width:110px;height:118px">'
     +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;'+(plan?'filter:grayscale(1);':'')+'"/>'
@@ -182,6 +183,7 @@ function _pinIsPlan(s){ return !!(s&&s.status==='PLAN'); }
 function _pinShape(s){
   if(s&&s.pinShape) return s.pinShape;
   var w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
+  if(/FLASH/i.test(w)) return 'flash'; // FLASH（EV 充電器と一体のサイネージ。10/22 眞野さん）
   return /大型/.test(w)?'large':'stand';
 }
 // 大型（横長の看板）ピン。濃い枠の画面に 3 段（価格／面積／人・車＋都道府県）、下に支柱 2 本
@@ -214,6 +216,39 @@ var PIN_DEMO=[
    addr:'愛知県名古屋市中村区（見本の位置）', size:'640mm×2240mm', type:'LED', status:'PLAN', plans:[], photos:[], docs:[], trf:''}
 ];
 function pinDemoOn(){ try{ return /[?&]pindemo\b/.test(location.search); }catch(e){ return false; } }
+// FLASH の見本（10/22）。本物の設置場所は殿野さんの返事待ちのため、仮に京都駅の近くに置く
+PIN_DEMO.push({id:1003, name:'【見本】FLASH Mark 6', yomi:'', lat:34.9858, lng:135.7588, area:'京都府', place:'EV 充電スポット（FLASH）', target:'ドライバー',
+  addr:'京都府京都市下京区（見本の位置）', size:'1000mm×1800mm', type:'FLASH', status:'ON', plans:[{n:'見本',p:'月額10,000円（見本）'}], photos:[], docs:[], trf:''});
+
+// FLASH（EV 充電器と一体のサイネージ）のピン。縦長の充電器の形で、上に黄色の雷マーク、
+// 画面に 3 段（価格／面積／車＋都道府県）、下に「FLASH」の文字、右に充電ケーブル
+var _PIN_FLASH_COLOR='#facc15';
+var _PIN_BOLT_SVG='<svg width="15" height="15" viewBox="0 0 24 24" style="display:block"><path d="M14 1 L4 14 H11 L9.5 23 L20 9 H13 Z" fill="#111"/></svg>';
+function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan){
+  var c=plan?_PIN_PLAN_COLOR:_PIN_FLASH_COLOR;
+  var row=function(txt,st){return '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:2px;line-height:1;white-space:nowrap;'+st+'">'+txt+'</div>';};
+  return '<div style="position:relative;width:100px;height:128px">'
+    // 充電ケーブル（本体の右から下へ）
+    +'<svg width="100" height="128" style="position:absolute;left:0;top:0;pointer-events:none"><path d="M86 52 C100 60 100 96 88 112" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/><rect x="82" y="108" width="10" height="8" rx="2" fill="#333"/></svg>'
+    // 本体
+    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#1f2937')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
+    // 画面（3 段）
+    +'<div style="position:absolute;left:12px;top:20px;width:68px;height:70px;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111;z-index:2">'
+    +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:10.5px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
+    +row(sizeTxt,'font-size:10.5px;font-weight:700;border-bottom:1px solid #ccc')
+    +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:'+(areaTxt.length>=4?8.5:9.5)+'px;font-weight:700;color:#444;letter-spacing:-0.4px')
+    +'</div>'
+    // 上の雷マーク
+    +'<div style="position:absolute;left:34px;top:-6px;width:24px;height:24px;border-radius:50%;background:'+_PIN_FLASH_COLOR+';border:2px solid #fff;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:3">'+_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="13" height="13"')+'</div>'
+    // 下の「⚡FLASH」
+    +'<div style="position:absolute;left:6px;top:94px;width:80px;display:flex;align-items:center;justify-content:center;gap:1px;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;z-index:2">'
+    +_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="10" height="10"').replace('fill="#111"','fill="'+_PIN_FLASH_COLOR+'"')+'FLASH</div>'
+    // 台座
+    +'<div style="position:absolute;left:2px;top:117px;width:88px;height:6px;border-radius:2px;background:#111"></div>'
+    +badgeHtml.replace('top:4px;right:4px','top:-4px;right:-6px')
+    +newHtml.replace('top:-22px','top:-28px')
+    +'</div>';
+}
 
 // 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
