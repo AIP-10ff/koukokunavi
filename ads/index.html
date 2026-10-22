@@ -50,6 +50,14 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .gmap-ctrl-btn.active{background:#e8650a;border-color:#e8650a}
 .gmap-ctrl-btn.locating{animation:pulse 1s infinite}
 #btn-locate{bottom:42px}  /* 🏪ボタンの上に積む */
+/* 囲んで探す（10/22 社長の指示 5）・一覧に戻る */
+#btn-area{position:fixed;right:10px;top:calc(var(--hdr) + 10px);z-index:801;height:36px;padding:0 12px;border-radius:18px;background:#fff;color:var(--org);border:2px solid var(--org);box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
+#btn-area.active{background:var(--org);color:#fff}
+#draw-layer{position:fixed;z-index:1500;touch-action:none;cursor:crosshair;background:rgba(232,101,10,.06)}
+#draw-layer svg{width:100%;height:100%;display:block}
+#draw-hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--hdr) + 56px);z-index:1501;background:#333;color:#fff;font-size:12px;padding:8px 12px;border-radius:18px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;white-space:nowrap}
+#draw-hint button{background:#fff;color:#333;border:none;border-radius:12px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer}
+#btn-listback{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:801;display:none;align-items:center;gap:6px;height:40px;padding:0 16px;border-radius:20px;background:var(--org);color:#fff;border:none;box-shadow:0 2px 10px rgba(0,0,0,.3);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;display:flex;align-items:center;justify-content:center}
 .modal-box{background:#fff;border-radius:8px;padding:24px 22px;width:88%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
 .modal-box p{font-size:13px;color:#444;line-height:1.7;margin-bottom:16px}
@@ -1057,6 +1065,7 @@ async function initMap(lat,lng){
   // 🏪 周辺施設ボタンは使わない（10/13 眞野判断。PC・スマホとも非表示。戻すときはこの行を有効に）
   // addFacilityControl();
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
+  addAreaSelectControl();  // ✏️ 囲んで探す（10/22 社長の指示 5）
   facilityLayer=null;
   function _updateZoomBadge(){
     const z=map.getZoom();
@@ -1084,7 +1093,8 @@ async function initMap(lat,lng){
   });
   _updateZoomBadge();
   pinCloseInfoOnDrag(map,_infoWin); // 吹き出しを開いたまま地図をドラッグしたら閉じる（shared-data.js）
-  map.addListener('click',function(){if(_histOpen)toggleHistPanel();if(mOpen)toggleMenu();closeList();});
+  // 地図を押しても検索結果の一覧は閉じない（10/22 眞野さん。閉じるのは「◀ 閉じる」・戻る操作だけ）
+  map.addListener('click',function(){if(_histOpen)toggleHistPanel();if(mOpen)toggleMenu();});
 }
 // ===== 商業施設レイヤー =====
 // 🏪ボタンで ON/OFF。Overpass API（OSMデータ）でコンビニ・スーパー・モールを取得し表示。
@@ -1452,7 +1462,7 @@ const _clusterRenderer={
 function focusPin(id){
   const s=SG.find(x=>x.id===id);if(!s)return;
   cur=s;
-  closeList();
+  if(_listCoversMap()) _hideListTemp(); // PC は一覧を開いたまま地図を動かせる
   if(_histOpen)toggleHistPanel();
   const m=markers.find(mk=>mk._sgId===id);
   _setView(s.lat,s.lng,16);
@@ -1518,7 +1528,7 @@ window.onload=()=>{
 //   ・フィルター・リスト・履歴パネルが開いていれば全て閉じてから開く
 function openDetail(id){
   if(fpOpen)closeFilter();
-  closeList();
+  _hideListTemp(); // 詳細を閉じたら一覧に戻れるよう、閉じずに隠す
   if(_histOpen)toggleHistPanel();
   const s=SG.find(x=>x.id===id);if(!s)return;cur=s;
   $('dp-bc').textContent=[s.area,s.target].filter(Boolean).join(' / '); // ターゲットが空の拠点で「大阪府 /」と末尾に / が残らないように
@@ -1548,12 +1558,12 @@ function openDetail(id){
     const term=p=>/年間/.test(p.n||'')?'12か月':'1か月';
     if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>${term(p)}</td><td>1日288回※</td><td class="price">${p.p}</td></tr>`).join('');}
   },60);
-  $('detail-panel').classList.add('open');
+  $('detail-panel').classList.add('open');_updListBack(); // 詳細の上に「一覧に戻る」を出さない
   document.querySelectorAll('.dp-left-col,.dp-right-col,.dp-page-body').forEach(el=>el.scrollTop=0);
   if(mOpen) toggleMenu();
   _setView(s.lat,s.lng,15);
 }
-function closeDetail(){$('detail-panel').classList.remove('open');}
+function closeDetail(){$('detail-panel').classList.remove('open');if(!_listCoversMap())_restoreList();else _updListBack();}
 function showTop(){
   closeDetail();
   closeList();
@@ -2020,6 +2030,7 @@ function applyFilter(){
 //   アイテムをタップすると openDetail(id) で詳細パネルを開く。
 // closeList() : リストパネルを閉じるだけのシンプルな関数。
 function showList(items,label){
+  _listHidden=false;_updListBack();_clearAreaPoly(); // 囲んだ範囲は「囲んで探す」の一覧のときだけ残す
   $('lp-count').textContent=label+'  '+items.length+'件';
   $('lp-items').innerHTML=items.map(s=>{
     const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
@@ -2030,7 +2041,84 @@ function showList(items,label){
   $('list-panel').classList.add('open');
   $('lp-items').scrollTop=0;
 }
-function closeList(){$('list-panel').classList.remove('open');}
+function closeList(){$('list-panel').classList.remove('open');_listHidden=false;_updListBack();_clearAreaPoly();}
+// ===== 一覧を一時的に隠す・戻す（10/22 眞野さん）=====
+// 詳細を開いたとき・スマホでピンへ移動したときは一覧を閉じずに隠し、「📋 一覧に戻る」で戻せるようにする
+let _listHidden=false;
+const _listCoversMap=()=>matchMedia('(max-width:479px)').matches; // スマホ縦は一覧が画面いっぱい
+function _hideListTemp(){ if($('list-panel').classList.contains('open')){ $('list-panel').classList.remove('open'); _listHidden=true; _updListBack(); } }
+function _restoreList(){ if(_listHidden){ $('list-panel').classList.add('open'); _listHidden=false; _updListBack(); } }
+function _updListBack(){
+  let b=$('btn-listback');
+  if(!b){ b=document.createElement('button'); b.id='btn-listback'; b.onclick=_restoreList; document.body.appendChild(b); }
+  b.textContent='📋 一覧に戻る（'+($('lp-count').textContent.replace(/\s+/g,' ').trim())+'）';
+  b.style.display=(_listHidden&&!$('detail-panel').classList.contains('open'))?'flex':'none';
+}
+
+// ===== 囲んで探す（10/22 社長の指示 5：地図の範囲を囲ったら一覧で出す）=====
+// 地図の上に透明な層を重ね、指・マウスでなぞった線で囲んだ中のピンを一覧に出す。
+// 対象は今地図に出しているピン（絞り込み中ならその結果）。囲んだ範囲は一覧を閉じるまで地図に残す
+let _areaPoly=null, _drawing=false;
+function addAreaSelectControl(){
+  if($('btn-area'))return;
+  const b=document.createElement('button'); b.id='btn-area'; b.innerHTML='✏️ 囲んで探す'; b.title='地図をなぞって範囲を囲むと、その中のサイネージを一覧で出します';
+  b.onclick=e=>{e.stopPropagation(); _drawing?_endDraw():_startDraw();};
+  document.body.appendChild(b);
+}
+function _clearAreaPoly(){ if(_areaPoly){ _areaPoly.setMap(null); _areaPoly=null; } }
+// 地図の中の位置（px）と緯度経度の変換。今の表示範囲の左上を基準に、Web メルカトルの座標で変換する
+function _mapXY(){
+  const proj=map.getProjection(), b=map.getBounds(); if(!proj||!b) return null;
+  const k=Math.pow(2,map.getZoom());
+  const nw=proj.fromLatLngToPoint(new google.maps.LatLng(b.getNorthEast().lat(),b.getSouthWest().lng()));
+  return {
+    toLatLng:(x,y)=>proj.fromPointToLatLng(new google.maps.Point(nw.x+x/k,nw.y+y/k)),
+    toPx:(lat,lng)=>{const p=proj.fromLatLngToPoint(new google.maps.LatLng(lat,lng));return [(p.x-nw.x)*k,(p.y-nw.y)*k];}
+  };
+}
+function _inPoly(pt,poly){ // 点が多角形の中か（辺との交差の数で判定）
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
+    if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function _startDraw(){
+  if(!map||!map.getProjection())return;
+  if(mOpen)toggleMenu(); if(fpOpen)closeFilter(); if(_infoWin)_infoWin.close();
+  _drawing=true; $('btn-area').classList.add('active'); $('btn-area').innerHTML='✕ やめる';
+  const r=map.getDiv().getBoundingClientRect();
+  const layer=document.createElement('div'); layer.id='draw-layer';
+  Object.assign(layer.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
+  layer.innerHTML='<svg><polyline fill="rgba(232,101,10,.18)" stroke="#e8650a" stroke-width="3" stroke-linejoin="round" points=""/></svg>';
+  const hint=document.createElement('div'); hint.id='draw-hint';
+  hint.innerHTML='<span>地図をなぞって、探したい範囲を囲んでください</span><button type="button">やめる</button>';
+  hint.querySelector('button').onclick=_endDraw;
+  document.body.appendChild(layer); document.body.appendChild(hint);
+  const line=layer.querySelector('polyline'); let pts=[];
+  layer.addEventListener('pointerdown',e=>{ e.preventDefault(); try{layer.setPointerCapture(e.pointerId);}catch(_){} pts=[[e.clientX-r.left,e.clientY-r.top]]; line.setAttribute('points',pts.join(' ')); });
+  layer.addEventListener('pointermove',e=>{ if(!pts.length||!(e.buttons||e.pointerType==='touch'))return; const p=[e.clientX-r.left,e.clientY-r.top], q=pts[pts.length-1]; if(Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1])<4)return; pts.push(p); line.setAttribute('points',pts.join(' ')); });
+  layer.addEventListener('pointerup',()=>{ if(pts.length) _finishDraw(pts); });
+}
+function _endDraw(){
+  _drawing=false; const b=$('btn-area'); if(b){b.classList.remove('active');b.innerHTML='✏️ 囲んで探す';}
+  ['draw-layer','draw-hint'].forEach(id=>{const el=$(id);if(el)el.remove();});
+}
+function _finishDraw(pts){
+  _endDraw();
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  if(pts.length<3||Math.max(...xs)-Math.min(...xs)<20||Math.max(...ys)-Math.min(...ys)<20){ toast('もう少し大きく囲んでください'); return; }
+  const m=_mapXY(); if(!m)return;
+  const shown=new Set(markers.map(k=>k._sgId));
+  const items=SG.filter(s=>shown.has(s.id)&&_inPoly(m.toPx(s.lat,s.lng),pts));
+  _clearAreaPoly();
+  if(!items.length){ toast('囲んだ範囲にサイネージがありません'); return; }
+  const poly=new google.maps.Polygon({map:map,paths:pts.map(p=>m.toLatLng(p[0],p[1])),strokeColor:'#e8650a',strokeWeight:2,fillColor:'#e8650a',fillOpacity:.12,clickable:false});
+  showList(items,'囲んだ範囲');
+  _areaPoly=poly; // 一覧を閉じるまで範囲を地図に残す
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_drawing) _endDraw(); });
 // ===== メニュー（ハンバーガードロワー） =====
 // toggleMenu() : 詳細パネルが開いている間は開かない（誤操作防止）。
 //   フィルターが開いていれば同時に閉じる。
