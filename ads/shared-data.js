@@ -20,10 +20,10 @@
 // =============================================================
 
 // ===== ステータス定数 =====
-var STATUS_COLOR = {ON:'#10b981', EMPTY:'#f59e0b', MAINT:'#ef4444'};
-var STATUS_BG    = {ON:'#d1fae5', EMPTY:'#fef3c7', MAINT:'#fee2e2'};
-var STATUS_TC    = {ON:'#065f46', EMPTY:'#92400e', MAINT:'#991b1b'};
-var STATUS_LBL   = {ON:'稼働中',  EMPTY:'空き',    MAINT:'メンテ中'};
+var STATUS_COLOR = {ON:'#10b981', EMPTY:'#f59e0b', MAINT:'#ef4444', PLAN:'#2563eb'};
+var STATUS_BG    = {ON:'#d1fae5', EMPTY:'#fef3c7', MAINT:'#fee2e2', PLAN:'#dbeafe'};
+var STATUS_TC    = {ON:'#065f46', EMPTY:'#92400e', MAINT:'#991b1b', PLAN:'#1e40af'};
+var STATUS_LBL   = {ON:'稼働中',  EMPTY:'空き',    MAINT:'メンテ中', PLAN:'設置予定'};
 
 // ===== トースト通知 =====
 function toast(msg){
@@ -52,11 +52,10 @@ function togglePw(id,btn){
 
 // ===== マップピンアイコン =====
 // ステータスバッジ設定（クラスター数バッジと同じスタイル・位置）
-var PIN_BADGE={
-  ON:  {bg:'#eab308', color:'#fff', text:''},
-  MAINT:{bg:'#ef4444', color:'#fff', text:''},
-  EMPTY:{bg:'#10b981', color:'#fff', text:'空'}
-};
+// 「空」の札は 10/22 社長の指示で出さない（EMPTY を外した。全拠点が空きで同じ札が並び、差がつかないため）
+// 稼働中の黄色い丸・メンテ中の赤い丸も出さない（10/22 眞野さん：稼働しているかはピンで見せなくてよい）。
+// 状態は詳細画面にだけ出す。印を戻すときはここに {bg,color,text} を足す
+var PIN_BADGE={};
 
 // ピン内オーバーレイ用ヘルパー
 function _pinNum(v){
@@ -92,10 +91,11 @@ window.formatSizeFieldValue=function(raw){
   var n=_sizeToSqM(raw);
   return n!=null ? n+'㎡' : (raw==null?'':String(raw));
 };
-// ピン表示用: ㎡ 抜きの数値文字列
+// ピン表示用: 面積（㎡ 付き）
 function _pinSizeM2(sz){
   var n=_sizeToSqM(sz);
-  return n!=null ? n : '---';
+  // 単位を付けないと何の数字か分からない（10/9 中井さんの指摘）。ピンの下の段＝画面の面積
+  return n!=null ? n+'㎡' : '---';
 }
 // 先頭プラン(plans[0])の価格を "○万/月" に整形
 function _pinFirstPrice(plans){
@@ -108,9 +108,12 @@ function _pinFirstPrice(plans){
   }
   return n.toLocaleString()+'円/月';
 }
-// ピンの通行アイコン: 'ped'(人) / null(未入力)。交通量（車）はデータ元が無いため 10/8 に表示をやめた
+// ピンの対象アイコン（10/22 マスタープラン 22）: 'car'(車向け) / 'ped'(人向け)
+// スタンド型など歩く人に見せるものは人、明和町のような道路沿いの大型は車。
+// 決め方：ターゲットに「車」「ドライバー」、または名前・設置場所・種別に「大型」「ロードサイド」「道路」があれば車、それ以外は人
 function _pinTrafficKind(s){
-  return _pinNum(s&&s.ped)>0?'ped':null;
+  var t=((s&&s.target)||''), w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
+  return (/車|ドライバー/.test(t)||/大型|ロードサイド|道路/.test(w))?'car':'ped';
 }
 var _PIN_PERSON_SVG='<svg width="22" height="24" viewBox="0 0 22 24" style="display:block">'
   +'<circle cx="11" cy="6" r="4" fill="none" stroke="#222" stroke-width="1.8"/>'
@@ -122,7 +125,11 @@ var _PIN_CAR_SVG='<svg width="28" height="20" viewBox="0 0 28 20" style="display
   +'<circle cx="20" cy="15.5" r="2.2" fill="#222"/>'
   +'</svg>';
 
-// ピンの内側HTML（画像＋価格/サイズ/通行アイコン＋バッジ＋NEW）を生成する。
+// ピンの台紙画像。3 段目の「人」のマークは人流を外したため消した版（10/14 AD MTG）。
+// 画像はブラウザに残りやすいので、同じ名前で上書きせず別名にした（元の「アセット 5.png」は残す）
+var PIN_IMG='pin-base.png';
+
+// ピンの内側HTML（画像＋価格/サイズ/エリア＋バッジ＋NEW）を生成する。
 // Leaflet(divIcon)・Google Maps(AdvancedMarker)の両方から利用する共通関数。
 function pinInnerHtml(s){
   var badge=s&&s.status?PIN_BADGE[s.status]:null;
@@ -142,14 +149,176 @@ function pinInnerHtml(s){
   var rowBase ='position:absolute;left:23px;width:64px;display:flex;align-items:center;justify-content:center;color:#111;line-height:1;z-index:2';
   var priceHtml='<div style="'+rowBase+';top:9px;height:22px;font-size:10.5px;font-weight:900;letter-spacing:-0.5px">'+priceTxt+'</div>';
   var sizeHtml ='<div style="'+rowBase+';top:39px;height:20px;font-size:11px;font-weight:700;letter-spacing:-0.3px">'+sizeTxt+'</div>';
+  // 3 段目（原寸 y 99-139）は人／車のアイコン＋都道府県。
+  // アイコンで誰に見せる広告かを、都道府県で地図を引いたときにどこの拠点かを示す
+  var kindSvg=(_pinShape(s)==='flash'||_pinTrafficKind(s)==='car'?_PIN_CAR_SVG:_PIN_PERSON_SVG).replace(/width="\d+" height="\d+"/,'height="14"');
+  var areaTxt=(s&&s.area)||'';
+  var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;gap:3px;font-size:'+(areaTxt.length>=4?9:10)+'px;font-weight:700;color:#444;letter-spacing:-0.4px;white-space:nowrap">'
+    +'<span style="flex:none;display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span></div>';
 
-  var html='<div style="position:relative;width:110px;height:118px">'
-    +'<img src="アセット%205.png" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
-    +priceHtml+sizeHtml
+  var plan=_pinIsPlan(s);
+  var planRibbon='';
+  if(plan){ // 設置予定：上の帯を NEW の代わりに出す
+    newHtml='';
+    planRibbon='<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:'+_PIN_PLAN_COLOR+';color:#fff;font-size:9.5px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">設置予定</div>';
+    if(!(s&&s.plans&&s.plans.length)) priceHtml=priceHtml.replace(priceTxt,'設置予定');
+  }
+  var shape=_pinShape(s), html;
+  if(shape==='large') html=_pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+  else if(shape==='flash') html=_pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+  else html='<div style="position:relative;width:110px;height:118px">'
+    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
+    +priceHtml+sizeHtml+areaHtml
+    +(plan?'<div style="position:absolute;left:18px;top:4px;width:74px;height:90px;border:2px dashed '+_PIN_PLAN_COLOR+';border-radius:4px;pointer-events:none;z-index:2"></div>':'')
     +badgeHtml
     +newHtml
     +'</div>';
+  // 設置予定はピン全体を青みのグレーに（黒をグレーに→もう少し濃く青っぽく。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
+  if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.6) brightness(1.1) sepia(.6) hue-rotate(180deg) saturate(2.2)">'+html+'</div>'+planRibbon+'</div>';
   return html;
+}
+
+// ===== ピンの形（10/22 マスタープラン「ピンの形を3種類に分ける」・投資家向けピン）=====
+// 'large'＝明和町のような道路沿いの大型（横長の看板形）／それ以外は店頭スタンド型（台紙画像）。
+// 設置予定（投資家向け）は status:'PLAN'。形はそのままで、灰色＋青の点線＋「設置予定」の帯で稼働中と見分ける
+var _PIN_PLAN_COLOR='#2563eb';
+function _pinIsPlan(s){ return !!(s&&s.status==='PLAN'); }
+function _pinShape(s){
+  if(s&&s.pinShape) return s.pinShape;
+  var w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
+  if(/FLASH/i.test(w)) return 'flash'; // FLASH（EV 充電器と一体のサイネージ。10/22 眞野さん）
+  return /大型/.test(w)?'large':'stand';
+}
+// 大型（横長の看板）ピン。濃い枠の画面に 3 段（価格／面積／人・車＋都道府県）、下に支柱 2 本
+function _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan){
+  var c=plan?_PIN_PLAN_COLOR:'#e8650a';
+  var row=function(txt,st){return '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:3px;line-height:1;white-space:nowrap;'+st+'">'+txt+'</div>';};
+  return '<div style="position:relative;width:132px;height:112px">'
+    +'<div style="position:absolute;left:0;top:0;width:132px;height:80px;background:#222;border-radius:7px;padding:4px;box-sizing:border-box;box-shadow:0 2px 6px rgba(0,0,0,.35);'+(plan?'opacity:.9':'')+'">'
+    +'<div style="width:100%;height:100%;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111">'
+    +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:12px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
+    +row(sizeTxt,'font-size:11px;font-weight:700;border-bottom:1px solid #ccc')
+    +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:10px;font-weight:700;color:#444')
+    +'</div></div>'
+    +'<div style="position:absolute;left:0;top:-9px;background:'+c+';color:#fff;font-size:8.5px;font-weight:900;border-radius:3px;padding:1px 5px;border:1.5px solid #fff;z-index:3">大型</div>'
+    +'<div style="position:absolute;left:30px;top:80px;width:9px;height:26px;background:#333"></div>'
+    +'<div style="position:absolute;left:93px;top:80px;width:9px;height:26px;background:#333"></div>'
+    +'<div style="position:absolute;left:20px;top:104px;width:92px;height:5px;border-radius:2px;background:#222"></div>'
+    +badgeHtml.replace('top:4px;right:4px','top:-8px;right:-8px')
+    +newHtml
+    +'</div>';
+}
+
+// ===== 見本ピン（10/22 デザイン確認用）=====
+// URL に ?pindemo を付けたときだけ、明和町の大型と設置予定（投資家向け）の見本を 1 つずつ地図に足す。
+// サーバーには保存しない。デザインが決まったら消す
+var PIN_DEMO=[
+  {id:1001, name:'【見本】明和町 大型ビジョン', yomi:'', lat:34.5560, lng:136.6260, area:'三重県', place:'国道23号沿い（大型）', target:'ドライバー',
+   addr:'三重県多気郡明和町（見本の位置）', size:'3000mm×5000mm', type:'大型LED', status:'ON', plans:[{n:'見本',p:'月額50,000円（見本）'}], photos:[], docs:[], trf:''},
+  {id:1002, name:'【見本】設置予定 名古屋駅前', yomi:'', lat:35.1700, lng:136.8830, area:'愛知県', place:'店舗前（スタンド型）', target:'',
+   addr:'愛知県名古屋市中村区（見本の位置）', size:'640mm×2240mm', type:'LED', status:'PLAN', plans:[], photos:[], docs:[], trf:''}
+];
+function pinDemoOn(){ try{ return /[?&]pindemo\b/.test(location.search); }catch(e){ return false; } }
+// FLASH の見本（10/22）。本物の設置場所は殿野さんの返事待ちのため、仮に京都駅の近くに置く
+PIN_DEMO.push({id:1003, name:'【見本】FLASH Mark 6', yomi:'', lat:34.9858, lng:135.7588, area:'京都府', place:'EV 充電スポット（FLASH）', target:'ドライバー',
+  addr:'京都府京都市下京区（見本の位置）', size:'1000mm×1800mm', type:'FLASH', status:'ON', plans:[{n:'見本',p:'月額10,000円（見本）'}], photos:[], docs:[], trf:''});
+
+// FLASH（EV 充電器と一体のサイネージ）のピン。縦長の充電器の形（上の雷マークは 10/22 眞野さんの指示で外した）、
+// 画面に 3 段（価格／面積／車＋都道府県）、下に「FLASH」の文字、右に充電ケーブル
+var _PIN_FLASH_COLOR='#facc15';
+var _PIN_BOLT_SVG='<svg width="15" height="15" viewBox="0 0 24 24" style="display:block"><path d="M14 1 L4 14 H11 L9.5 23 L20 9 H13 Z" fill="#111"/></svg>';
+function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan){
+  var c=plan?_PIN_PLAN_COLOR:_PIN_FLASH_COLOR;
+  var row=function(txt,st){return '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:2px;line-height:1;white-space:nowrap;'+st+'">'+txt+'</div>';};
+  return '<div style="position:relative;width:100px;height:128px">'
+    // 充電ケーブル（本体の右から下へ）
+    +'<svg width="100" height="128" style="position:absolute;left:0;top:0;pointer-events:none"><path d="M86 52 C100 60 100 96 88 112" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/><rect x="82" y="108" width="10" height="8" rx="2" fill="#333"/></svg>'
+    // 本体
+    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#dc2626')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
+    // 画面（3 段）
+    +'<div style="position:absolute;left:12px;top:20px;width:68px;height:70px;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111;z-index:2">'
+    +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:10.5px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
+    +row(sizeTxt,'font-size:10.5px;font-weight:700;border-bottom:1px solid #ccc')
+    +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:'+(areaTxt.length>=4?8.5:9.5)+'px;font-weight:700;color:#444;letter-spacing:-0.4px')
+    +'</div>'
+    // 下の「⚡FLASH」
+    +'<div style="position:absolute;left:6px;top:94px;width:80px;display:flex;align-items:center;justify-content:center;gap:1px;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;z-index:2">'
+    +_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="10" height="10"').replace('fill="#111"','fill="'+_PIN_FLASH_COLOR+'"')+'FLASH</div>'
+    // 台座
+    +'<div style="position:absolute;left:2px;top:117px;width:88px;height:6px;border-radius:2px;background:#111"></div>'
+    +badgeHtml.replace('top:4px;right:4px','top:-4px;right:-6px')
+    +newHtml
+    +'</div>';
+}
+
+// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
+// 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
+// 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
+function pinClusterInnerHtml(count){
+  var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
+  var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
+  return '<div style="position:relative;width:122px;height:130px">'
+    +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
+    +row(21,22,'color:#e8650a;font-size:13px;font-weight:900',count+'件')
+    +row(51,20,'color:#111;font-size:11px;font-weight:700','重なり')
+    +row(78,24,'color:#444;font-size:9.5px;font-weight:700;letter-spacing:-0.3px','タップで拡大')
+    +'</div>';
+}
+
+// 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。
+// 標準はピンの根元の点だけで地図を合わせるため、台紙（高さ約 120px）が画面の外に切れ、
+// ズームも 17 まで寄って「関係ない場所に飛んだ」ように見えた（10/14 眞野さんの指摘）。
+// 上に台紙の高さ分・左右と下にも余白を取り、ズームは 15 までにする。
+// fitBounds は使わない：PC の広い画面で引いた状態（ズーム 5〜6）から使うと、経度が元の中心のまま残り
+// 別の場所（九州のピンなのに四国の海上など）に寄った（10/14 眞野さんの指摘・PC で再現）。
+// ズームを先に計算して決め、そのあと中心を置く（Web メルカトルの座標で計算）
+var PIN_CLUSTER_MAX_ZOOM=15;
+var PIN_CLUSTER_PAD={top:150,right:70,bottom:50,left:70};
+function pinClusterClick(ev, cluster, map){
+  if(!cluster||!cluster.bounds) return;
+  var b=cluster.bounds.toJSON(), P=PIN_CLUSTER_PAD, d=map.getDiv();
+  var W=Math.max(d.clientWidth-P.left-P.right,1), H=Math.max(d.clientHeight-P.top-P.bottom,1);
+  // 緯度経度 → ズーム 0 の世界座標（256px 四方）
+  var wx=function(lng){return (lng+180)/360*256;};
+  var wy=function(lat){var s=Math.sin(lat*Math.PI/180);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*256;};
+  var spanX=Math.max(wx(b.east)-wx(b.west),1e-9), spanY=Math.max(wy(b.south)-wy(b.north),1e-9);
+  var z=Math.min(PIN_CLUSTER_MAX_ZOOM, Math.floor(Math.log(Math.min(W/spanX,H/spanY))/Math.LN2));
+  // 上下の余白の差の半分だけ中心を上へずらす（ピンの台紙が上に伸びるため）
+  var cy=(wy(b.north)+wy(b.south))/2-(P.top-P.bottom)/2/Math.pow(2,z);
+  var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy/256)))*180/Math.PI;
+  map.setZoom(z);
+  map.setCenter({lat:lat,lng:(b.west+b.east)/2});
+}
+
+// ピンを押したとき、ピンの台紙の中心が地図の真ん中に来るよう寄せてから吹き出しを開く（10/14 眞野さん。利用者・管理の両画面）。
+// ピンは根元の点が位置なので、台紙の高さの半分（約 59px）だけ上にずらした点を真ん中にする。
+// 吹き出しは disableAutoPan:true で作ること（自動スクロールとぶつかるため）。
+// スマホなど縦が短く吹き出しの上が切れるときだけ、入る分だけ地図を下げる。中身（setContent）は呼ぶ側で入れておく
+var PIN_HALF_H=59;
+function pinCenter(map, s){
+  var proj=map.getProjection();
+  if(proj){
+    var pt=proj.fromLatLngToPoint(new google.maps.LatLng(s.lat,s.lng));
+    var k=Math.pow(2,map.getZoom());
+    map.panTo(proj.fromPointToLatLng(new google.maps.Point(pt.x,pt.y-PIN_HALF_H/k)));
+  }else{
+    map.panTo({lat:s.lat,lng:s.lng});
+  }
+}
+function pinCenterAndOpen(map, iw, s, anchor){
+  pinCenter(map,s);
+  iw.open({map:map,anchor:anchor});
+  google.maps.event.addListenerOnce(iw,'domready',function(){
+    setTimeout(function(){
+      var el=map.getDiv().querySelector('.gm-style-iw-c'); if(!el) return;
+      var gap=el.getBoundingClientRect().top-map.getDiv().getBoundingClientRect().top-12;
+      if(gap<0) map.panBy(0,gap);
+    },350);
+  });
+}
+// 吹き出しを開いたまま地図をドラッグしたら閉じる（PC で吹き出しが地図を隠して邪魔だった。10/14 眞野さん）
+function pinCloseInfoOnDrag(map, iw){
+  map.addListener('dragstart',function(){ if(iw) iw.close(); });
 }
 
 // ピンアイコン用の中身を組み立てる（admin.html・index.html の双方が利用）。
@@ -324,15 +493,6 @@ function _fmtInqDate(value){
 }
 function getFavIds(){try{return JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]');}catch(e){return[];}}
 
-// ===== 通知先メール =====
-var SECURITY_NOTIFY_EMAIL = 'h.mano@10-ff.com';
-
-// ===== EmailJS 設定定数 =====
-var EJ_PUBLIC_KEY  = '0Clg3RbnfDE5hK7XS';
-var EJ_SVC         = 'service_q9riskq';
-var EJ_TPL_AUTH    = 'template_ae5nrdo';
-var EJ_TPL_CONTACT = 'template_6c6jjv9';
-
 // ===== Cookie 操作 =====
 function _setCookie(name,val,days){var d=new Date();d.setTime(d.getTime()+days*864e5);document.cookie=name+'='+val+';expires='+d.toUTCString()+';path=/;SameSite=Lax';}
 function _getCookie(name){var m=document.cookie.match('(?:^|; )'+name+'=([^;]*)');return m?m[1]:null;}
@@ -412,9 +572,11 @@ function _queryForms(q){
 }
 
 // ===== プラン料金正規化（¥なし→¥付き・/月付きに統一） =====
+// 数字だけの料金（例 "5,000"・"¥5,000/月"）に限って整える。「月額5,000円相当（税別）／…」のような文章はそのまま出す
 function normalizePlan(p){
   if(!p.p) return p;
   var price=String(p.p).replace(/^¥/,'').replace(/\/月$/,'').trim();
+  if(!/^[\d,]+$/.test(price)) return p;
   return {n:p.n, p:'¥'+price+'/月'};
 }
 
@@ -465,6 +627,18 @@ function _migrateOldPhotos(sg,cb){
 // 掲載情報（サイネージ）はサーバーの DB を正とする。利用者画面・管理画面の両方から使う。
 // file:// で開いたときや API が無いときは fetch が失敗し、呼び出し側が従来の動き（localStorage／DEFAULT_SG）に戻る。
 var KN_API_BASE = '/api/v1';
+
+// Firebase（電話番号＋SMS の本人確認だけに使う）。Web 用の設定は公開される前提の値で、
+// 使えるドメインは Firebase 側の「承認済みドメイン」（app・app2・localhost）で絞っている
+var KN_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA75nlsclgEcSkpFXNEXYRvkQdAMEO0WEY',
+  authDomain: 'koukokunavi-e4b90.firebaseapp.com',
+  projectId: 'koukokunavi-e4b90',
+  storageBucket: 'koukokunavi-e4b90.firebasestorage.app',
+  messagingSenderId: '465232241609',
+  appId: '1:465232241609:web:29020d80c7810106c8be18'
+};
+window.KN_FIREBASE_CONFIG = KN_FIREBASE_CONFIG;
 var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs'];
 
 function knApi(method, path, body, token){
