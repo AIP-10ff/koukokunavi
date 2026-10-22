@@ -1483,7 +1483,8 @@ function popupHtml(s){
   return `<div>
     <div class="pp-head">📍 ${s.name}</div>
     <div class="pp-body">
-      <div class="pp-row">🏠 ${(s.addr||'').slice(0,18)}…</div>
+      <div class="pp-row">🏠 ${s.addr||'—'}</div>
+      <div class="pp-row">📐 ${fmtSize(s.size)}</div>
       <div class="pp-price">${price}〜</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>

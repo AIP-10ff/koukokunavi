@@ -109,9 +109,12 @@ function _pinFirstPrice(plans){
   }
   return n.toLocaleString()+'円/月';
 }
-// ピンの通行アイコン: 'ped'(人) / null(未入力)。交通量（車）はデータ元が無いため 10/8 に表示をやめた
+// ピンの対象アイコン（10/22 マスタープラン 22）: 'car'(車向け) / 'ped'(人向け)
+// スタンド型など歩く人に見せるものは人、明和町のような道路沿いの大型は車。
+// 決め方：ターゲットに「車」「ドライバー」、または名前・設置場所・種別に「大型」「ロードサイド」「道路」があれば車、それ以外は人
 function _pinTrafficKind(s){
-  return _pinNum(s&&s.ped)>0?'ped':null;
+  var t=((s&&s.target)||''), w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
+  return (/車|ドライバー/.test(t)||/大型|ロードサイド|道路/.test(w))?'car':'ped';
 }
 var _PIN_PERSON_SVG='<svg width="22" height="24" viewBox="0 0 22 24" style="display:block">'
   +'<circle cx="11" cy="6" r="4" fill="none" stroke="#222" stroke-width="1.8"/>'
@@ -147,8 +150,12 @@ function pinInnerHtml(s){
   var rowBase ='position:absolute;left:23px;width:64px;display:flex;align-items:center;justify-content:center;color:#111;line-height:1;z-index:2';
   var priceHtml='<div style="'+rowBase+';top:9px;height:22px;font-size:10.5px;font-weight:900;letter-spacing:-0.5px">'+priceTxt+'</div>';
   var sizeHtml ='<div style="'+rowBase+';top:39px;height:20px;font-size:11px;font-weight:700;letter-spacing:-0.3px">'+sizeTxt+'</div>';
-  // 3 段目（原寸 y 99-139）は都道府県。地図を引いたときにどこの拠点か分かるように
-  var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;font-size:10.5px;font-weight:700;color:#444;letter-spacing:-0.3px">'+((s&&s.area)||'')+'</div>';
+  // 3 段目（原寸 y 99-139）は人／車のアイコン＋都道府県。
+  // アイコンで誰に見せる広告かを、都道府県で地図を引いたときにどこの拠点かを示す
+  var kindSvg=(_pinTrafficKind(s)==='car'?_PIN_CAR_SVG:_PIN_PERSON_SVG).replace(/width="\d+" height="\d+"/,'height="14"');
+  var areaTxt=(s&&s.area)||'';
+  var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;gap:3px;font-size:'+(areaTxt.length>=4?9:10)+'px;font-weight:700;color:#444;letter-spacing:-0.4px;white-space:nowrap">'
+    +'<span style="flex:none;display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span></div>';
 
   var html='<div style="position:relative;width:110px;height:118px">'
     +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
