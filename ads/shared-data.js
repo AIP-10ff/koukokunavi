@@ -20,10 +20,10 @@
 // =============================================================
 
 // ===== ステータス定数 =====
-var STATUS_COLOR = {ON:'#10b981', EMPTY:'#f59e0b', MAINT:'#ef4444'};
-var STATUS_BG    = {ON:'#d1fae5', EMPTY:'#fef3c7', MAINT:'#fee2e2'};
-var STATUS_TC    = {ON:'#065f46', EMPTY:'#92400e', MAINT:'#991b1b'};
-var STATUS_LBL   = {ON:'稼働中',  EMPTY:'空き',    MAINT:'メンテ中'};
+var STATUS_COLOR = {ON:'#10b981', EMPTY:'#f59e0b', MAINT:'#ef4444', PLAN:'#2563eb'};
+var STATUS_BG    = {ON:'#d1fae5', EMPTY:'#fef3c7', MAINT:'#fee2e2', PLAN:'#dbeafe'};
+var STATUS_TC    = {ON:'#065f46', EMPTY:'#92400e', MAINT:'#991b1b', PLAN:'#1e40af'};
+var STATUS_LBL   = {ON:'稼働中',  EMPTY:'空き',    MAINT:'メンテ中', PLAN:'設置予定'};
 
 // ===== トースト通知 =====
 function toast(msg){
@@ -157,14 +157,63 @@ function pinInnerHtml(s){
   var areaHtml ='<div style="'+rowBase+';top:66px;height:24px;gap:3px;font-size:'+(areaTxt.length>=4?9:10)+'px;font-weight:700;color:#444;letter-spacing:-0.4px;white-space:nowrap">'
     +'<span style="flex:none;display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span></div>';
 
+  var plan=_pinIsPlan(s);
+  if(plan){ // 設置予定：上の帯を NEW の代わりに出し、文字を青に
+    newHtml='<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:'+_PIN_PLAN_COLOR+';color:#fff;font-size:9.5px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">設置予定</div>';
+    if(!(s&&s.plans&&s.plans.length)) priceHtml=priceHtml.replace(priceTxt,'設置予定');
+  }
+  if(_pinShape(s)==='large') return _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+
   var html='<div style="position:relative;width:110px;height:118px">'
-    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
+    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;'+(plan?'filter:grayscale(1);':'')+'"/>'
     +priceHtml+sizeHtml+areaHtml
+    +(plan?'<div style="position:absolute;left:18px;top:4px;width:74px;height:90px;border:2px dashed '+_PIN_PLAN_COLOR+';border-radius:4px;pointer-events:none;z-index:2"></div>':'')
     +badgeHtml
     +newHtml
     +'</div>';
   return html;
 }
+
+// ===== ピンの形（10/22 マスタープラン「ピンの形を3種類に分ける」・投資家向けピン）=====
+// 'large'＝明和町のような道路沿いの大型（横長の看板形）／それ以外は店頭スタンド型（台紙画像）。
+// 設置予定（投資家向け）は status:'PLAN'。形はそのままで、灰色＋青の点線＋「設置予定」の帯で稼働中と見分ける
+var _PIN_PLAN_COLOR='#2563eb';
+function _pinIsPlan(s){ return !!(s&&s.status==='PLAN'); }
+function _pinShape(s){
+  if(s&&s.pinShape) return s.pinShape;
+  var w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
+  return /大型/.test(w)?'large':'stand';
+}
+// 大型（横長の看板）ピン。濃い枠の画面に 3 段（価格／面積／人・車＋都道府県）、下に支柱 2 本
+function _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan){
+  var c=plan?_PIN_PLAN_COLOR:'#e8650a';
+  var row=function(txt,st){return '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:3px;line-height:1;white-space:nowrap;'+st+'">'+txt+'</div>';};
+  return '<div style="position:relative;width:132px;height:112px">'
+    +'<div style="position:absolute;left:0;top:0;width:132px;height:80px;background:#222;border-radius:7px;padding:4px;box-sizing:border-box;box-shadow:0 2px 6px rgba(0,0,0,.35);'+(plan?'opacity:.9':'')+'">'
+    +'<div style="width:100%;height:100%;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111">'
+    +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:12px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
+    +row(sizeTxt,'font-size:11px;font-weight:700;border-bottom:1px solid #ccc')
+    +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:10px;font-weight:700;color:#444')
+    +'</div></div>'
+    +'<div style="position:absolute;left:0;top:-9px;background:'+c+';color:#fff;font-size:8.5px;font-weight:900;border-radius:3px;padding:1px 5px;border:1.5px solid #fff;z-index:3">大型</div>'
+    +'<div style="position:absolute;left:30px;top:80px;width:9px;height:26px;background:#333"></div>'
+    +'<div style="position:absolute;left:93px;top:80px;width:9px;height:26px;background:#333"></div>'
+    +'<div style="position:absolute;left:20px;top:104px;width:92px;height:5px;border-radius:2px;background:#222"></div>'
+    +badgeHtml.replace('top:4px;right:4px','top:-8px;right:-8px')
+    +newHtml
+    +'</div>';
+}
+
+// ===== 見本ピン（10/22 デザイン確認用）=====
+// URL に ?pindemo を付けたときだけ、明和町の大型と設置予定（投資家向け）の見本を 1 つずつ地図に足す。
+// サーバーには保存しない。デザインが決まったら消す
+var PIN_DEMO=[
+  {id:1001, name:'【見本】明和町 大型ビジョン', yomi:'', lat:34.5560, lng:136.6260, area:'三重県', place:'国道23号沿い（大型）', target:'ドライバー',
+   addr:'三重県多気郡明和町（見本の位置）', size:'3000mm×5000mm', type:'大型LED', status:'ON', plans:[{n:'見本',p:'月額50,000円（見本）'}], photos:[], docs:[], trf:''},
+  {id:1002, name:'【見本】設置予定 名古屋駅前', yomi:'', lat:35.1700, lng:136.8830, area:'愛知県', place:'店舗前（スタンド型）', target:'',
+   addr:'愛知県名古屋市中村区（見本の位置）', size:'640mm×2240mm', type:'LED', status:'PLAN', plans:[], photos:[], docs:[], trf:''}
+];
+function pinDemoOn(){ try{ return /[?&]pindemo\b/.test(location.search); }catch(e){ return false; } }
 
 // 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
