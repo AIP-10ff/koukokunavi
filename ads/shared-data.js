@@ -157,20 +157,24 @@ function pinInnerHtml(s){
     +'<span style="flex:none;display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span></div>';
 
   var plan=_pinIsPlan(s);
-  if(plan){ // 設置予定：上の帯を NEW の代わりに出し、文字を青に
-    newHtml='<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:'+_PIN_PLAN_COLOR+';color:#fff;font-size:9.5px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">設置予定</div>';
+  var planRibbon='';
+  if(plan){ // 設置予定：上の帯を NEW の代わりに出す
+    newHtml='';
+    planRibbon='<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:'+_PIN_PLAN_COLOR+';color:#fff;font-size:9.5px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">設置予定</div>';
     if(!(s&&s.plans&&s.plans.length)) priceHtml=priceHtml.replace(priceTxt,'設置予定');
   }
-  if(_pinShape(s)==='large') return _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
-  if(_pinShape(s)==='flash') return _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
-
-  var html='<div style="position:relative;width:110px;height:118px">'
-    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;'+(plan?'filter:grayscale(1);':'')+'"/>'
+  var shape=_pinShape(s), html;
+  if(shape==='large') html=_pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+  else if(shape==='flash') html=_pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan);
+  else html='<div style="position:relative;width:110px;height:118px">'
+    +'<img src="'+PIN_IMG+'" style="width:110px;height:auto;display:block;pointer-events:none;"/>'
     +priceHtml+sizeHtml+areaHtml
     +(plan?'<div style="position:absolute;left:18px;top:4px;width:74px;height:90px;border:2px dashed '+_PIN_PLAN_COLOR+';border-radius:4px;pointer-events:none;z-index:2"></div>':'')
     +badgeHtml
     +newHtml
     +'</div>';
+  // 設置予定はピン全体を薄く（黒をグレーに。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
+  if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.45) brightness(1.45)">'+html+'</div>'+planRibbon+'</div>';
   return html;
 }
 
@@ -219,7 +223,7 @@ function pinDemoOn(){ try{ return /[?&]pindemo\b/.test(location.search); }catch(
 PIN_DEMO.push({id:1003, name:'【見本】FLASH Mark 6', yomi:'', lat:34.9858, lng:135.7588, area:'京都府', place:'EV 充電スポット（FLASH）', target:'ドライバー',
   addr:'京都府京都市下京区（見本の位置）', size:'1000mm×1800mm', type:'FLASH', status:'ON', plans:[{n:'見本',p:'月額10,000円（見本）'}], photos:[], docs:[], trf:''});
 
-// FLASH（EV 充電器と一体のサイネージ）のピン。縦長の充電器の形で、上に黄色の雷マーク、
+// FLASH（EV 充電器と一体のサイネージ）のピン。縦長の充電器の形（上の雷マークは 10/22 眞野さんの指示で外した）、
 // 画面に 3 段（価格／面積／車＋都道府県）、下に「FLASH」の文字、右に充電ケーブル
 var _PIN_FLASH_COLOR='#facc15';
 var _PIN_BOLT_SVG='<svg width="15" height="15" viewBox="0 0 24 24" style="display:block"><path d="M14 1 L4 14 H11 L9.5 23 L20 9 H13 Z" fill="#111"/></svg>';
@@ -237,15 +241,13 @@ function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
     +row(sizeTxt,'font-size:10.5px;font-weight:700;border-bottom:1px solid #ccc')
     +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:'+(areaTxt.length>=4?8.5:9.5)+'px;font-weight:700;color:#444;letter-spacing:-0.4px')
     +'</div>'
-    // 上の雷マーク
-    +'<div style="position:absolute;left:34px;top:-6px;width:24px;height:24px;border-radius:50%;background:'+_PIN_FLASH_COLOR+';border:2px solid #fff;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:3">'+_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="13" height="13"')+'</div>'
     // 下の「⚡FLASH」
     +'<div style="position:absolute;left:6px;top:94px;width:80px;display:flex;align-items:center;justify-content:center;gap:1px;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;z-index:2">'
     +_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="10" height="10"').replace('fill="#111"','fill="'+_PIN_FLASH_COLOR+'"')+'FLASH</div>'
     // 台座
     +'<div style="position:absolute;left:2px;top:117px;width:88px;height:6px;border-radius:2px;background:#111"></div>'
     +badgeHtml.replace('top:4px;right:4px','top:-4px;right:-6px')
-    +newHtml.replace('top:-22px','top:-28px')
+    +newHtml
     +'</div>';
 }
 
