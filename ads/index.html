@@ -2067,7 +2067,16 @@ function addAreaSelectControl(){
   b.onclick=e=>{e.stopPropagation(); _drawing?_endDraw():_startDraw();};
   document.body.appendChild(b);
 }
-function _clearAreaPoly(){ if(_areaPoly){ _areaPoly.setMap(null); _areaPoly=null; } }
+// 囲んでいる間は囲んだ中のピンだけを地図に出す（10/22 眞野さん）。範囲を消したら、囲む前に出ていたピンに戻す。
+// ただし、その間にフィルターなどでピンを出し直していたら、そちらを優先して戻さない
+let _areaPrevIds=null, _areaMarkers=null;
+function _clearAreaPoly(){
+  if(_areaPoly){ _areaPoly.setMap(null); _areaPoly=null; }
+  if(_areaPrevIds){
+    const ids=_areaPrevIds, same=markers===_areaMarkers; _areaPrevIds=_areaMarkers=null;
+    if(same) putMarkers(ids.size>=SG.length?SG:SG.filter(s=>ids.has(s.id)));
+  }
+}
 // 地図の中の位置（px）と緯度経度の変換。今の表示範囲の左上を基準に、Web メルカトルの座標で変換する
 function _mapXY(){
   const proj=map.getProjection(), b=map.getBounds(); if(!proj||!b) return null;
@@ -2112,13 +2121,14 @@ function _finishDraw(pts){
   const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   if(pts.length<3||Math.max(...xs)-Math.min(...xs)<20||Math.max(...ys)-Math.min(...ys)<20){ toast('もう少し大きく囲んでください'); return; }
   const m=_mapXY(); if(!m)return;
+  _clearAreaPoly(); // 前に囲んだ範囲があれば先に消して、囲む前のピンに戻してから探す
   const shown=new Set(markers.map(k=>k._sgId));
   const items=SG.filter(s=>shown.has(s.id)&&_inPoly(m.toPx(s.lat,s.lng),pts));
-  _clearAreaPoly();
   if(!items.length){ toast('囲んだ範囲にサイネージがありません'); return; }
   const poly=new google.maps.Polygon({map:map,paths:pts.map(p=>m.toLatLng(p[0],p[1])),strokeColor:'#e8650a',strokeWeight:2,fillColor:'#e8650a',fillOpacity:.12,clickable:false});
   showList(items,'囲んだ範囲');
   _areaPoly=poly; // 一覧を閉じるまで範囲を地図に残す
+  _areaPrevIds=shown; putMarkers(items); _areaMarkers=markers; // 囲んだ中のピンだけにする
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_drawing) _endDraw(); });
 // ===== メニュー（ハンバーガードロワー） =====
