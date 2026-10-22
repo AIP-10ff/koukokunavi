@@ -599,6 +599,19 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 
     <!-- 右列：数値条件・ボタン -->
     <div class="fp-col" style="padding:10px 12px;display:flex;flex-direction:column;gap:10px">
+      <!-- 10/22 社長の指示：サイネージの仕様（種類）と稼働状況で絞り込む。判定は _sgKind／_pinIsPlan（文字の一致ではない） -->
+      <div>
+        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">サイネージの種類</h4>
+        <div class="tags" id="t-kind">
+          <span class="tag" data-kind="stand" onclick="tt(this)">スタンド型</span><span class="tag" data-kind="flash" onclick="tt(this)">FLASH</span><span class="tag" data-kind="large" onclick="tt(this)">大型</span>
+        </div>
+      </div>
+      <div>
+        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">稼働状況</h4>
+        <div class="tags" id="t-status">
+          <span class="tag" data-st="on" onclick="tt(this)">稼働中</span><span class="tag" data-st="plan" onclick="tt(this)">設置予定</span>
+        </div>
+      </div>
       <div>
         <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">予算</h4>
         <div class="range-val-display" id="bgt-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
@@ -2012,17 +2025,33 @@ function toggleSelectAll(){
   clearFilter();
   btn.textContent='デフォルトに戻す';btn.style.color='var(--org)';btn.style.borderColor='var(--org)';
 }
+// サイネージの種類（絞り込み用）：'stand'／'flash'／'large'。ピンの形の判定（_pinShape）に合わせ、
+// FLASH の形がまだ無い間も名前・設置場所・種別に「FLASH」があれば FLASH として扱う
+function _sgKind(s){
+  const k=_pinShape(s);
+  if(k!=='stand') return k;
+  return /FLASH/i.test([s.name||'',s.place||'',s.type||''].join(' '))?'flash':'stand';
+}
 function applyFilter(){
-  const active=[...$('filter-panel').querySelectorAll('.tag.on')].map(t=>t.textContent);
+  const on=[...$('filter-panel').querySelectorAll('.tag.on')];
+  const active=on.map(t=>t.textContent);
+  // 種類・稼働状況は文字の一致ではなく判定で絞る。同じ見出しの中はどれか、見出しどうしは両方を満たすもの
+  const words=on.filter(t=>!t.dataset.kind&&!t.dataset.st).map(t=>t.textContent);
+  const kinds=on.filter(t=>t.dataset.kind).map(t=>t.dataset.kind);
+  const sts=on.filter(t=>t.dataset.st).map(t=>t.dataset.st);
   closeFilter();
   if(active.length)saveFilterHistory(active);
-  const res=active.length?SG.filter(s=>active.some(t=>
-    (s.area||'').includes(t)||
-    (s.target||'').includes(t)||
-    (s.place||'').includes(t)||
-    (s.name||'').includes(t)||
-    (s.addr||'').includes(t)
-  )):SG;
+  const res=active.length?SG.filter(s=>
+    (!words.length||words.some(t=>
+      (s.area||'').includes(t)||
+      (s.target||'').includes(t)||
+      (s.place||'').includes(t)||
+      (s.name||'').includes(t)||
+      (s.addr||'').includes(t)
+    ))&&
+    (!kinds.length||kinds.includes(_sgKind(s)))&&
+    (!sts.length||sts.includes(_pinIsPlan(s)?'plan':'on'))
+  ):SG;
   putMarkers(res);
   showList(res,"フィルタリング結果");
 }
