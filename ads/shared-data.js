@@ -110,11 +110,11 @@ function _pinFirstPrice(plans){
   return n.toLocaleString()+'円/月';
 }
 // ピンの対象アイコン（10/22 マスタープラン 22）: 'car'(車向け) / 'ped'(人向け)
-// スタンド型など歩く人に見せるものは人、明和町のような道路沿いの大型は車。
-// 決め方：ターゲットに「車」「ドライバー」、または名前・設置場所・種別に「大型」「ロードサイド」「道路」があれば車、それ以外は人
+// スタンド型など歩く人に見せるものは人、明和町のような道路沿いの大型と FLASH（EV 充電器・10/22 眞野決定）は車。
+// 決め方：ターゲットに「車」「ドライバー」、または名前・設置場所・種別に「大型」「ロードサイド」「道路」「FLASH」があれば車、それ以外は人
 function _pinTrafficKind(s){
   var t=((s&&s.target)||''), w=[(s&&s.name)||'',(s&&s.place)||'',(s&&s.type)||''].join(' ');
-  return (/車|ドライバー/.test(t)||/大型|ロードサイド|道路/.test(w))?'car':'ped';
+  return (/車|ドライバー/.test(t)||/大型|ロードサイド|道路|FLASH/i.test(w))?'car':'ped';
 }
 var _PIN_PERSON_SVG='<svg width="22" height="24" viewBox="0 0 22 24" style="display:block">'
   +'<circle cx="11" cy="6" r="4" fill="none" stroke="#222" stroke-width="1.8"/>'
@@ -208,8 +208,8 @@ function _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
 // URL に ?pindemo を付けたときだけ、明和町の大型と設置予定（投資家向け）の見本を 1 つずつ地図に足す。
 // サーバーには保存しない。デザインが決まったら消す
 var PIN_DEMO=[
-  {id:1001, name:'【見本】明和町 大型ビジョン', yomi:'', lat:34.5560, lng:136.6260, area:'三重県', place:'国道23号沿い（大型）', target:'ドライバー',
-   addr:'三重県多気郡明和町（見本の位置）', size:'3000mm×5000mm', type:'大型LED', status:'ON', plans:[{n:'見本',p:'月額50,000円（見本）'}], photos:[], docs:[], trf:''},
+  {id:1001, name:'【見本】明和町 大型ビジョン', yomi:'', lat:34.569535, lng:136.632914, area:'三重県', place:'国道23号沿い（大型）', target:'ドライバー',
+   addr:'三重県多気郡明和町大字根倉（中井さん指定の位置）', size:'3000mm×5000mm', type:'大型LED', status:'ON', plans:[{n:'見本',p:'月額50,000円（見本）'}], photos:[], docs:[], trf:''},
   {id:1002, name:'【見本】設置予定 名古屋駅前', yomi:'', lat:35.1700, lng:136.8830, area:'愛知県', place:'店舗前（スタンド型）', target:'',
    addr:'愛知県名古屋市中村区（見本の位置）', size:'640mm×2240mm', type:'LED', status:'PLAN', plans:[], photos:[], docs:[], trf:''}
 ];
