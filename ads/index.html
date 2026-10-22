@@ -241,6 +241,9 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .fp-tab-bar{display:none}
 .fp-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--org)}
 .fp-header h3{font-size:13px;font-weight:700;color:#333}
+/* 絞り込み中のヒット件数（10/22 眞野さん） */
+#fp-hit{margin-left:auto;margin-right:10px;background:var(--org);color:#fff;font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px;white-space:nowrap}
+#fp-hit.zero{background:#9ca3af}
 .fp-close{background:none;border:none;font-size:18px;cursor:pointer;color:#aaa}
 .fp-sec{padding:10px 14px;border-bottom:1px solid #f0f0f0}
 .fp-sec h4{font-size:11px;color:var(--org);font-weight:700;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
@@ -549,7 +552,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 </div>
 
 <div id="filter-panel">
-  <div class="fp-header"><h3>🔍 絞り込み検索</h3><button class="fp-close" onclick="toggleFilter()">✕</button></div>
+  <div class="fp-header"><h3>🔍 絞り込み検索</h3><span id="fp-hit"></span><button class="fp-close" onclick="toggleFilter()">✕</button></div>
   <div class="fp-tab-bar">
     <button class="fp-tab-btn active" onclick="fpTab(0)">ターゲット・設置場所</button>
     <button class="fp-tab-btn" onclick="fpTab(1)">エリア</button>
@@ -1690,6 +1693,7 @@ function clearFilter(){
   const allToggle=$('btn-all-toggle');
   if(allToggle){allToggle.textContent='デフォルトに戻す';allToggle.style.color='var(--org)';allToggle.style.borderColor='var(--org)';}
   putMarkers(SG);
+  _updFilterCount();
   toast("フィルター条件をクリアしました");
 }
 // ===== 検索履歴 =====
@@ -1949,6 +1953,7 @@ function toggleFilter(){
   fpOpen=!fpOpen;
   $('filter-panel').classList.toggle('open',fpOpen);
   if(fpOpen){
+    _updFilterCount();
     if(_histOpen){_histOpen=false;$('hist-wrap').classList.remove('open');}
     _listWasOpen=false;
     $('list-panel').classList.remove('open');
@@ -1999,6 +2004,7 @@ function tt(el){
   const tagsEl=el.closest('.tags');
   if(tagsEl)_syncBtn(tagsEl);
   if(el.closest('#area-grid'))_syncAreaAllBtn();
+  _updFilterCount();
 }
 function selectAll(tagsEl){
   if(!tagsEl)return;
@@ -2008,6 +2014,7 @@ function selectAll(tagsEl){
   else{tags.forEach(t=>t.classList.add('on'));}
   _syncBtn(tagsEl);
   if(tagsEl.closest('#area-grid'))_syncAreaAllBtn();
+  _updFilterCount();
 }
 function fpTab(idx){
   document.querySelectorAll('.fp-col').forEach((c,i)=>c.classList.toggle('active',i===idx));
@@ -2019,6 +2026,7 @@ function selectAllArea(btn){
   if(sel>=2){tags.forEach(t=>t.classList.remove('on'));btn.textContent='全都道府県を選択';}
   else{tags.forEach(t=>t.classList.add('on'));btn.textContent='選択を解除';}
   document.querySelectorAll('#area-grid .tags').forEach(t=>_syncBtn(t));
+  _updFilterCount();
 }
 function toggleSelectAll(){
   const btn=document.getElementById('btn-all-toggle');
@@ -2032,15 +2040,14 @@ function _sgKind(s){
   if(k!=='stand') return k;
   return /FLASH/i.test([s.name||'',s.place||'',s.type||''].join(' '))?'flash':'stand';
 }
-function applyFilter(){
+// 今選んでいる条件に合うサイネージ。件数の表示（_updFilterCount）と検索（applyFilter）で同じ判定を使う
+function _filterResult(){
   const on=[...$('filter-panel').querySelectorAll('.tag.on')];
   const active=on.map(t=>t.textContent);
   // 種類・稼働状況は文字の一致ではなく判定で絞る。同じ見出しの中はどれか、見出しどうしは両方を満たすもの
   const words=on.filter(t=>!t.dataset.kind&&!t.dataset.st).map(t=>t.textContent);
   const kinds=on.filter(t=>t.dataset.kind).map(t=>t.dataset.kind);
   const sts=on.filter(t=>t.dataset.st).map(t=>t.dataset.st);
-  closeFilter();
-  if(active.length)saveFilterHistory(active);
   const res=active.length?SG.filter(s=>
     (!words.length||words.some(t=>
       (s.area||'').includes(t)||
@@ -2052,8 +2059,23 @@ function applyFilter(){
     (!kinds.length||kinds.includes(_sgKind(s)))&&
     (!sts.length||sts.includes(_pinIsPlan(s)?'plan':'on'))
   ):SG;
+  return {active,res};
+}
+// 条件を選ぶたびに「N件ヒット！」を見出しの横と検索ボタンに出す（10/22 眞野さん）
+function _updFilterCount(){
+  const el=$('fp-hit'); if(!el)return;
+  const {active,res}=_filterResult(), n=res.length;
+  el.textContent=active.length?(n?n+'件ヒット！':'0件（該当なし）'):'全'+n+'件';
+  el.classList.toggle('zero',!n);
+  document.querySelectorAll('#filter-panel .btn-apply').forEach(b=>b.textContent=active.length?'この条件で検索（'+n+'件）':'この条件で検索');
+}
+function applyFilter(){
+  const {active,res}=_filterResult();
+  closeFilter();
+  if(active.length)saveFilterHistory(active);
   putMarkers(res);
   showList(res,"フィルタリング結果");
+  if(active.length)toast(res.length?res.length+'件ヒット！':'条件に合うサイネージがありませんでした');
 }
 // ===== リストパネル =====
 // showList(items, label) : 検索結果・フィルター結果を受け取り、リストパネルに件数とアイテムを描画。
