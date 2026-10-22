@@ -52,10 +52,10 @@ function togglePw(id,btn){
 
 // ===== マップピンアイコン =====
 // ステータスバッジ設定（クラスター数バッジと同じスタイル・位置）
+// 「空」の札は 10/22 社長の指示で出さない（EMPTY を外した。全拠点が空きで同じ札が並び、差がつかないため）
 var PIN_BADGE={
   ON:  {bg:'#eab308', color:'#fff', text:''},
-  MAINT:{bg:'#ef4444', color:'#fff', text:''},
-  EMPTY:{bg:'#10b981', color:'#fff', text:'空'}
+  MAINT:{bg:'#ef4444', color:'#fff', text:''}
 };
 
 // ピン内オーバーレイ用ヘルパー
