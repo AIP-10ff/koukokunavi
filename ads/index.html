@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>広告ナビ</title>
+<!-- スマホで Web からインストールして使える形（PWA）。10/22 社長の指示。中身は sw.js・manifest.json -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#e8650a">
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="広告ナビ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!-- Google Maps JavaScript API（インライン・ブートストラップローダー） -->
 <script>
 (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})
@@ -635,6 +644,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
   <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
   <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
+  <div class="menu-row" id="menu-install" onclick="showInstall()"><span class="mi">📲</span>アプリとして使う（ホーム画面に追加）</div>
   <div class="menu-foot">広告ナビ © テンフィールズファクトリー</div>
 </div>
 
@@ -2422,6 +2432,31 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowLeft'){ e.preventDefault(); history.back(); }
   else if(e.key==='ArrowRight'){ e.preventDefault(); history.forward(); }
 });
+
+// ===== アプリとして使う（PWA）=====
+// Android の Chrome などは「インストール」の確認をそのまま出せる（beforeinstallprompt）。
+// iPhone の Safari は自動では出せないので、共有ボタン →「ホーム画面に追加」の手順を案内する。
+// LINE などのアプリ内ブラウザでは追加できないので、Safari／Chrome で開き直すよう案内する。
+let _installEvt=null;
+const _isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_installEvt=e;});
+window.addEventListener('appinstalled',()=>{_installEvt=null;toast('ホーム画面に追加しました');});
+function showInstall(){
+  if(mOpen)toggleMenu();
+  if(_isStandalone()){toast('アプリとして開いています');return;}
+  if(_installEvt){const e=_installEvt;_installEvt=null;e.prompt();return;}
+  const ua=navigator.userAgent, inApp=/Line\/|FBAN|FBAV|Instagram|LINE WORKS|NAVER/i.test(ua), ios=/iPhone|iPad|iPod/.test(ua);
+  const steps=inApp
+    ?'<p>このブラウザ（LINE など）からは追加できません。右上や下のメニューから<b>「Safari で開く」「ブラウザで開く」</b>を選び、開き直してから、もう一度このメニューを押してください。</p>'
+    :ios
+    ?'<ol style="padding-left:1.2em;line-height:1.9"><li>画面下（iPad は右上）の <b>共有ボタン</b>（□に↑）を押す</li><li><b>「ホーム画面に追加」</b>を選ぶ</li><li>右上の <b>「追加」</b>を押す</li></ol>'
+    :'<ol style="padding-left:1.2em;line-height:1.9"><li>ブラウザの <b>メニュー</b>（︙）を開く</li><li><b>「アプリをインストール」</b>または<b>「ホーム画面に追加」</b>を選ぶ</li></ol>';
+  openModal(`<h3>📲 アプリとして使う</h3><p style="font-size:13px;color:#555;margin:8px 0">ホーム画面に「広告ナビ」のアイコンが追加され、アプリと同じように開けます。機能は Web 版と同じです。</p><div style="font-size:13px;color:#333">${steps}</div>`);
+}
+if(_isStandalone()){const r=document.getElementById('menu-install');if(r)r.style.display='none';}
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
+}
 
 function $(id){return document.getElementById(id);}
 // toast は shared-data.js で定義
