@@ -217,6 +217,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .dp-guide dd{margin:0 0 0 1em}
 .dp-guide p{margin:0 0 6px}
 .dp-guide-tel{margin-top:12px!important;font-weight:700;color:#333}
+/* 大型（明和町）は提案書の内容が違う部分だけ文章を切り替える（10/27 眞野さん） */
+.dp-guide.large .g-std,.dp-guide:not(.large) .g-large{display:none}
 .dp-body{padding:12px 14px}
 .dp-breadcrumb{font-size:14px;color:#aaa;margin-bottom:4px}
 .dp-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -545,7 +547,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
           <div style="padding:8px 12px">
             <h4>配信の仕組み</h4>
             <ul>
-              <li>1 枠 15 秒 × 1 台あたり最大 20 社で、5 分で 1 周します</li>
+              <li class="g-std">1 枠 15 秒 × 1 台あたり最大 20 社で、5 分で 1 周します</li>
+              <li class="g-large">1 枠 15 秒。画面を左右 2 つに分け、各面 最大 20 社（計 40 枠）で、5 分で 1 周します</li>
               <li>24 時間 365 日、自動でくり返し配信（1 日 288 回・1 か月 8,640 回）</li>
               <li>スキップされず、人通りの多い場所では一度に複数の人が見られます</li>
             </ul>
@@ -555,8 +558,10 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
               <li>配信の管理・広告動画の差し替え対応</li>
               <li>広告効果のレポート</li>
             </ul>
-            <h4>動画制作サポート（オプション）</h4>
-            <p>動画をお持ちでなくても大丈夫です。訴求したい点をお聞きし、15 秒の広告動画を制作します（制作費は別途お見積り）。静止画や文字だけの広告にも対応します。</p>
+            <h4 class="g-std">動画制作サポート（オプション）</h4>
+            <p class="g-std">動画をお持ちでなくても大丈夫です。訴求したい点をお聞きし、15 秒の広告動画を制作します（制作費は別途お見積り）。静止画や文字だけの広告にも対応します。</p>
+            <h4 class="g-large">動画制作（年間契約は制作費込み）</h4>
+            <p class="g-large">年間契約には 15 秒の広告動画の制作費が含まれます。訴求したい点をお聞きし、制作から放映まで対応します。単月契約の場合は、動画をご用意いただくか、制作を別途お見積りします。</p>
             <h4>よくあるご質問</h4>
             <dl>
               <dt>配信はいつから始められますか？</dt>
@@ -566,7 +571,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
               <dt>音声付きの広告は流せますか？</dt>
               <dd>設置場所によって異なります。音声なしで映像のみ配信する場所もあります。</dd>
               <dt>競合他社と同じ枠に入ることはありますか？</dt>
-              <dd>可能性はありますが、1 台 20 社までのため少なく抑えられます。業種の独占枠はご相談ください。</dd>
+              <dd class="g-std">可能性はありますが、1 台 20 社までのため少なく抑えられます。業種の独占枠はご相談ください。</dd>
+              <dd class="g-large">可能性はありますが、各面 20 社までのため少なく抑えられます。業種の独占枠はご相談ください。</dd>
             </dl>
             <h4>お申し込みの流れ</h4>
             <ol>
@@ -1600,6 +1606,7 @@ function openDetail(id){
   const s=SG.find(x=>x.id===id);if(!s)return;cur=s;
   $('dp-bc').textContent=[s.area,s.target].filter(Boolean).join(' / '); // ターゲットが空の拠点で「大阪府 /」と末尾に / が残らないように
   $('dp-nm').textContent=s.name;
+  document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('large',_pinShape(s)==='large')); // 「広告掲載について」を大型用の文章に
   $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
   const photos=s.photos||[];
   const mainPhoto=photos.find(p=>p.isMain)||photos[0];
