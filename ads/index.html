@@ -1499,6 +1499,7 @@ function putMarkers(list){
     markers.push(m);
   });
   _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:pinClusterClick});
+  _tryDeepOpen(); // 個別ページの「地図で見る」から来たときは、ピンがそろった時点でそのピンの詳細を開く
 }
 
 // ピンの吹き出し(InfoWindow)を開く。押したピンが画面の真ん中に来るよう寄せる（pinCenterAndOpen は shared-data.js）
@@ -1644,8 +1645,36 @@ function openDetail(id){
   document.querySelectorAll('.dp-left-col,.dp-right-col,.dp-page-body').forEach(el=>el.scrollTop=0);
   if(mOpen) toggleMenu();
   _setView(s.lat,s.lng,15);
+  _setDetailUrl(s.id);
 }
-function closeDetail(){$('detail-panel').classList.remove('open');if(!_listCoversMap())_restoreList();else _updListBack();}
+function closeDetail(){$('detail-panel').classList.remove('open');_clearDetailUrl();if(!_listCoversMap())_restoreList();else _updListBack();}
+
+// ===== ピンごとの個別ページ（固有 URL）=====
+// 10/22 AD MTG E-2（市川さんの指示）：詳細を開いたらアドレスバーを /s/<ID>/ にする。そのままコピーして共有でき、
+// その URL を開くとサーバー（Django）が作る個別ページが出る（Google 検索にも載る）。
+// 個別ページの「地図で見る」（/?s=<ID>）・「問い合わせる」（/?s=<ID>&inq=1）から来たら、そのピンの詳細を開いた状態で始める。
+// 控え（Service Worker）から /s/<ID>/ のまま地図が開いた場合も同じに扱う
+const _deepQs=new URLSearchParams(location.search);
+let _deepId=_deepQs.get('s')||((location.pathname.match(/^\/s\/(\d+)\/?$/)||[])[1])||'';
+const _deepInq=_deepQs.get('inq')==='1';
+// 地図のページの URL（s・inq は外し、?pindemo などほかの指定は残す）
+const _homeUrl=(function(){ const q=new URLSearchParams(location.search); q.delete('s'); q.delete('inq'); const t=q.toString(); return '/'+(t?'?'+t:''); })();
+if(_deepId) history.replaceState(history.state,'',_homeUrl);
+function _tryDeepOpen(){
+  if(!_deepId||!map) return;
+  const s=SG.find(x=>String(x.id)===String(_deepId));
+  if(!s){ if(_sgFromServer){ _deepId=''; toast('このサイネージは見つかりませんでした'); } return; } // サーバーの掲載情報が届くまでは待つ
+  _deepId='';
+  openDetail(s.id);
+  if(_deepInq) showInq(); // 問い合わせ欄はこのサイネージを選んだ状態で開く（_buildSignageOptions が cur を選ぶ）
+}
+// 詳細を開いたら /s/<ID>/ に。開くと同時に「戻る」用の履歴が積まれる（_navPush）ので、その後に今の履歴の URL を書き換える
+function _setDetailUrl(id){
+  setTimeout(function(){
+    if(cur&&cur.id===id&&$('detail-panel').classList.contains('open')) history.replaceState(history.state,'','/s/'+id+'/');
+  },0);
+}
+function _clearDetailUrl(){ if(/^\/s\//.test(location.pathname)) history.replaceState(history.state,'',_homeUrl); }
 function showTop(){
   closeDetail();
   closeList();
