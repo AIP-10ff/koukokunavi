@@ -210,11 +210,9 @@ function _pinLargeHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
 }
 
 // ===== 見本ピン（10/22 デザイン確認用）=====
-// URL に ?pindemo を付けたときだけ、明和町の大型と設置予定（投資家向け）の見本を 1 つずつ地図に足す。
-// サーバーには保存しない。デザインが決まったら消す
+// URL に ?pindemo を付けたときだけ、設置予定（投資家向け）と FLASH の見本を地図に足す。
+// サーバーには保存しない。デザインが決まったら消す。明和町は 10/27 に本物を登録したので見本から外した
 var PIN_DEMO=[
-  {id:1001, name:'【見本】明和町 大型ビジョン', yomi:'', lat:34.5560, lng:136.6260, area:'三重県', place:'国道23号沿い（大型）', target:'ドライバー',
-   addr:'三重県多気郡明和町（見本の位置）', size:'3000mm×5000mm', type:'大型LED', status:'ON', plans:[{n:'見本',p:'月額50,000円（見本）'}], photos:[], docs:[], trf:''},
   {id:1002, name:'【見本】設置予定 名古屋駅前', yomi:'', lat:35.1700, lng:136.8830, area:'愛知県', place:'店舗前（スタンド型）', target:'',
    addr:'愛知県名古屋市中村区（見本の位置）', size:'640mm×2240mm', type:'LED', status:'PLAN', plans:[], photos:[], docs:[], trf:''}
 ];
