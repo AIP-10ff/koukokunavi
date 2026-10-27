@@ -249,6 +249,14 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 #fp-grid{display:grid;grid-template-columns:1fr 1.6fr 1fr;height:calc(100% - 44px);overflow:hidden}
 .fp-col{overflow:hidden}
 .fp-tab-bar{display:none}
+/* 899px 以下はタブ切り替え（ターゲット・設置場所／エリア／条件・検索）。上の @media の指定が、後ろにあるこの基本の指定で
+   打ち消されていて、スマホで 2 列が細く並び・エリアの列が出なかった（10/27 修正）。列の display はタグに直接書いてあるので !important で上書きする */
+@media(max-width:899px){
+  #fp-grid{display:block;height:calc(100% - 88px)}
+  .fp-tab-bar{display:flex}
+  .fp-col{display:none!important;height:100%;overflow-y:auto!important}
+  .fp-col.active{display:flex!important;flex-direction:column}
+}
 .fp-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--org)}
 .fp-header h3{font-size:13px;font-weight:700;color:#333}
 /* 絞り込み中のヒット件数（10/22 眞野さん） */
