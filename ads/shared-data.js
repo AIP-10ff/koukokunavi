@@ -136,7 +136,7 @@ function pinInnerHtml(s){
   var badgeHtml=badge
     ? '<div style="position:absolute;top:4px;right:4px;background:'+badge.bg+';color:'+badge.color+';font-size:12px;font-weight:700;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+badge.text+'</div>'
     : '';
-  var isNew=s&&s.id&&(Date.now()-s.id)<3*30*24*60*60*1000;
+  var isNew=s&&s.id&&(Date.now()-s.id)<30*24*60*60*1000;  // 登録から 1 か月（30 日）だけ NEW!（10/27 眞野さんの指示で 3 か月→1 か月）
   var newHtml=isNew
     ? '<div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#e8650a;color:#fff;font-size:9px;font-weight:900;border:2px solid #fff;border-radius:3px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);letter-spacing:.5px;z-index:3">NEW!</div>'
     : '';
