@@ -1536,7 +1536,7 @@ function _fitAll(){
   if(!b.isEmpty())map.fitBounds(b,40);else _setView(35.6762,139.6503,6);
 }
 
-// クラスタの見た目（重ねた台紙に「N件／重なり／タップで拡大」）
+// クラスタの見た目（重ねた台紙に件数を大きく＋「タップで拡大／クリックで拡大」。pinClusterInnerHtml）
 // 「TAP してチェック！」では何がまとまっているのか伝わらなかった（10/14 AD MTG）。押すと地図が拡大して分かれる
 const _clusterRenderer={
   render:function(cluster){
