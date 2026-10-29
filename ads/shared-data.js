@@ -258,6 +258,11 @@ function pinZoomHint(){
   try{ return matchMedia('(hover: none) and (pointer: coarse)').matches?'タップで拡大':'クリックで拡大'; }
   catch(e){ return 'タップで拡大'; }
 }
+// 重なったピン用：「クリック」「で拡大」の 2 行に分けた HTML
+function pinZoomHintHtml(){
+  var t=pinZoomHint(), i=t.indexOf('で');
+  return i>0?'<span>'+t.slice(0,i)+'</span><span>'+t.slice(i)+'</span>':'<span>'+t+'</span>';
+}
 
 // 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、件数を真ん中に大きく、下に「タップで拡大／クリックで拡大」を出す。
 // 「重なり」の文言は外した（10/28 AD MTG）。件数が大きい方が、いくつまとまっているかが一目で分かる
@@ -270,10 +275,11 @@ function pinClusterInnerHtml(count, label){
   var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
   return _pinScaled('<div style="position:relative;width:122px;height:130px">'
     +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
-    // 台紙の画像は 3 段の区切り線入りなので、件数の下地を白で塗って 1・2 段目の線を隠す
-    +'<div style="position:absolute;left:26px;top:23px;width:58px;height:52px;background:#fff"></div>' // 左右・上の枠線は隠さない
-    +row(23,52,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
-    +row(78,24,'color:#444;font-size:8.5px;font-weight:700;letter-spacing:-0.4px;white-space:nowrap',pinZoomHint())
+    // 台紙の画像は 3 段の区切り線入りなので、画面の下地を白で塗って区切り線をすべて隠す
+    +'<div style="position:absolute;left:26px;top:23px;width:58px;height:76px;background:#fff"></div>' // 左右・上下の枠線は隠さない
+    +row(23,44,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
+    // 「クリックで拡大」は 1 行だと台紙の幅に収まらず小さくしか出せないため、「クリック／で拡大」の 2 行にして大きく・少し上に出す（10/29 AD MTG）
+    +row(64,32,'flex-direction:column;gap:2px;color:#333;font-size:11.5px;font-weight:700;white-space:nowrap',pinZoomHintHtml())
     +(label?'<div style="position:absolute;top:-10px;left:55px;transform:translateX(-50%);background:#1f2937;color:#fff;font-size:12px;font-weight:900;border:2px solid #fff;border-radius:4px;padding:1px 8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+String(label).replace(/[<>&"]/g,'')+'</div>':'')
     +'</div>');
 }
