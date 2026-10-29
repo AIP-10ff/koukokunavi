@@ -175,7 +175,7 @@ function pinInnerHtml(s){
     +'</div>';
   // 設置予定はピン全体を青みのグレーに（黒をグレーに→もう少し濃く青っぽく。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
   if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.6) brightness(1.1) sepia(.6) hue-rotate(180deg) saturate(2.2)">'+html+'</div>'+planRibbon+'</div>';
-  return html;
+  return _pinScaled(html);
 }
 
 // ===== ピンの形（10/22 マスタープラン「ピンの形を3種類に分ける」・投資家向けピン）=====
@@ -247,18 +247,33 @@ function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
     +'</div>';
 }
 
-// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
+// ピンの大きさ（10/28 AD MTG：ピンを一回り小さく）。中身は今までの寸法のまま作り、外側の zoom でまとめて縮める。
+// zoom は見た目と当たり判定の大きさの両方が縮むので、ピンの根元（位置）はずれない
+var PIN_SCALE=0.85;
+function _pinScaled(html){ return '<div style="zoom:'+PIN_SCALE+'">'+html+'</div>'; }
+
+// 重なったピンを押すと何が起きるかの案内。画面に触って操作する端末（スマホ・タブレット）は「タップ」、
+// マウスで操作する端末（PC。タッチ画面付きのノート PC も主な操作がマウスならこちら）は「クリック」（10/28 AD MTG）
+function pinZoomHint(){
+  try{ return matchMedia('(hover: none) and (pointer: coarse)').matches?'タップで拡大':'クリックで拡大'; }
+  catch(e){ return 'タップで拡大'; }
+}
+
+// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、件数を真ん中に大きく、下に「タップで拡大／クリックで拡大」を出す。
+// 「重なり」の文言は外した（10/28 AD MTG）。件数が大きい方が、いくつまとまっているかが一目で分かる
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
 function pinClusterInnerHtml(count){
   var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
   var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
-  return '<div style="position:relative;width:122px;height:130px">'
+  var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
+  return _pinScaled('<div style="position:relative;width:122px;height:130px">'
     +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
-    +row(21,22,'color:#e8650a;font-size:13px;font-weight:900',count+'件')
-    +row(51,20,'color:#111;font-size:11px;font-weight:700','重なり')
-    +row(78,24,'color:#444;font-size:9.5px;font-weight:700;letter-spacing:-0.3px','タップで拡大')
-    +'</div>';
+    // 台紙の画像は 3 段の区切り線入りなので、件数の下地を白で塗って 1・2 段目の線を隠す
+    +'<div style="position:absolute;left:26px;top:23px;width:58px;height:52px;background:#fff"></div>' // 左右・上の枠線は隠さない
+    +row(23,52,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
+    +row(78,24,'color:#444;font-size:8.5px;font-weight:700;letter-spacing:-0.4px;white-space:nowrap',pinZoomHint())
+    +'</div>');
 }
 
 // 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。
@@ -290,7 +305,7 @@ function pinClusterClick(ev, cluster, map){
 // ピンは根元の点が位置なので、台紙の高さの半分（約 59px）だけ上にずらした点を真ん中にする。
 // 吹き出しは disableAutoPan:true で作ること（自動スクロールとぶつかるため）。
 // スマホなど縦が短く吹き出しの上が切れるときだけ、入る分だけ地図を下げる。中身（setContent）は呼ぶ側で入れておく
-var PIN_HALF_H=59;
+var PIN_HALF_H=Math.round(59*PIN_SCALE); // 台紙の高さの半分（縮小後）
 function pinCenter(map, s){
   var proj=map.getProjection();
   if(proj){

@@ -664,7 +664,7 @@ async function _admInitGoogleMap(){
 // Leafletのpinicon相当（AdvancedMarkerElement用の中身を組み立てる）
 function _admPinContent(s){
   var wrap=document.createElement('div');
-  wrap.innerHTML='<div style="width:110px">'+pinInnerHtml(s)+'</div>';
+  wrap.innerHTML='<div style="width:'+Math.round(110*PIN_SCALE)+'px">'+pinInnerHtml(s)+'</div>'; // ピンの縮小（PIN_SCALE）に合わせる
   return wrap.firstElementChild;
 }
 
