@@ -1494,23 +1494,50 @@ function fmtSize(v){if(!v)return'—';return /^\d+(\.\d+)?$/.test(v.trim())?v.tr
  * クラスターグループ使用時は clearLayers() で一括削除してから再追加。
  * 各ピンをクリックすると cur にそのサイネージをセットし、フィルター開放中なら閉じる。
  */
+// ===== 同じ場所に複数台あるピンを少しずらして並べる =====
+// FLASH は同じ店に 2〜3 台あり、緯度経度がまったく同じだと地図で寄っても「3件」のまとまりのまま分かれず、
+// さらに寄ると 1 台に見えて下の台が押せなかった（10/29 AD MTG H-4。眞野さん：不具合なので案2＝少しずらすで本番へ）。
+// データ（緯度経度）は変えず、地図に出すときだけ東西に SPREAD_M メートルずつ並べる。個別ページの位置もそのまま
+const SPREAD_M=40, SPREAD_ZOOM=18; // ズーム 18 でピン 1 本分（約 85px）の間隔になる
+function _spreadPositions(list){
+  const groups={}, pos={};
+  list.forEach(s=>{ const k=Number(s.lat).toFixed(6)+','+Number(s.lng).toFixed(6); (groups[k]=groups[k]||[]).push(s); });
+  Object.keys(groups).forEach(k=>{
+    const g=groups[k], n=g.length;
+    g.forEach((s,i)=>{
+      const dLng=n>1?(i-(n-1)/2)*SPREAD_M/(111320*Math.cos(s.lat*Math.PI/180)):0;
+      pos[s.id]={lat:s.lat,lng:s.lng+dLng,spread:n>1};
+    });
+  });
+  return pos;
+}
+// まとまりの中のピンが全部すぐ近く（同じ場所の数台）なら true
+function _isSpreadCluster(cluster){
+  const b=cluster&&cluster.bounds; if(!b) return false;
+  const ne=b.getNorthEast(), sw=b.getSouthWest();
+  const dy=(ne.lat()-sw.lat())*111320, dx=(ne.lng()-sw.lng())*111320*Math.cos(ne.lat()*Math.PI/180);
+  return Math.max(dx,dy)<=SPREAD_M*4;
+}
 function putMarkers(list){
   if(list===SG&&pinDemoOn()) PIN_DEMO.forEach(d=>{ if(!SG.some(x=>x.id===d.id)) SG.push(d); }); // 見本ピン（?pindemo のときだけ）
   if(_cluster){_cluster.clearMarkers();}
   markers=[];
   if(!map||!_GM)return;
   const AME=_GM.AdvancedMarkerElement;
+  const spread=_spreadPositions(list);
   list.forEach(s=>{
     const wrap=document.createElement('div');
     wrap.innerHTML=pinInnerHtml(s);              // 共通ピンHTML(shared-data.js)
     const content=wrap.firstElementChild;
     content.style.cursor='pointer';
-    const m=new AME({position:{lat:s.lat,lng:s.lng},content:content});
-    m._sgId=s.id;
+    const p=spread[s.id];
+    const m=new AME({position:{lat:p.lat,lng:p.lng},content:content});
+    m._sgId=s.id; m._pos={lat:p.lat,lng:p.lng}; m._spread=p.spread;
     content.addEventListener('click',function(ev){ev.stopPropagation();cur=s;if(fpOpen)closeFilter();_openInfo(s,m);});
     markers.push(m);
   });
-  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:pinClusterClick});
+  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:_onClusterClick,
+    algorithm:_clusterMode==='pref'?_makePrefAlgorithm():undefined});
   _tryDeepOpen(); // 個別ページの「地図で見る」から来たときは、ピンがそろった時点でそのピンの詳細を開く
 }
 
@@ -1518,7 +1545,7 @@ function putMarkers(list){
 function _openInfo(s,m){
   if(!_infoWin)return;
   _infoWin.setContent(popupHtml(s));
-  pinCenterAndOpen(map,_infoWin,s,m);
+  pinCenterAndOpen(map,_infoWin,m._pos||s,m); // 並べてずらしたピンは、ずらした位置を真ん中に
 }
 
 // 地図の中心・ズームを設定(Leaflet setView 相当)
@@ -1536,17 +1563,63 @@ function _fitAll(){
   if(!b.isEmpty())map.fitBounds(b,40);else _setView(35.6762,139.6503,6);
 }
 
-// クラスタの見た目（重ねた台紙に「N件／重なり／タップで拡大」）
+// クラスタの見た目（重ねた台紙に件数を大きく＋「タップで拡大／クリックで拡大」。pinClusterInnerHtml）
 // 「TAP してチェック！」では何がまとまっているのか伝わらなかった（10/14 AD MTG）。押すと地図が拡大して分かれる
 const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML=pinClusterInnerHtml(count);
+    wrap.innerHTML=pinClusterInnerHtml(count,cluster._pref||'');
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
+// ===== 地方 → 都道府県 → 距離 のまとめ（試作）=====
+// 10/28 AD MTG（若尾さん案）：今の距離ベースのまとめは残し、比べるために都道府県別も作る。URL に ?cluster=pref を付けたときだけ使う。
+// 10/29 眞野さん：都道府県の前に地方ごとにも分ける。
+//   ズーム REGION_MAX_ZOOM 以下（日本全体）  … 地方ごと（北海道・東北・関東・中部・近畿・中国・四国・九州沖縄）
+//   ズーム REGION_MAX_ZOOM+1〜PREF_SPLIT_ZOOM-1 … 都道府県ごと
+//   ズーム PREF_SPLIT_ZOOM 以上             … 今までの距離ベース（ライブラリ標準の SuperCluster）
+// まとまりの上には地方名・都道府県名の帯を出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
+const _clusterMode=new URLSearchParams(location.search).get('cluster')==='pref'?'pref':'dist';
+const REGION_MAX_ZOOM=6, PREF_SPLIT_ZOOM=8;
+function _prefLevel(z){ return z>=PREF_SPLIT_ZOOM?'dist':(z<=REGION_MAX_ZOOM?'region':'pref'); }
+function _makePrefAlgorithm(){
+  const base=new markerClusterer.SuperClusterAlgorithm({});
+  let lastMode='', clusters=[];
+  return {
+    calculate:function(args){
+      const mode=_prefLevel(args.map.getZoom());
+      const switched=mode!==lastMode; lastMode=mode;
+      if(mode==='dist'){ const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
+      if(!switched) return {clusters:clusters,changed:false};
+      const groups={};
+      args.markers.forEach(function(m){
+        const s=SG.find(x=>x.id===m._sgId);
+        const k=(mode==='region'?sgRegion(s):sgPrefecture(s))||'その他';
+        (groups[k]=groups[k]||{ms:[],lat:0,lng:0}).ms.push(m);
+        if(s){ groups[k].lat+=s.lat; groups[k].lng+=s.lng; }
+      });
+      clusters=Object.keys(groups).map(function(k){
+        const g=groups[k], n=g.ms.length;
+        const c=new markerClusterer.Cluster({markers:g.ms,position:{lat:g.lat/n,lng:g.lng/n}});
+        c._pref=k; c._level=mode;
+        return c;
+      });
+      return {clusters:clusters,changed:true};
+    }
+  };
+}
+function _onClusterClick(ev,cluster,m){
+  pinClusterClick(ev,cluster,m);
+  // 同じ場所の数台だけのまとまりは、並べたピンが分かれて見えるズームまで寄る（標準の寄せ方はズーム 15 までのため分かれなかった）
+  if(_isSpreadCluster(cluster)){ m.setZoom(SPREAD_ZOOM); m.setCenter(cluster.position); return; }
+  // 地方・都道府県のまとまりは、広くても一段細かいまとめ方に切り替わるところまでは寄る
+  if(_clusterMode!=='pref'||!cluster._pref) return;
+  const need=cluster._level==='region'?REGION_MAX_ZOOM+1:PREF_SPLIT_ZOOM;
+  if(m.getZoom()<need) m.setZoom(need);
+}
+
 /**
  * 検索結果リストのアイテムをタップしたときの動作。
  * 詳細パネルは開かず、地図上の対応ピンにフォーカスしてポップアップを表示する。
@@ -1558,7 +1631,8 @@ function focusPin(id){
   if(_listCoversMap()) _hideListTemp(); // PC は一覧を開いたまま地図を動かせる
   if(_histOpen)toggleHistPanel();
   const m=markers.find(mk=>mk._sgId===id);
-  _setView(s.lat,s.lng,16);
+  const p=(m&&m._pos)||s;
+  _setView(p.lat,p.lng,m&&m._spread?SPREAD_ZOOM:16); // 同じ場所に数台あるピンは、分かれて見えるズームまで寄る
   if(m)_openInfo(s,m);
 }
 // 交通量（車）。国交省の道路交通センサスで店の前の道路の値が取れた拠点だけ出す（10/14 AD MTG）。

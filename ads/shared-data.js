@@ -175,7 +175,7 @@ function pinInnerHtml(s){
     +'</div>';
   // 設置予定はピン全体を青みのグレーに（黒をグレーに→もう少し濃く青っぽく。10/22 眞野さん）。「設置予定」の帯だけは薄くしない
   if(plan) html='<div style="position:relative;width:max-content"><div style="filter:grayscale(1) contrast(.6) brightness(1.1) sepia(.6) hue-rotate(180deg) saturate(2.2)">'+html+'</div>'+planRibbon+'</div>';
-  return html;
+  return _pinScaled(html);
 }
 
 // ===== ピンの形（10/22 マスタープラン「ピンの形を3種類に分ける」・投資家向けピン）=====
@@ -247,19 +247,69 @@ function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan
     +'</div>';
 }
 
-// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、3 段に「N件／重なり／タップで拡大」を出す。
+// ピンの大きさ（10/28 AD MTG：ピンを一回り小さく）。中身は今までの寸法のまま作り、外側の zoom でまとめて縮める。
+// zoom は見た目と当たり判定の大きさの両方が縮むので、ピンの根元（位置）はずれない
+var PIN_SCALE=0.85;
+function _pinScaled(html){ return '<div style="zoom:'+PIN_SCALE+'">'+html+'</div>'; }
+
+// 重なったピンを押すと何が起きるかの案内。画面に触って操作する端末（スマホ・タブレット）は「タップ」、
+// マウスで操作する端末（PC。タッチ画面付きのノート PC も主な操作がマウスならこちら）は「クリック」（10/28 AD MTG）
+function pinZoomHint(){
+  try{ return matchMedia('(hover: none) and (pointer: coarse)').matches?'タップで拡大':'クリックで拡大'; }
+  catch(e){ return 'タップで拡大'; }
+}
+// 重なったピン用：「クリック」「で拡大」の 2 行に分けた HTML
+function pinZoomHintHtml(){
+  var t=pinZoomHint(), i=t.indexOf('で');
+  return i>0?'<span>'+t.slice(0,i)+'</span><span>'+t.slice(i)+'</span>':'<span>'+t+'</span>';
+}
+
+// 重なったピン（クラスタ）の中身。台紙を 3 枚ずらして重ね、件数を真ん中に大きく、下に「タップで拡大／クリックで拡大」を出す。
+// 「重なり」の文言は外した（10/28 AD MTG）。件数が大きい方が、いくつまとまっているかが一目で分かる
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
-function pinClusterInnerHtml(count){
+// label（都道府県名など）を渡すと、台紙の上に帯で出す（都道府県別まとめの試作で使う）
+function pinClusterInnerHtml(count, label){
   var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
   var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
-  return '<div style="position:relative;width:122px;height:130px">'
+  var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
+  return _pinScaled('<div style="position:relative;width:122px;height:130px">'
     +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
-    +row(21,22,'color:#e8650a;font-size:13px;font-weight:900',count+'件')
-    +row(51,20,'color:#111;font-size:11px;font-weight:700','重なり')
-    +row(78,24,'color:#444;font-size:9.5px;font-weight:700;letter-spacing:-0.3px','タップで拡大')
-    +'</div>';
+    // 台紙の画像は 3 段の区切り線入りなので、画面の下地を白で塗って区切り線をすべて隠す
+    +'<div style="position:absolute;left:26px;top:23px;width:58px;height:76px;background:#fff"></div>' // 左右・上下の枠線は隠さない
+    +row(23,44,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
+    // 「クリックで拡大」は 1 行だと台紙の幅に収まらず小さくしか出せないため、「クリック／で拡大」の 2 行にして大きく・少し上に出す（10/29 AD MTG）
+    +row(64,32,'flex-direction:column;gap:2px;color:#333;font-size:11.5px;font-weight:700;white-space:nowrap',pinZoomHintHtml())
+    +(label?'<div style="position:absolute;top:-10px;left:55px;transform:translateX(-50%);background:#1f2937;color:#fff;font-size:12px;font-weight:900;border:2px solid #fff;border-radius:4px;padding:1px 8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+String(label).replace(/[<>&"]/g,'')+'</div>':'')
+    +'</div>');
 }
+
+// サイネージの都道府県（都道府県別まとめの試作で使う）。エリア → 住所 → 名前の順に「◯◯県」などを探す。見つからなければ空
+var _PREF_RE=/(北海道|東京都|(?:京都|大阪)府|[^\s　]{2,3}?県)/;
+function sgPrefecture(s){
+  if(!s) return '';
+  var cands=[s.area,s.addr,s.name];
+  for(var i=0;i<cands.length;i++){
+    var m=String(cands[i]||'').replace(/[\s　]/g,'').match(_PREF_RE);
+    if(m) return m[1];
+  }
+  return '';
+}
+
+// 都道府県 → 地方（一般的な 8 地方区分。三重県は近畿、沖縄県は九州沖縄）。地方ごとのまとめ（試作）で使う
+var _REGIONS={
+  '北海道':['北海道'],
+  '東北':['青森県','岩手県','宮城県','秋田県','山形県','福島県'],
+  '関東':['茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県'],
+  '中部':['新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県'],
+  '近畿':['三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県'],
+  '中国':['鳥取県','島根県','岡山県','広島県','山口県'],
+  '四国':['徳島県','香川県','愛媛県','高知県'],
+  '九州沖縄':['福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県']
+};
+var _PREF_TO_REGION={};
+Object.keys(_REGIONS).forEach(function(r){ _REGIONS[r].forEach(function(p){ _PREF_TO_REGION[p]=r; }); });
+function sgRegion(s){ return _PREF_TO_REGION[sgPrefecture(s)]||''; }
 
 // 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。
 // 標準はピンの根元の点だけで地図を合わせるため、台紙（高さ約 120px）が画面の外に切れ、
@@ -290,7 +340,7 @@ function pinClusterClick(ev, cluster, map){
 // ピンは根元の点が位置なので、台紙の高さの半分（約 59px）だけ上にずらした点を真ん中にする。
 // 吹き出しは disableAutoPan:true で作ること（自動スクロールとぶつかるため）。
 // スマホなど縦が短く吹き出しの上が切れるときだけ、入る分だけ地図を下げる。中身（setContent）は呼ぶ側で入れておく
-var PIN_HALF_H=59;
+var PIN_HALF_H=Math.round(59*PIN_SCALE); // 台紙の高さの半分（縮小後）
 function pinCenter(map, s){
   var proj=map.getProjection();
   if(proj){
