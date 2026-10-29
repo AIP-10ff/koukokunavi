@@ -1548,32 +1548,36 @@ const _clusterRenderer={
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
-// ===== 都道府県別のまとめ（試作）=====
+// ===== 地方 → 都道府県 → 距離 のまとめ（試作）=====
 // 10/28 AD MTG（若尾さん案）：今の距離ベースのまとめは残し、比べるために都道府県別も作る。URL に ?cluster=pref を付けたときだけ使う。
-// 日本全体が見えるくらい引いているとき（ズーム PREF_SPLIT_ZOOM 未満）は都道府県ごとに 1 つにまとめ、上に都道府県名を出す。
-// それより寄ったら今までの距離ベース（ライブラリ標準の SuperCluster）に切り替える。都道府県のまとまりを押すとその県に寄る
+// 10/29 眞野さん：都道府県の前に地方ごとにも分ける。
+//   ズーム REGION_MAX_ZOOM 以下（日本全体）  … 地方ごと（北海道・東北・関東・中部・近畿・中国・四国・九州沖縄）
+//   ズーム REGION_MAX_ZOOM+1〜PREF_SPLIT_ZOOM-1 … 都道府県ごと
+//   ズーム PREF_SPLIT_ZOOM 以上             … 今までの距離ベース（ライブラリ標準の SuperCluster）
+// まとまりの上には地方名・都道府県名の帯を出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
 const _clusterMode=new URLSearchParams(location.search).get('cluster')==='pref'?'pref':'dist';
-const PREF_SPLIT_ZOOM=8;
+const REGION_MAX_ZOOM=6, PREF_SPLIT_ZOOM=8;
+function _prefLevel(z){ return z>=PREF_SPLIT_ZOOM?'dist':(z<=REGION_MAX_ZOOM?'region':'pref'); }
 function _makePrefAlgorithm(){
   const base=new markerClusterer.SuperClusterAlgorithm({});
   let lastMode='', clusters=[];
   return {
     calculate:function(args){
-      const mode=args.map.getZoom()>=PREF_SPLIT_ZOOM?'dist':'pref';
+      const mode=_prefLevel(args.map.getZoom());
       const switched=mode!==lastMode; lastMode=mode;
       if(mode==='dist'){ const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
       if(!switched) return {clusters:clusters,changed:false};
       const groups={};
       args.markers.forEach(function(m){
         const s=SG.find(x=>x.id===m._sgId);
-        const k=sgPrefecture(s)||'その他';
+        const k=(mode==='region'?sgRegion(s):sgPrefecture(s))||'その他';
         (groups[k]=groups[k]||{ms:[],lat:0,lng:0}).ms.push(m);
         if(s){ groups[k].lat+=s.lat; groups[k].lng+=s.lng; }
       });
       clusters=Object.keys(groups).map(function(k){
         const g=groups[k], n=g.ms.length;
         const c=new markerClusterer.Cluster({markers:g.ms,position:{lat:g.lat/n,lng:g.lng/n}});
-        c._pref=k;
+        c._pref=k; c._level=mode;
         return c;
       });
       return {clusters:clusters,changed:true};
@@ -1582,8 +1586,10 @@ function _makePrefAlgorithm(){
 }
 function _onClusterClick(ev,cluster,m){
   pinClusterClick(ev,cluster,m);
-  // 都道府県のまとまりは、県が広くても距離ベースに切り替わるところまでは寄る
-  if(_clusterMode==='pref'&&cluster._pref&&m.getZoom()<PREF_SPLIT_ZOOM) m.setZoom(PREF_SPLIT_ZOOM);
+  // 地方・都道府県のまとまりは、広くても一段細かいまとめ方に切り替わるところまでは寄る
+  if(_clusterMode!=='pref'||!cluster._pref) return;
+  const need=cluster._level==='region'?REGION_MAX_ZOOM+1:PREF_SPLIT_ZOOM;
+  if(m.getZoom()<need) m.setZoom(need);
 }
 
 /**
