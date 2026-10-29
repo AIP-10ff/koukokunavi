@@ -263,7 +263,8 @@ function pinZoomHint(){
 // 「重なり」の文言は外した（10/28 AD MTG）。件数が大きい方が、いくつまとまっているかが一目で分かる
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
-function pinClusterInnerHtml(count){
+// label（都道府県名など）を渡すと、台紙の上に帯で出す（都道府県別まとめの試作で使う）
+function pinClusterInnerHtml(count, label){
   var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
   var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
   var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
@@ -273,7 +274,20 @@ function pinClusterInnerHtml(count){
     +'<div style="position:absolute;left:26px;top:23px;width:58px;height:52px;background:#fff"></div>' // 左右・上の枠線は隠さない
     +row(23,52,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
     +row(78,24,'color:#444;font-size:8.5px;font-weight:700;letter-spacing:-0.4px;white-space:nowrap',pinZoomHint())
+    +(label?'<div style="position:absolute;top:-10px;left:55px;transform:translateX(-50%);background:#1f2937;color:#fff;font-size:12px;font-weight:900;border:2px solid #fff;border-radius:4px;padding:1px 8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+String(label).replace(/[<>&"]/g,'')+'</div>':'')
     +'</div>');
+}
+
+// サイネージの都道府県（都道府県別まとめの試作で使う）。エリア → 住所 → 名前の順に「◯◯県」などを探す。見つからなければ空
+var _PREF_RE=/(北海道|東京都|(?:京都|大阪)府|[^\s　]{2,3}?県)/;
+function sgPrefecture(s){
+  if(!s) return '';
+  var cands=[s.area,s.addr,s.name];
+  for(var i=0;i<cands.length;i++){
+    var m=String(cands[i]||'').replace(/[\s　]/g,'').match(_PREF_RE);
+    if(m) return m[1];
+  }
+  return '';
 }
 
 // 重なったピンを押したときの寄せ方（MarkerClusterer の onClusterClick）。

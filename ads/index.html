@@ -1510,7 +1510,8 @@ function putMarkers(list){
     content.addEventListener('click',function(ev){ev.stopPropagation();cur=s;if(fpOpen)closeFilter();_openInfo(s,m);});
     markers.push(m);
   });
-  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:pinClusterClick});
+  _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:_onClusterClick,
+    algorithm:_clusterMode==='pref'?_makePrefAlgorithm():undefined});
   _tryDeepOpen(); // 個別ページの「地図で見る」から来たときは、ピンがそろった時点でそのピンの詳細を開く
 }
 
@@ -1542,11 +1543,49 @@ const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML=pinClusterInnerHtml(count);
+    wrap.innerHTML=pinClusterInnerHtml(count,cluster._pref||'');
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
+// ===== 都道府県別のまとめ（試作）=====
+// 10/28 AD MTG（若尾さん案）：今の距離ベースのまとめは残し、比べるために都道府県別も作る。URL に ?cluster=pref を付けたときだけ使う。
+// 日本全体が見えるくらい引いているとき（ズーム PREF_SPLIT_ZOOM 未満）は都道府県ごとに 1 つにまとめ、上に都道府県名を出す。
+// それより寄ったら今までの距離ベース（ライブラリ標準の SuperCluster）に切り替える。都道府県のまとまりを押すとその県に寄る
+const _clusterMode=new URLSearchParams(location.search).get('cluster')==='pref'?'pref':'dist';
+const PREF_SPLIT_ZOOM=8;
+function _makePrefAlgorithm(){
+  const base=new markerClusterer.SuperClusterAlgorithm({});
+  let lastMode='', clusters=[];
+  return {
+    calculate:function(args){
+      const mode=args.map.getZoom()>=PREF_SPLIT_ZOOM?'dist':'pref';
+      const switched=mode!==lastMode; lastMode=mode;
+      if(mode==='dist'){ const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
+      if(!switched) return {clusters:clusters,changed:false};
+      const groups={};
+      args.markers.forEach(function(m){
+        const s=SG.find(x=>x.id===m._sgId);
+        const k=sgPrefecture(s)||'その他';
+        (groups[k]=groups[k]||{ms:[],lat:0,lng:0}).ms.push(m);
+        if(s){ groups[k].lat+=s.lat; groups[k].lng+=s.lng; }
+      });
+      clusters=Object.keys(groups).map(function(k){
+        const g=groups[k], n=g.ms.length;
+        const c=new markerClusterer.Cluster({markers:g.ms,position:{lat:g.lat/n,lng:g.lng/n}});
+        c._pref=k;
+        return c;
+      });
+      return {clusters:clusters,changed:true};
+    }
+  };
+}
+function _onClusterClick(ev,cluster,m){
+  pinClusterClick(ev,cluster,m);
+  // 都道府県のまとまりは、県が広くても距離ベースに切り替わるところまでは寄る
+  if(_clusterMode==='pref'&&cluster._pref&&m.getZoom()<PREF_SPLIT_ZOOM) m.setZoom(PREF_SPLIT_ZOOM);
+}
+
 /**
  * 検索結果リストのアイテムをタップしたときの動作。
  * 詳細パネルは開かず、地図上の対応ピンにフォーカスしてポップアップを表示する。
