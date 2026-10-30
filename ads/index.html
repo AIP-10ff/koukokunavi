@@ -1494,37 +1494,14 @@ function fmtSize(v){if(!v)return'—';return /^\d+(\.\d+)?$/.test(v.trim())?v.tr
  * クラスターグループ使用時は clearLayers() で一括削除してから再追加。
  * 各ピンをクリックすると cur にそのサイネージをセットし、フィルター開放中なら閉じる。
  */
-// ===== 同じ場所に複数台あるピンを少しずらして並べる =====
-// FLASH は同じ店に 2〜3 台あり、緯度経度がまったく同じだと地図で寄っても「3件」のまとまりのまま分かれず、
-// さらに寄ると 1 台に見えて下の台が押せなかった（10/29 AD MTG H-4。眞野さん：不具合なので案2＝少しずらすで本番へ）。
-// データ（緯度経度）は変えず、地図に出すときだけ東西に SPREAD_M メートルずつ並べる。個別ページの位置もそのまま
-const SPREAD_M=40, SPREAD_ZOOM=18; // ズーム 18 でピン 1 本分（約 85px）の間隔になる
-function _spreadPositions(list){
-  const groups={}, pos={};
-  list.forEach(s=>{ const k=Number(s.lat).toFixed(6)+','+Number(s.lng).toFixed(6); (groups[k]=groups[k]||[]).push(s); });
-  Object.keys(groups).forEach(k=>{
-    const g=groups[k], n=g.length;
-    g.forEach((s,i)=>{
-      const dLng=n>1?(i-(n-1)/2)*SPREAD_M/(111320*Math.cos(s.lat*Math.PI/180)):0;
-      pos[s.id]={lat:s.lat,lng:s.lng+dLng,spread:n>1};
-    });
-  });
-  return pos;
-}
-// まとまりの中のピンが全部すぐ近く（同じ場所の数台）なら true
-function _isSpreadCluster(cluster){
-  const b=cluster&&cluster.bounds; if(!b) return false;
-  const ne=b.getNorthEast(), sw=b.getSouthWest();
-  const dy=(ne.lat()-sw.lat())*111320, dx=(ne.lng()-sw.lng())*111320*Math.cos(ne.lat()*Math.PI/180);
-  return Math.max(dx,dy)<=SPREAD_M*4;
-}
+// 同じ場所に複数台あるピンは、地図に出すときだけ少しずらして並べる（pinSpreadPositions は shared-data.js。管理画面と共通）
 function putMarkers(list){
   if(list===SG&&pinDemoOn()) PIN_DEMO.forEach(d=>{ if(!SG.some(x=>x.id===d.id)) SG.push(d); }); // 見本ピン（?pindemo のときだけ）
   if(_cluster){_cluster.clearMarkers();}
   markers=[];
   if(!map||!_GM)return;
   const AME=_GM.AdvancedMarkerElement;
-  const spread=_spreadPositions(list);
+  const spread=pinSpreadPositions(list);
   list.forEach(s=>{
     const wrap=document.createElement('div');
     wrap.innerHTML=pinInnerHtml(s);              // 共通ピンHTML(shared-data.js)
@@ -1612,8 +1589,6 @@ function _makePrefAlgorithm(){
 }
 function _onClusterClick(ev,cluster,m){
   pinClusterClick(ev,cluster,m);
-  // 同じ場所の数台だけのまとまりは、並べたピンが分かれて見えるズームまで寄る（標準の寄せ方はズーム 15 までのため分かれなかった）
-  if(_isSpreadCluster(cluster)){ m.setZoom(SPREAD_ZOOM); m.setCenter(cluster.position); return; }
   // 地方・都道府県のまとまりは、広くても一段細かいまとめ方に切り替わるところまでは寄る
   if(_clusterMode!=='pref'||!cluster._pref) return;
   const need=cluster._level==='region'?REGION_MAX_ZOOM+1:PREF_SPLIT_ZOOM;
@@ -1632,7 +1607,7 @@ function focusPin(id){
   if(_histOpen)toggleHistPanel();
   const m=markers.find(mk=>mk._sgId===id);
   const p=(m&&m._pos)||s;
-  _setView(p.lat,p.lng,m&&m._spread?SPREAD_ZOOM:16); // 同じ場所に数台あるピンは、分かれて見えるズームまで寄る
+  _setView(p.lat,p.lng,m&&m._spread?PIN_SPREAD_ZOOM:16); // 同じ場所に数台あるピンは、分かれて見えるズームまで寄る
   if(m)_openInfo(s,m);
 }
 // 交通量（車）。国交省の道路交通センサスで店の前の道路の値が取れた拠点だけ出す（10/14 AD MTG）。

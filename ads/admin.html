@@ -687,12 +687,15 @@ function render(){
   markers={};
   if(_admCluster){ try{_admCluster.clearMarkers();}catch(e){} }
   var list=[];
+  var spread=pinSpreadPositions(SG); // 同じ場所に複数台あるピンは少しずらして並べる（利用者画面と同じ。データは変えない）
   SG.forEach(function(s){
-    var m=new _AGM.AdvancedMarkerElement({position:{lat:s.lat,lng:s.lng},content:_admPinContent(s)});
+    var p=spread[s.id];
+    var m=new _AGM.AdvancedMarkerElement({position:{lat:p.lat,lng:p.lng},content:_admPinContent(s)});
+    m._pos={lat:p.lat,lng:p.lng};
     m.addListener('click',function(){
       curId=s.id;
       _admInfoWin.setContent('<div style="max-width:280px">'+popupHtml(s)+'</div>');
-      pinCenterAndOpen(map,_admInfoWin,s,m); // 押したピンを真ん中に寄せる（利用者画面と同じ）
+      pinCenterAndOpen(map,_admInfoWin,m._pos,m); // 押したピンを真ん中に寄せる（利用者画面と同じ。ずらしたピンはずらした位置）
     });
     markers[s.id]=m;
     list.push(m);
