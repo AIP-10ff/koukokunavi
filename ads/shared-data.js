@@ -334,6 +334,34 @@ function pinClusterClick(ev, cluster, map){
   var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy/256)))*180/Math.PI;
   map.setZoom(z);
   map.setCenter({lat:lat,lng:(b.west+b.east)/2});
+  // 同じ場所の数台だけのまとまりは、並べたピンが分かれて見えるズームまで寄る（上の寄せ方はズーム 15 までのため分かれなかった）
+  if(pinIsSpreadCluster(cluster)){ map.setZoom(PIN_SPREAD_ZOOM); map.setCenter(cluster.position); }
+}
+
+// ===== 同じ場所に複数台あるピンを少しずらして並べる（利用者・管理の両画面）=====
+// FLASH は同じ店に 2〜3 台あり、緯度経度がまったく同じだと地図で寄っても「3件」のまとまりのまま分かれず、
+// さらに寄ると 1 台に見えて下の台が押せなかった（10/29 AD MTG H-4。眞野さん：不具合なので案2＝少しずらすで本番へ）。
+// データ（緯度経度）は変えず、地図に出すときだけ東西に PIN_SPREAD_M メートルずつ並べる。個別ページの位置もそのまま
+var PIN_SPREAD_M=40, PIN_SPREAD_ZOOM=18; // ズーム 18 でピン 1 本分（約 85px）の間隔になる
+// サイネージの配列 → { id: {lat, lng, spread} }（spread は同じ場所に他の台があるとき true）
+function pinSpreadPositions(list){
+  var groups={}, pos={};
+  list.forEach(function(s){ var k=Number(s.lat).toFixed(6)+','+Number(s.lng).toFixed(6); (groups[k]=groups[k]||[]).push(s); });
+  Object.keys(groups).forEach(function(k){
+    var g=groups[k], n=g.length;
+    g.forEach(function(s,i){
+      var dLng=n>1?(i-(n-1)/2)*PIN_SPREAD_M/(111320*Math.cos(s.lat*Math.PI/180)):0;
+      pos[s.id]={lat:s.lat,lng:s.lng+dLng,spread:n>1};
+    });
+  });
+  return pos;
+}
+// まとまりの中のピンが全部すぐ近く（同じ場所の数台）なら true
+function pinIsSpreadCluster(cluster){
+  var b=cluster&&cluster.bounds; if(!b) return false;
+  var ne=b.getNorthEast(), sw=b.getSouthWest();
+  var dy=(ne.lat()-sw.lat())*111320, dx=(ne.lng()-sw.lng())*111320*Math.cos(ne.lat()*Math.PI/180);
+  return Math.max(dx,dy)<=PIN_SPREAD_M*4;
 }
 
 // ピンを押したとき、ピンの台紙の中心が地図の真ん中に来るよう寄せてから吹き出しを開く（10/14 眞野さん。利用者・管理の両画面）。
