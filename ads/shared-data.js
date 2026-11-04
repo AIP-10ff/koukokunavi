@@ -223,25 +223,30 @@ function pinDemoOn(){ try{ return /[?&]pindemo\b/.test(location.search); }catch(
 // 画面に 3 段（価格／面積／車＋都道府県）、下に「FLASH」の文字、右に充電ケーブル
 var _PIN_FLASH_COLOR='#facc15';
 var _PIN_BOLT_SVG='<svg width="15" height="15" viewBox="0 0 24 24" style="display:block"><path d="M14 1 L4 14 H11 L9.5 23 L20 9 H13 Z" fill="#111"/></svg>';
+// FLASH の外側（ケーブル・本体・「⚡FLASH」・台座）。画面の中身は含まない。100×128 の箱の中に置く。
+// 重なったピン（pinClusterInnerHtml）でも同じ形を使う（11/4 眞野さん：まとまると FLASH の細部が消えていた）
+function _pinFlashFrame(plan){
+  // 充電ケーブル（本体の右から下へ）
+  return '<svg width="100" height="128" style="position:absolute;left:0;top:0;pointer-events:none"><path d="M86 52 C100 60 100 96 88 112" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/><rect x="82" y="108" width="10" height="8" rx="2" fill="#333"/></svg>'
+    // 本体
+    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#dc2626')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
+    // 下の「⚡FLASH」
+    +'<div style="position:absolute;left:6px;top:94px;width:80px;display:flex;align-items:center;justify-content:center;gap:1px;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;z-index:2">'
+    +_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="10" height="10"').replace('fill="#111"','fill="'+_PIN_FLASH_COLOR+'"')+'FLASH</div>'
+    // 台座
+    +'<div style="position:absolute;left:2px;top:117px;width:88px;height:6px;border-radius:2px;background:#111"></div>';
+}
 function _pinFlashHtml(s,priceTxt,sizeTxt,kindSvg,areaTxt,badgeHtml,newHtml,plan){
   var c=plan?_PIN_PLAN_COLOR:_PIN_FLASH_COLOR;
   var row=function(txt,st){return '<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:2px;line-height:1;white-space:nowrap;'+st+'">'+txt+'</div>';};
   return '<div style="position:relative;width:100px;height:128px">'
-    // 充電ケーブル（本体の右から下へ）
-    +'<svg width="100" height="128" style="position:absolute;left:0;top:0;pointer-events:none"><path d="M86 52 C100 60 100 96 88 112" fill="none" stroke="#333" stroke-width="3" stroke-linecap="round"/><rect x="82" y="108" width="10" height="8" rx="2" fill="#333"/></svg>'
-    // 本体
-    +'<div style="position:absolute;left:6px;top:4px;width:80px;height:114px;background:'+(plan?'#6b7280':'#dc2626')+';border-radius:16px 16px 6px 6px;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>'
+    +_pinFlashFrame(plan)
     // 画面（3 段）
     +'<div style="position:absolute;left:12px;top:20px;width:68px;height:70px;background:#fff;border:2px '+(plan?'dashed':'solid')+' '+c+';border-radius:4px;box-sizing:border-box;display:flex;flex-direction:column;color:#111;z-index:2">'
     +row(plan&&!(s&&s.plans&&s.plans.length)?'設置予定':priceTxt,'font-size:10.5px;font-weight:900;letter-spacing:-0.5px;border-bottom:1px solid #ccc')
     +row(sizeTxt,'font-size:10.5px;font-weight:700;border-bottom:1px solid #ccc')
     +row('<span style="display:flex">'+kindSvg+'</span><span>'+areaTxt+'</span>','font-size:'+(areaTxt.length>=4?8.5:9.5)+'px;font-weight:700;color:#444;letter-spacing:-0.4px')
     +'</div>'
-    // 下の「⚡FLASH」
-    +'<div style="position:absolute;left:6px;top:94px;width:80px;display:flex;align-items:center;justify-content:center;gap:1px;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;z-index:2">'
-    +_PIN_BOLT_SVG.replace(/width="15" height="15"/,'width="10" height="10"').replace('fill="#111"','fill="'+_PIN_FLASH_COLOR+'"')+'FLASH</div>'
-    // 台座
-    +'<div style="position:absolute;left:2px;top:117px;width:88px;height:6px;border-radius:2px;background:#111"></div>'
     +badgeHtml.replace('top:4px;right:4px','top:-4px;right:-6px')
     +newHtml
     +'</div>';
@@ -270,24 +275,25 @@ function pinZoomHintHtml(){
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
 // label（都道府県名など）を渡すと、台紙の上に帯で出す（都道府県別まとめの試作で使う）
 // mix（pinClusterMix の戻り値）で中身の種類を見分ける（11/2 AD MTG）。FLASH だけのまとまりがサイネージの台紙で出ていたため
-//   'mixed' … 前はサイネージの台紙、後ろの 2 枚を FLASH の赤い本体（残像）にする（サイネージを優先）
-//   'flash' … 3 枚とも FLASH の赤い本体にする
+//   'mixed' … 前はサイネージの台紙、後ろの 2 枚を FLASH のピン（薄い残像）にする（サイネージを優先）
+//   'flash' … 3 枚とも FLASH のピン（ケーブル・黄色枠の画面・⚡FLASH・台座まで単体と同じ形）にする
 //   省略    … 今までどおりサイネージの台紙 3 枚
 function pinClusterInnerHtml(count, label, mix){
-  var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
+  var isF=mix==='flash', dy=isF?9:0; // FLASH の画面は台紙の画面より 9px 下にあるので、文字もその分下げる
+  var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+(t+dy)+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
   var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
-  // FLASH の本体（_pinFlashHtml と同じ赤・角丸）。台紙の画面の位置に重なるよう合わせる
-  var flash=function(l,t,op){return '<div style="position:absolute;left:'+(l+16)+'px;top:'+(t+2)+'px;width:78px;height:116px;background:#dc2626;border-radius:16px 16px 6px 6px;opacity:'+op+';box-shadow:0 2px 6px rgba(0,0,0,.35);pointer-events:none"></div>';};
-  var back=mix?flash:img, front=mix==='flash'?flash:img;
+  // FLASH のピン（_pinFlashFrame＋空の画面）。本体の中心が台紙の画面の中心と揃うよう、台紙より 9px 右に置く
+  var flash=function(l,t,op){return '<div style="position:absolute;left:'+(l+9)+'px;top:'+t+'px;width:100px;height:128px;opacity:'+op+';pointer-events:none">'+_pinFlashFrame(false)
+    +'<div style="position:absolute;left:12px;top:20px;width:68px;height:70px;background:#fff;border:2px solid '+_PIN_FLASH_COLOR+';border-radius:4px;box-sizing:border-box;z-index:2"></div></div>';};
+  var back=mix?flash:img, front=isF?flash:img;
   var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
   return _pinScaled('<div style="position:relative;width:122px;height:130px">'
     +back(12,0,.35)+back(6,6,.6)+front(0,12,1)
-    // 台紙の画像は 3 段の区切り線入りなので、画面の下地を白で塗って区切り線をすべて隠す
-    +'<div style="position:absolute;left:26px;top:23px;width:58px;height:76px;background:#fff'+(mix==='flash'?';border-radius:4px':'')+'"></div>' // 左右・上下の枠線は隠さない
-    +(mix==='flash'?'<div style="position:absolute;left:16px;top:103px;width:78px;text-align:center;color:'+_PIN_FLASH_COLOR+';font-size:10px;font-weight:900;letter-spacing:1px;line-height:1">FLASH</div>':'')
-    +row(23,44,'color:'+(mix==='flash'?'#dc2626':'#e8650a')+';font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
+    // 台紙の画像は 3 段の区切り線入りなので、画面の下地を白で塗って区切り線をすべて隠す（FLASH の画面は元から白）
+    +(isF?'':'<div style="position:absolute;left:26px;top:23px;width:58px;height:76px;background:#fff"></div>') // 左右・上下の枠線は隠さない
+    +row(23,44,'color:'+(isF?'#dc2626':'#e8650a')+';font-weight:900;letter-spacing:-0.5px;z-index:3','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
     // 「クリックで拡大」は 1 行だと台紙の幅に収まらず小さくしか出せないため、「クリック／で拡大」の 2 行にして大きく・少し上に出す（10/29 AD MTG）
-    +row(64,32,'flex-direction:column;gap:2px;color:#333;font-size:11.5px;font-weight:700;white-space:nowrap',pinZoomHintHtml())
+    +row(64,isF?28:32,'flex-direction:column;gap:2px;color:#333;font-size:11.5px;font-weight:700;white-space:nowrap;z-index:3',pinZoomHintHtml())
     +(label?'<div style="position:absolute;top:-10px;left:55px;transform:translateX(-50%);background:#1f2937;color:#fff;font-size:12px;font-weight:900;border:2px solid #fff;border-radius:4px;padding:1px 8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+String(label).replace(/[<>&"]/g,'')+'</div>':'')
     +'</div>');
 }
