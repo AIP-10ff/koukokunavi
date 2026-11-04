@@ -2657,7 +2657,6 @@ async function submitInq(){
   if(btn){btn.disabled=true;btn.textContent='送信中...';}
   const mailBody=_buildInqMailBody(inqData);
   // サーバー（/api/v1/contact/）へ送る。サーバーが DB に保存し、SES で担当者に通知する。
-  // EmailJS（公開キーがブラウザに出る）は使わない（構成図 v3 ⑥ 8、Asana「EmailJS を本番から外す」）。
   let srv=null;
   try{
     srv=await knSendContact(inqData,mailBody);
