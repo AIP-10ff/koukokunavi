@@ -269,12 +269,17 @@ function pinZoomHintHtml(){
 // 上に浮かせていたバッジ（TAP してチェック！）は地図を隠して分かりにくかったため使わない
 // 右上の丸は個々のピンの空き状況（空など）と同じ位置で取り違えやすいため使わない（10/14 AD MTG）
 // label（都道府県名など）を渡すと、台紙の上に帯で出す（都道府県別まとめの試作で使う）
-function pinClusterInnerHtml(count, label){
+// hasFlash（まとまりに FLASH を含む）なら、後ろの 2 枚を赤にする。サイネージを前、FLASH は後ろに赤い残像（11/4 AD MTG）
+function pinClusterInnerHtml(count, label, hasFlash){
   var row=function(t,h,st,txt){return '<div style="position:absolute;left:23px;top:'+t+'px;width:64px;height:'+h+'px;display:flex;align-items:center;justify-content:center;line-height:1;'+st+'">'+txt+'</div>';};
-  var img=function(l,t,op){return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';};
+  var img=function(l,t,op,red){
+    // 赤い残像は台紙の形をそのまま赤で塗る（台紙の画像は白と黒なので、色味を変えるだけでは赤にならない）
+    if(red) return '<div style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:124px;opacity:'+op+';pointer-events:none;background:'+_PIN_FLASH_GHOST+';-webkit-mask:url('+PIN_IMG+') top left/110px auto no-repeat;mask:url('+PIN_IMG+') top left/110px auto no-repeat"></div>';
+    return '<img src="'+PIN_IMG+'" style="position:absolute;left:'+l+'px;top:'+t+'px;width:110px;height:auto;opacity:'+op+';pointer-events:none;"/>';
+  };
   var n=String(count), fs=n.length>=3?17:21; // 3 桁は台紙の幅（64px）に収まるよう少し小さく
   return _pinScaled('<div style="position:relative;width:122px;height:130px">'
-    +img(12,0,.35)+img(6,6,.6)+img(0,12,1)
+    +img(12,0,.35,hasFlash)+img(6,6,.6,hasFlash)+img(0,12,1)
     // 台紙の画像は 3 段の区切り線入りなので、画面の下地を白で塗って区切り線をすべて隠す
     +'<div style="position:absolute;left:26px;top:23px;width:58px;height:76px;background:#fff"></div>' // 左右・上下の枠線は隠さない
     +row(23,44,'color:#e8650a;font-weight:900;letter-spacing:-0.5px','<span style="font-size:'+fs+'px">'+n+'</span><span style="font-size:12px;margin-left:1px">件</span>')
@@ -282,6 +287,13 @@ function pinClusterInnerHtml(count, label){
     +row(64,32,'flex-direction:column;gap:2px;color:#333;font-size:11.5px;font-weight:700;white-space:nowrap',pinZoomHintHtml())
     +(label?'<div style="position:absolute;top:-10px;left:55px;transform:translateX(-50%);background:#1f2937;color:#fff;font-size:12px;font-weight:900;border:2px solid #fff;border-radius:4px;padding:1px 8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);z-index:3">'+String(label).replace(/[<>&"]/g,'')+'</div>':'')
     +'</div>');
+}
+
+// まとまりの後ろの残像の色（FLASH のピン本体と同じ赤）
+var _PIN_FLASH_GHOST='#dc2626';
+// まとまり（MarkerClusterer の cluster）に FLASH のピンが入っているか。ピンを作るときに m._flash を付けておく
+function pinClusterHasFlash(cluster){
+  return !!(cluster&&cluster.markers&&cluster.markers.some(function(m){ return m._flash; }));
 }
 
 // サイネージの都道府県（都道府県別まとめの試作で使う）。エリア → 住所 → 名前の順に「◯◯県」などを探す。見つからなければ空
