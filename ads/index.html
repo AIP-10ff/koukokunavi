@@ -1524,7 +1524,7 @@ function putMarkers(list){
     content.style.cursor='pointer';
     const p=spread[s.id];
     const m=new AME({position:{lat:p.lat,lng:p.lng},content:content});
-    m._sgId=s.id; m._pos={lat:p.lat,lng:p.lng}; m._spread=p.spread; m._flash=_pinShape(s)==='flash';
+    m._sgId=s.id; m._pos={lat:p.lat,lng:p.lng}; m._spread=p.spread;
     content.addEventListener('click',function(ev){ev.stopPropagation();cur=s;if(fpOpen)closeFilter();_openInfo(s,m);});
     markers.push(m);
   });
@@ -1562,7 +1562,9 @@ const _clusterRenderer={
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
     // 地方・都道府県のまとまりは、台紙だと隣どうしで重なって読めないため、名前と件数だけの小さな札にする（11/4）
-    wrap.innerHTML=cluster._pref?_areaBadgeHtml(cluster._pref,count):pinClusterInnerHtml(count,'',pinClusterHasFlash(cluster));
+    // それ以外は、中身に FLASH があれば FLASH の赤い形で出す（サイネージと混ざるときはサイネージを前に。11/2 AD MTG）
+    const list=cluster.markers.map(m=>SG.find(x=>x.id===m._sgId)).filter(Boolean);
+    wrap.innerHTML=cluster._pref?_areaBadgeHtml(cluster._pref,count):pinClusterInnerHtml(count,'',pinClusterMix(list));
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
