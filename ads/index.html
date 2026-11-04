@@ -1612,15 +1612,15 @@ function _spreadBoxes(items){
 }
 function _makePrefAlgorithm(){
   const base=new markerClusterer.SuperClusterAlgorithm({});
-  let lastZoom=null, lastMode='', clusters=[];
+  let lastZoom=null, lastN=-1, lastMode='', clusters=[];
   return {
     calculate:function(args){
       const z=args.map.getZoom(), mode=_prefLevel(z);
       const switched=mode!==lastMode; lastMode=mode;
       if(mode==='dist'){ lastZoom=null; const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
-      // 札どうしの間隔はズームで変わるため、ズームが変わったら置き直す（動かしただけなら前のまま）
-      if(z===lastZoom) return {clusters:clusters,changed:false};
-      lastZoom=z;
+      // 札どうしの間隔はズームで変わるため、ズームかピンの数が変わったら置き直す（動かしただけなら前のまま）
+      if(z===lastZoom&&args.markers.length===lastN) return {clusters:clusters,changed:false};
+      lastZoom=z; lastN=args.markers.length;
       const groups={};
       args.markers.forEach(function(m){
         const s=SG.find(x=>x.id===m._sgId);
