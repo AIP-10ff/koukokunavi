@@ -673,7 +673,7 @@ var _admClusterRenderer={
   render:function(cluster){
     var count=cluster.count, position=cluster.position;
     var wrap=document.createElement('div');
-    wrap.innerHTML=pinClusterInnerHtml(count);
+    wrap.innerHTML=pinClusterInnerHtml(count,'',pinClusterHasFlash(cluster));
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _AGM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
@@ -691,7 +691,7 @@ function render(){
   SG.forEach(function(s){
     var p=spread[s.id];
     var m=new _AGM.AdvancedMarkerElement({position:{lat:p.lat,lng:p.lng},content:_admPinContent(s)});
-    m._pos={lat:p.lat,lng:p.lng};
+    m._pos={lat:p.lat,lng:p.lng}; m._flash=_pinShape(s)==='flash';
     m.addListener('click',function(){
       curId=s.id;
       _admInfoWin.setContent('<div style="max-width:280px">'+popupHtml(s)+'</div>');
