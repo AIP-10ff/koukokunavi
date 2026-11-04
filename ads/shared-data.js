@@ -469,8 +469,6 @@ function _checkSendCooldown(key, seconds){
   localStorage.setItem(key,now.toString());
   return {ok:true};
 }
-// EmailJS などの catch(e) でエラー文字列を安全に取得する共通ヘルパー
-function _errMsg(e){return e&&(e.text||e.message)||JSON.stringify(e)||'不明なエラー';}
 
 function _parseKokokunaviInquiryTimestamp(value){
   try{
