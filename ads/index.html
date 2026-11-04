@@ -1548,7 +1548,9 @@ const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML=pinClusterInnerHtml(count,cluster._pref||'');
+    // 中身に FLASH があれば、FLASH の赤い形で出す（サイネージと混ざるときはサイネージを前に。11/2 AD MTG）
+    const list=cluster.markers.map(m=>SG.find(x=>x.id===m._sgId)).filter(Boolean);
+    wrap.innerHTML=pinClusterInnerHtml(count,cluster._pref||'',pinClusterMix(list));
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
