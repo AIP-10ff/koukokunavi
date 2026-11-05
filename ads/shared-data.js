@@ -714,6 +714,11 @@ function _migrateOldPhotos(sg,cb){
   if(pending===0&&cb)cb();
 }
 
+// ===== スマホアプリのストア URL（11/5 AD MTG：PC は QR コード、スマホはストアへのリンク）=====
+// アプリ公開後にここへ URL を入れると、本番の地図に「アプリの案内」が出る。空のあいだは検証環境（app2）だけ見本を出す
+var KN_APP_IOS_URL     = '';
+var KN_APP_ANDROID_URL = '';
+
 // ===== サーバー API（Phase2 管理系 API） =====
 // 掲載情報（サイネージ）はサーバーの DB を正とする。利用者画面・管理画面の両方から使う。
 // file:// で開いたときや API が無いときは fetch が失敗し、呼び出し側が従来の動き（localStorage／DEFAULT_SG）に戻る。
