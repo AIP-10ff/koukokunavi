@@ -765,7 +765,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
   <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
   <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
-  <div class="menu-row" id="menu-install" onclick="showInstall()"><span class="mi">📲</span>アプリとして使う（ホーム画面に追加）</div>
   <div class="menu-row" id="menu-appdl" onclick="showAppDl()" style="display:none"><span class="mi">📱</span>スマホアプリ（QR コード）</div>
   <div class="menu-row" onclick="window.open('./terms.html','_blank','noopener')"><span class="mi">📄</span>利用規約</div>
   <div class="menu-row" onclick="window.open('./privacy.html','_blank','noopener')"><span class="mi">🔒</span>プライバシーポリシー</div>
@@ -2858,27 +2857,10 @@ document.addEventListener('keydown',function(e){
   else if(e.key==='ArrowRight'){ e.preventDefault(); history.forward(); }
 });
 
-// ===== アプリとして使う（PWA）=====
-// Android の Chrome などは「インストール」の確認をそのまま出せる（beforeinstallprompt）。
-// iPhone の Safari は自動では出せないので、共有ボタン →「ホーム画面に追加」の手順を案内する。
-// LINE などのアプリ内ブラウザでは追加できないので、Safari／Chrome で開き直すよう案内する。
-let _installEvt=null;
-const _isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_installEvt=e;});
-window.addEventListener('appinstalled',()=>{_installEvt=null;toast('ホーム画面に追加しました');});
-function showInstall(){
-  if(mOpen)toggleMenu();
-  if(_isStandalone()){toast('アプリとして開いています');return;}
-  if(_installEvt){const e=_installEvt;_installEvt=null;e.prompt();return;}
-  const ua=navigator.userAgent, inApp=/Line\/|FBAN|FBAV|Instagram|LINE WORKS|NAVER/i.test(ua), ios=/iPhone|iPad|iPod/.test(ua);
-  const steps=inApp
-    ?'<p>このブラウザ（LINE など）からは追加できません。右上や下のメニューから<b>「Safari で開く」「ブラウザで開く」</b>を選び、開き直してから、もう一度このメニューを押してください。</p>'
-    :ios
-    ?'<ol style="padding-left:1.2em;line-height:1.9"><li>画面下（iPad は右上）の <b>共有ボタン</b>（□に↑）を押す</li><li><b>「ホーム画面に追加」</b>を選ぶ</li><li>右上の <b>「追加」</b>を押す</li></ol>'
-    :'<ol style="padding-left:1.2em;line-height:1.9"><li>ブラウザの <b>メニュー</b>（︙）を開く</li><li><b>「アプリをインストール」</b>または<b>「ホーム画面に追加」</b>を選ぶ</li></ol>';
-  openModal(`<h3>📲 アプリとして使う</h3><p style="font-size:13px;color:#555;margin:8px 0">ホーム画面に「広告ナビ」のアイコンが追加され、アプリと同じように開けます。機能は Web 版と同じです。</p><div style="font-size:13px;color:#333">${steps}</div>`);
-}
-if(_isStandalone()){const r=document.getElementById('menu-install');if(r)r.style.display='none';}
+// ===== スマホアプリ =====
+// 「ホーム画面に追加」の案内は 11/5 眞野さんの指示で外し、ストアのアプリ（メニューの「スマホアプリ（QR コード）」）に一本化した。
+// ブラウザが自分で出す「インストール」の案内も出さない
+window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
 // スマホアプリの行は、ストア URL が入るか、検証環境・ローカルのときだけ出す
 if(_appDlReady()||/^(app2\.|localhost$|127\.)/.test(location.hostname)){const r=document.getElementById('menu-appdl');if(r)r.style.display='';}
 if('serviceWorker' in navigator && location.protocol==='https:'){
