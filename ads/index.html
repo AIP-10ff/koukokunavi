@@ -21,6 +21,8 @@
 <meta name="theme-color" content="#e8650a">
 <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<!-- 検索結果に出るサイト名（11/4 眞野さん：ロゴは今の「広告ナビ」の文字入りアイコンに決定。検索結果のアイコンは上の rel="icon"、/favicon.ico も同じ絵） -->
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"広告ナビ","alternateName":["Koukoku Navi","こうこくナビ"],"url":"https://app.signage-ad.com/","publisher":{"@type":"Organization","@id":"https://10-ff.com/#org","name":"テンフィールズファクトリー","alternateName":"10Fields Factory","url":"https://10-ff.com/"}}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="広告ナビ">
@@ -65,6 +67,15 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 /* 囲んで探す（10/22 社長の指示 5）・一覧に戻る */
 #btn-area{position:fixed;right:10px;top:calc(var(--hdr) + 10px);z-index:801;height:36px;padding:0 12px;border-radius:18px;background:#fff;color:var(--org);border:2px solid var(--org);box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
 #btn-area.active{background:var(--org);color:#fff}
+/* まとめ方の切り替え（検証環境だけ）・地方／都道府県の札（11/4） */
+#cl-mode{position:fixed;right:10px;top:calc(var(--hdr) + 54px);z-index:801;display:flex;align-items:center;background:#fff;border:2px solid #1f2937;border-radius:18px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:12px;font-weight:700}
+#cl-mode span{padding:0 8px;color:#555}
+#cl-mode button{border:none;background:#fff;color:#1f2937;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
+#cl-mode button.on{background:#1f2937;color:#fff}
+.area-badge{display:flex;flex-direction:column;align-items:center;min-width:60px;background:#fff;border:2px solid var(--org);border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);overflow:hidden;cursor:pointer;line-height:1}
+.area-badge .ab-name{width:100%;box-sizing:border-box;background:var(--org);color:#fff;font-size:13px;font-weight:900;padding:4px 8px;text-align:center;white-space:nowrap}
+.area-badge .ab-cnt{padding:3px 8px 4px;color:#333;font-size:12px;font-weight:700}
+.area-badge .ab-cnt b{font-size:18px;color:var(--org);margin-right:1px}
 #draw-layer{position:fixed;z-index:1500;touch-action:none;cursor:crosshair;background:rgba(232,101,10,.06)}
 #draw-layer svg{width:100%;height:100%;display:block}
 #draw-hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--hdr) + 56px);z-index:1501;background:#333;color:#fff;font-size:12px;padding:8px 12px;border-radius:18px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;white-space:nowrap}
@@ -879,6 +890,7 @@ document.addEventListener('visibilitychange', function(){
 // ===== グローバル変数 =====
 let map,           // Google Maps マップインスタンス
     markers=[],    // 現在マップに表示中のマーカー配列(AdvancedMarkerElement)
+    _shownList=null, // 今マップに出しているサイネージ（putMarkers に渡したもの）
     clusterGroup=null, // (未使用) 旧Leafletクラスタ
     _cluster=null,     // Google Maps MarkerClusterer インスタンス
     _GM=null,          // Google Maps ライブラリ参照 {Map,InfoWindow,AdvancedMarkerElement}
@@ -1159,6 +1171,7 @@ async function initMap(lat,lng){
   // addFacilityControl();
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
   addAreaSelectControl();  // ✏️ 囲んで探す（10/22 社長の指示 5）
+  addClusterModeToggle();  // まとめ方の切り替え（検証環境だけ）
   facilityLayer=null;
   function _updateZoomBadge(){
     const z=map.getZoom();
@@ -1500,7 +1513,7 @@ function fmtSize(v){if(!v)return'—';return /^\d+(\.\d+)?$/.test(v.trim())?v.tr
 function putMarkers(list){
   if(list===SG&&pinDemoOn()) PIN_DEMO.forEach(d=>{ if(!SG.some(x=>x.id===d.id)) SG.push(d); }); // 見本ピン（?pindemo のときだけ）
   if(_cluster){_cluster.clearMarkers();}
-  markers=[];
+  markers=[]; _shownList=list; // まとめ方を切り替えたとき、今出しているピンのまま出し直すため
   if(!map||!_GM)return;
   const AME=_GM.AdvancedMarkerElement;
   const spread=pinSpreadPositions(list);
@@ -1548,30 +1561,73 @@ const _clusterRenderer={
   render:function(cluster){
     const count=cluster.count,position=cluster.position;
     const wrap=document.createElement('div');
-    wrap.innerHTML=pinClusterInnerHtml(count,cluster._pref||'');
+    // 地方・都道府県のまとまりは、台紙だと隣どうしで重なって読めないため、名前と件数だけの小さな札にする（11/4）
+    // それ以外は、中身に FLASH があれば FLASH の赤い形で出す（サイネージと混ざるときはサイネージを前に。11/2 AD MTG）
+    const list=cluster.markers.map(m=>SG.find(x=>x.id===m._sgId)).filter(Boolean);
+    // 1 件だけの地方・県は同じピンを 2 回入れて札にしているため、件数は重複を除いて数える（_makePrefAlgorithm）
+    wrap.innerHTML=cluster._pref?_areaBadgeHtml(cluster._pref,new Set(cluster.markers).size):pinClusterInnerHtml(count,'',pinClusterMix(list));
     // 単体のピンの下に隠れて件数が読めなかったため前面に出す
     return new _GM.AdvancedMarkerElement({position:position,content:wrap.firstElementChild,zIndex:1000});
   }
 };
-// ===== 地方 → 都道府県 → 距離 のまとめ（試作）=====
-// 10/28 AD MTG（若尾さん案）：今の距離ベースのまとめは残し、比べるために都道府県別も作る。URL に ?cluster=pref を付けたときだけ使う。
+// ===== 地方 → 都道府県 → 距離 のまとめ =====
+// 10/28 AD MTG（若尾さん案）：今の距離ベースのまとめは残し、比べるために都道府県別も作る。
+// 11/5 AD MTG：地方・県のまとめを採用し、いつもの画面にする。今までの距離ベースは URL に ?cluster=dist を付けたときだけ。
+// 1 件だけの地方・県も、本物のピンではなく「1 件」の札で出す（11/5 AD MTG）。
 // 10/29 眞野さん：都道府県の前に地方ごとにも分ける。
 //   ズーム REGION_MAX_ZOOM 以下（日本全体）  … 地方ごと（北海道・東北・関東・中部・近畿・中国・四国・九州沖縄）
 //   ズーム REGION_MAX_ZOOM+1〜PREF_SPLIT_ZOOM-1 … 都道府県ごと
 //   ズーム PREF_SPLIT_ZOOM 以上             … 今までの距離ベース（ライブラリ標準の SuperCluster）
-// まとまりの上には地方名・都道府県名の帯を出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
-const _clusterMode=new URLSearchParams(location.search).get('cluster')==='pref'?'pref':'dist';
+// まとまりは地方名・都道府県名と件数の札で出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
+// 11/4 眞野さん：札は地方・県の真ん中に置き、隣の札と重なるときは押し離す（設置場所の平均だと関西〜関東で重なった）
+let _clusterMode=new URLSearchParams(location.search).get('cluster')==='dist'?'dist':'pref';
 const REGION_MAX_ZOOM=6, PREF_SPLIT_ZOOM=8;
 function _prefLevel(z){ return z>=PREF_SPLIT_ZOOM?'dist':(z<=REGION_MAX_ZOOM?'region':'pref'); }
+// 地方の札を置く位置（地図で見たときの地方の真ん中あたり）
+const REGION_CENTER={'北海道':[43.3,142.8],'東北':[39.4,140.9],'関東':[36.1,139.7],'中部':[36.3,137.7],
+  '近畿':[34.7,135.6],'中国':[35.0,132.8],'四国':[33.6,133.4],'九州沖縄':[32.6,130.9]};
+// 都道府県は PREF_BOUNDS の真ん中。離島まで含む県は真ん中が海の上になるため本土側に直す
+const PREF_CENTER_FIX={'長崎県':[32.95,129.95],'鹿児島県':[31.6,130.6],'沖縄県':[26.4,127.9]};
+function _areaCenter(level,k){
+  if(level==='region') return REGION_CENTER[k];
+  if(PREF_CENTER_FIX[k]) return PREF_CENTER_FIX[k];
+  const b=PREF_BOUNDS[k]; return b&&[(b[0]+b[1])/2,(b[2]+b[3])/2];
+}
+function _areaBadgeHtml(label,count){
+  const t=String(label).replace(/[<>&"]/g,'');
+  return '<div class="area-badge" title="'+t+'のサイネージ '+count+' 件（クリックで拡大）"><div class="ab-name">'+t+'</div><div class="ab-cnt"><b>'+count+'</b>件</div></div>';
+}
+// 札の大きさの目安（px）。押し離すときの当たり判定に使う（CSS の .area-badge と合わせる）
+function _areaBadgeSize(label){ return {w:Math.max(60,String(label).length*13+22),h:50}; }
+// 重なった札を、重なりの小さい向き（横か縦）に押し離す。fixed（1 件だけで本物のピンが出るもの）は動かさない
+const AREA_BADGE_GAP=4;
+function _spreadBoxes(items){
+  for(let it=0;it<40;it++){
+    let moved=false;
+    for(let i=0;i<items.length;i++) for(let j=i+1;j<items.length;j++){
+      const a=items[i], b=items[j];
+      const ox=(a.w+b.w)/2+AREA_BADGE_GAP-Math.abs(a.x-b.x);
+      const oy=(a.h+b.h)/2+AREA_BADGE_GAP-Math.abs((a.y-a.h/2)-(b.y-b.h/2)); // y は札の下端（ピンの根元）
+      if(ox<=0||oy<=0||(a.fixed&&b.fixed)) continue;
+      moved=true;
+      const wa=a.fixed?0:(b.fixed?1:.5), wb=b.fixed?0:(a.fixed?1:.5);
+      if(ox<oy){ const d=Math.sign(a.x-b.x)||1; a.x+=d*ox*wa; b.x-=d*ox*wb; }
+      else     { const d=Math.sign(a.y-b.y)||1; a.y+=d*oy*wa; b.y-=d*oy*wb; }
+    }
+    if(!moved) break;
+  }
+}
 function _makePrefAlgorithm(){
   const base=new markerClusterer.SuperClusterAlgorithm({});
-  let lastMode='', clusters=[];
+  let lastZoom=null, lastN=-1, lastMode='', clusters=[];
   return {
     calculate:function(args){
-      const mode=_prefLevel(args.map.getZoom());
+      const z=args.map.getZoom(), mode=_prefLevel(z);
       const switched=mode!==lastMode; lastMode=mode;
-      if(mode==='dist'){ const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
-      if(!switched) return {clusters:clusters,changed:false};
+      if(mode==='dist'){ lastZoom=null; const r=base.calculate(args); return {clusters:r.clusters,changed:r.changed||switched}; }
+      // 札どうしの間隔はズームで変わるため、ズームかピンの数が変わったら置き直す（動かしただけなら前のまま）
+      if(z===lastZoom&&args.markers.length===lastN) return {clusters:clusters,changed:false};
+      lastZoom=z; lastN=args.markers.length;
       const groups={};
       args.markers.forEach(function(m){
         const s=SG.find(x=>x.id===m._sgId);
@@ -1579,15 +1635,42 @@ function _makePrefAlgorithm(){
         (groups[k]=groups[k]||{ms:[],lat:0,lng:0}).ms.push(m);
         if(s){ groups[k].lat+=s.lat; groups[k].lng+=s.lng; }
       });
-      clusters=Object.keys(groups).map(function(k){
-        const g=groups[k], n=g.ms.length;
-        const c=new markerClusterer.Cluster({markers:g.ms,position:{lat:g.lat/n,lng:g.lng/n}});
-        c._pref=k; c._level=mode;
+      const keys=Object.keys(groups), proj=args.mapCanvasProjection;
+      const items=keys.map(function(k){
+        const g=groups[k], n=g.ms.length, c=_areaCenter(mode,k);
+        const ll=c?new google.maps.LatLng(c[0],c[1]):new google.maps.LatLng(g.lat/n,g.lng/n);
+        const px=proj.fromLatLngToDivPixel(ll), sz=_areaBadgeSize(k);
+        return {k:k,ll:ll,x:px.x,y:px.y,w:sz.w,h:sz.h,fixed:false};
+      });
+      _spreadBoxes(items);
+      clusters=items.map(function(it){
+        const g=groups[it.k];
+        const pos=proj.fromDivPixelToLatLng(new google.maps.Point(it.x,it.y));
+        // ライブラリは中身が 1 件のまとまりを本物のピンで出すため、1 件のときは同じピンを 2 回入れて札にする
+        const c=new markerClusterer.Cluster({markers:g.ms.length===1?[g.ms[0],g.ms[0]]:g.ms,position:pos});
+        c._pref=it.k; c._level=mode;
         return c;
       });
       return {clusters:clusters,changed:true};
     }
   };
+}
+// まとめ方の切り替え（11/4・検証環境とローカルだけ）。若尾さん・山川さんが URL を変えずに 2 つを見比べられるように。本番には出さない
+function addClusterModeToggle(){
+  if(!/^(app2\.|localhost$|127\.)/.test(location.hostname)||$('cl-mode')) return;
+  const d=document.createElement('div'); d.id='cl-mode';
+  d.innerHTML='<span>まとめ方</span>'+[['dist','距離'],['pref','地方・県']].map(function(o){
+    return '<button data-k="'+o[0]+'"'+(o[0]===_clusterMode?' class="on"':'')+'>'+o[1]+'</button>';
+  }).join('');
+  d.onclick=function(e){
+    const k=e.target.dataset&&e.target.dataset.k; if(!k||k===_clusterMode) return;
+    _clusterMode=k;
+    d.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===k); });
+    const u=new URL(location.href); if(k==='dist') u.searchParams.set('cluster','dist'); else u.searchParams.delete('cluster');
+    history.replaceState(history.state,'',u);
+    putMarkers(_shownList||SG);
+  };
+  document.body.appendChild(d);
 }
 function _onClusterClick(ev,cluster,m){
   pinClusterClick(ev,cluster,m);
