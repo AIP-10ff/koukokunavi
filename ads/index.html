@@ -72,6 +72,17 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 #cl-mode span{padding:0 8px;color:#555}
 #cl-mode button{border:none;background:#fff;color:#1f2937;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
 #cl-mode button.on{background:#1f2937;color:#fff}
+/* スマホアプリの案内（11/5）。メニューから開くポップアップ。PC は QR コード 2 つ、スマホはストアへのボタン */
+.ad-note{display:inline-block;font-size:11px;color:#e53935;font-weight:700;margin-left:6px}
+.ad-qrs{display:flex;justify-content:center;gap:20px;margin:12px 0 4px}
+.ad-qr{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#333}
+.ad-qr div{width:120px;height:120px}
+.ad-btns{display:none;flex-direction:column;gap:8px;margin:12px 0 4px}
+.ad-btns a{text-align:center;background:var(--org);color:#fff;text-decoration:none;font-weight:800;border-radius:20px;padding:10px 14px}
+@media(max-width:699px){
+  .ad-qrs{display:none}
+  .ad-btns{display:flex}
+}
 .area-badge{display:flex;flex-direction:column;align-items:center;min-width:60px;background:#fff;border:2px solid var(--org);border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);overflow:hidden;cursor:pointer;line-height:1}
 .area-badge .ab-name{width:100%;box-sizing:border-box;background:var(--org);color:#fff;font-size:13px;font-weight:900;padding:4px 8px;text-align:center;white-space:nowrap}
 .area-badge .ab-cnt{padding:3px 8px 4px;color:#333;font-size:12px;font-weight:700}
@@ -754,7 +765,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
   <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
   <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
-  <div class="menu-row" id="menu-install" onclick="showInstall()"><span class="mi">📲</span>アプリとして使う（ホーム画面に追加）</div>
+  <div class="menu-row" id="menu-appdl" onclick="showAppDl()" style="display:none"><span class="mi">📱</span>スマホアプリ（QR コード）</div>
   <div class="menu-row" onclick="window.open('./terms.html','_blank','noopener')"><span class="mi">📄</span>利用規約</div>
   <div class="menu-row" onclick="window.open('./privacy.html','_blank','noopener')"><span class="mi">🔒</span>プライバシーポリシー</div>
   <div class="menu-foot">広告ナビ © テンフィールズファクトリー</div>
@@ -1671,6 +1682,29 @@ function addClusterModeToggle(){
     putMarkers(_shownList||SG);
   };
   document.body.appendChild(d);
+}
+// スマホアプリの案内（11/5 AD MTG）。メニューの「スマホアプリ」から、「アプリとして使う」と同じポップアップで出す。
+// PC は QR コード（iPhone／Android）、スマホはストアへのボタン。
+// ストア URL（shared-data.js の KN_APP_*_URL）が空のあいだは、検証環境とローカルだけ見本として出す（QR の中身は仮に本番の地図の URL）
+const _appDlReady=()=>!!(KN_APP_IOS_URL||KN_APP_ANDROID_URL);
+function showAppDl(){
+  if(mOpen)toggleMenu();
+  const ready=_appDlReady(), tmp='https://app.signage-ad.com/', sp=matchMedia('(max-width:699px)').matches;
+  const stores=[['iPhone','App Store',KN_APP_IOS_URL||(ready?'':tmp)],['Android','Google Play',KN_APP_ANDROID_URL||(ready?'':tmp)]].filter(x=>x[2]);
+  const ua=navigator.userAgent, os=/iPhone|iPad|iPod/.test(ua)?'iPhone':/Android/.test(ua)?'Android':'';
+  const mine=stores.filter(x=>x[0]===os), btns=mine.length?mine:stores;
+  openModal('<h3>📱 スマホアプリ'+(ready?'':'<span class="ad-note">公開前の見本</span>')+'</h3>'
+    +'<p style="font-size:13px;color:#555;margin:8px 0">'+(sp?'ストアからアプリを入れられます。':'スマートフォンのカメラで読み取ると、ストアのページが開きます。')+'</p>'
+    +'<div class="ad-qrs">'+stores.map((x,i)=>'<div class="ad-qr"><div id="ad-qr'+i+'"></div>'+x[0]+'（'+x[1]+'）</div>').join('')+'</div>'
+    +'<div class="ad-btns" id="ad-btns">'+btns.map(x=>'<a href="'+x[2]+'" target="_blank" rel="noopener">'+x[1]+' で開く</a>').join('')+'</div>');
+  if(sp) return; // スマホは QR を使わないので読み込まない
+  const draw=()=>stores.forEach((x,i)=>{ try{ new QRCode($('ad-qr'+i),{text:x[2],width:120,height:120,correctLevel:QRCode.CorrectLevel.M}); }catch(e){} });
+  if(window.QRCode) return draw();
+  const sc=document.createElement('script');
+  sc.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  sc.onload=draw;
+  sc.onerror=()=>{ const q=document.querySelector('.ad-qrs'),b=$('ad-btns'); if(q)q.style.display='none'; if(b)b.style.display='flex'; }; // QR が出せないときはボタンにする
+  document.head.appendChild(sc);
 }
 function _onClusterClick(ev,cluster,m){
   pinClusterClick(ev,cluster,m);
@@ -2823,27 +2857,12 @@ document.addEventListener('keydown',function(e){
   else if(e.key==='ArrowRight'){ e.preventDefault(); history.forward(); }
 });
 
-// ===== アプリとして使う（PWA）=====
-// Android の Chrome などは「インストール」の確認をそのまま出せる（beforeinstallprompt）。
-// iPhone の Safari は自動では出せないので、共有ボタン →「ホーム画面に追加」の手順を案内する。
-// LINE などのアプリ内ブラウザでは追加できないので、Safari／Chrome で開き直すよう案内する。
-let _installEvt=null;
-const _isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_installEvt=e;});
-window.addEventListener('appinstalled',()=>{_installEvt=null;toast('ホーム画面に追加しました');});
-function showInstall(){
-  if(mOpen)toggleMenu();
-  if(_isStandalone()){toast('アプリとして開いています');return;}
-  if(_installEvt){const e=_installEvt;_installEvt=null;e.prompt();return;}
-  const ua=navigator.userAgent, inApp=/Line\/|FBAN|FBAV|Instagram|LINE WORKS|NAVER/i.test(ua), ios=/iPhone|iPad|iPod/.test(ua);
-  const steps=inApp
-    ?'<p>このブラウザ（LINE など）からは追加できません。右上や下のメニューから<b>「Safari で開く」「ブラウザで開く」</b>を選び、開き直してから、もう一度このメニューを押してください。</p>'
-    :ios
-    ?'<ol style="padding-left:1.2em;line-height:1.9"><li>画面下（iPad は右上）の <b>共有ボタン</b>（□に↑）を押す</li><li><b>「ホーム画面に追加」</b>を選ぶ</li><li>右上の <b>「追加」</b>を押す</li></ol>'
-    :'<ol style="padding-left:1.2em;line-height:1.9"><li>ブラウザの <b>メニュー</b>（︙）を開く</li><li><b>「アプリをインストール」</b>または<b>「ホーム画面に追加」</b>を選ぶ</li></ol>';
-  openModal(`<h3>📲 アプリとして使う</h3><p style="font-size:13px;color:#555;margin:8px 0">ホーム画面に「広告ナビ」のアイコンが追加され、アプリと同じように開けます。機能は Web 版と同じです。</p><div style="font-size:13px;color:#333">${steps}</div>`);
-}
-if(_isStandalone()){const r=document.getElementById('menu-install');if(r)r.style.display='none';}
+// ===== スマホアプリ =====
+// 「ホーム画面に追加」の案内は 11/5 眞野さんの指示で外し、ストアのアプリ（メニューの「スマホアプリ（QR コード）」）に一本化した。
+// ブラウザが自分で出す「インストール」の案内も出さない
+window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
+// スマホアプリの行は、ストア URL が入るか、検証環境・ローカルのときだけ出す
+if(_appDlReady()||/^(app2\.|localhost$|127\.)/.test(location.hostname)){const r=document.getElementById('menu-appdl');if(r)r.style.display='';}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
 }
