@@ -1165,12 +1165,12 @@ function initRanges(){
 // ・地図クリックで「検索結果リスト・履歴パネル・メニュー」を全て閉じる
 // ※周辺施設(🏪)・現在地(📍)はフェーズ2/3で移植予定（現在は非表示）
 async function initMap(lat,lng){
-  if(map){_setView(lat,lng,13);return;}
+  if(map){_setView(lat,lng,_startZoom());return;}
   const {Map,InfoWindow}=await google.maps.importLibrary("maps");
   const {AdvancedMarkerElement}=await google.maps.importLibrary("marker");
   _GM={Map,InfoWindow,AdvancedMarkerElement};
   map=new Map(document.getElementById('map'),{
-    center:{lat:lat,lng:lng},zoom:13,minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
+    center:{lat:lat,lng:lng},zoom:_startZoom(),minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
     mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
     keyboardShortcuts:!matchMedia('(pointer:coarse)').matches, // タッチ端末（スマホ等）では下部の「キーボード ショートカット」を出さない
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
@@ -1182,7 +1182,7 @@ async function initMap(lat,lng){
   // addFacilityControl();
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
   addAreaSelectControl();  // ✏️ 囲んで探す（10/22 社長の指示 5）
-  addClusterModeToggle();  // まとめ方の切り替え（検証環境だけ）
+  addMapViewToggle();      // 地図の表示の切り替え（今・A・B。検証環境だけ）
   facilityLayer=null;
   function _updateZoomBadge(){
     const z=map.getZoom();
@@ -1592,7 +1592,16 @@ const _clusterRenderer={
 // まとまりは地方名・都道府県名と件数の札で出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
 // 11/4 眞野さん：札は地方・県の真ん中に置き、隣の札と重なるときは押し離す（設置場所の平均だと関西〜関東で重なった）
 let _clusterMode=new URLSearchParams(location.search).get('cluster')==='dist'?'dist':'pref';
-const REGION_MAX_ZOOM=6, PREF_SPLIT_ZOOM=8;
+// 11/6 AD MTG（姫島さん）：「もうちょっと拡大してからピンが出るぐらいでもいい」「地方レベルぐらいで開く」。
+// どちらの意味か決めるため、検証環境で 3 つを見比べる（URL の ?view=a / ?view=b、本番は「今」のまま）
+//   今 … 今までどおり（ズーム 13 で開く・ズーム 8 からピン）
+//   A  … ピンが出るのを遅らせる（ズーム 10 まで都道府県の札。情報量を減らす）
+//   B  … 開いたときの広さを地方レベルに（ズーム 7 で開く）
+const _VIEW_OPTS={now:{start:13,split:8},a:{start:13,split:10},b:{start:7,split:8}};
+let _viewMode=(function(){ const v=new URLSearchParams(location.search).get('view'); return _VIEW_OPTS[v]&&/^(app2\.|localhost$|127\.)/.test(location.hostname)?v:'now'; })();
+const REGION_MAX_ZOOM=6;
+let PREF_SPLIT_ZOOM=_VIEW_OPTS[_viewMode].split;
+function _startZoom(){ return _VIEW_OPTS[_viewMode].start; }
 function _prefLevel(z){ return z>=PREF_SPLIT_ZOOM?'dist':(z<=REGION_MAX_ZOOM?'region':'pref'); }
 // 地方の札を置く位置（地図で見たときの地方の真ん中あたり）
 const REGION_CENTER={'北海道':[43.3,142.8],'東北':[39.4,140.9],'関東':[36.1,139.7],'中部':[36.3,137.7],
@@ -1666,20 +1675,22 @@ function _makePrefAlgorithm(){
     }
   };
 }
-// まとめ方の切り替え（11/4・検証環境とローカルだけ）。若尾さん・山川さんが URL を変えずに 2 つを見比べられるように。本番には出さない
-function addClusterModeToggle(){
+// 地図の表示の切り替え（11/6・検証環境とローカルだけ）。姫島さん・市川さんが URL を変えずに 3 つを見比べられるように。本番には出さない
+// （11/4 の「まとめ方 距離／地方・県」の切り替えは、地方・県の採用が決まったので外した。距離は ?cluster=dist で今も見られる）
+function addMapViewToggle(){
   if(!/^(app2\.|localhost$|127\.)/.test(location.hostname)||$('cl-mode')) return;
   const d=document.createElement('div'); d.id='cl-mode';
-  d.innerHTML='<span>まとめ方</span>'+[['dist','距離'],['pref','地方・県']].map(function(o){
-    return '<button data-k="'+o[0]+'"'+(o[0]===_clusterMode?' class="on"':'')+'>'+o[1]+'</button>';
+  d.innerHTML='<span>地図の表示</span>'+[['now','今'],['a','A ピン遅め'],['b','B 広く開く']].map(function(o){
+    return '<button data-k="'+o[0]+'"'+(o[0]===_viewMode?' class="on"':'')+'>'+o[1]+'</button>';
   }).join('');
   d.onclick=function(e){
-    const k=e.target.dataset&&e.target.dataset.k; if(!k||k===_clusterMode) return;
-    _clusterMode=k;
+    const k=e.target.dataset&&e.target.dataset.k; if(!k||k===_viewMode) return;
+    _viewMode=k; PREF_SPLIT_ZOOM=_VIEW_OPTS[k].split;
     d.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===k); });
-    const u=new URL(location.href); if(k==='dist') u.searchParams.set('cluster','dist'); else u.searchParams.delete('cluster');
+    const u=new URL(location.href); if(k==='now') u.searchParams.delete('view'); else u.searchParams.set('view',k);
     history.replaceState(history.state,'',u);
     putMarkers(_shownList||SG);
+    if(map&&k==='b') map.setZoom(_startZoom()); // B は開いたときの広さの案なので、その広さにして見せる（今・A は今のズームのまま見比べる）
   };
   document.body.appendChild(d);
 }
