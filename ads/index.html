@@ -67,11 +67,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 /* 囲んで探す（10/22 社長の指示 5）・一覧に戻る */
 #btn-area{position:fixed;right:10px;top:calc(var(--hdr) + 10px);z-index:801;height:36px;padding:0 12px;border-radius:18px;background:#fff;color:var(--org);border:2px solid var(--org);box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
 #btn-area.active{background:var(--org);color:#fff}
-/* まとめ方の切り替え（検証環境だけ）・地方／都道府県の札（11/4） */
-#cl-mode{position:fixed;right:10px;top:calc(var(--hdr) + 54px);z-index:801;display:flex;align-items:center;background:#fff;border:2px solid #1f2937;border-radius:18px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:12px;font-weight:700}
-#cl-mode span{padding:0 8px;color:#555}
-#cl-mode button{border:none;background:#fff;color:#1f2937;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
-#cl-mode button.on{background:#1f2937;color:#fff}
 /* スマホアプリの案内（11/5）。メニューから開くポップアップ。PC は QR コード 2 つ、スマホはストアへのボタン */
 .ad-note{display:inline-block;font-size:11px;color:#e53935;font-weight:700;margin-left:6px}
 .ad-qrs{display:flex;justify-content:center;gap:20px;margin:12px 0 4px}
@@ -1165,12 +1160,12 @@ function initRanges(){
 // ・地図クリックで「検索結果リスト・履歴パネル・メニュー」を全て閉じる
 // ※周辺施設(🏪)・現在地(📍)はフェーズ2/3で移植予定（現在は非表示）
 async function initMap(lat,lng){
-  if(map){_setView(lat,lng,_startZoom());return;}
+  if(map){_setView(lat,lng,13);return;}
   const {Map,InfoWindow}=await google.maps.importLibrary("maps");
   const {AdvancedMarkerElement}=await google.maps.importLibrary("marker");
   _GM={Map,InfoWindow,AdvancedMarkerElement};
   map=new Map(document.getElementById('map'),{
-    center:{lat:lat,lng:lng},zoom:_startZoom(),minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
+    center:{lat:lat,lng:lng},zoom:13,minZoom:5,mapId:"4ef6e0c1e3644c4183545b90",
     mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,
     keyboardShortcuts:!matchMedia('(pointer:coarse)').matches, // タッチ端末（スマホ等）では下部の「キーボード ショートカット」を出さない
     restriction:{latLngBounds:{north:50,south:22,east:156,west:120},strictBounds:false}
@@ -1182,7 +1177,6 @@ async function initMap(lat,lng){
   // addFacilityControl();
   addLocateControl();      // 📍 現在地ボタン（フェーズ3）
   addAreaSelectControl();  // ✏️ 囲んで探す（10/22 社長の指示 5）
-  addMapViewToggle();      // 地図の表示の切り替え（今・A・B。検証環境だけ）
   facilityLayer=null;
   function _updateZoomBadge(){
     const z=map.getZoom();
@@ -1592,16 +1586,9 @@ const _clusterRenderer={
 // まとまりは地方名・都道府県名と件数の札で出す。押すとその地方・県に寄り、一段細かいまとめ方に切り替わる
 // 11/4 眞野さん：札は地方・県の真ん中に置き、隣の札と重なるときは押し離す（設置場所の平均だと関西〜関東で重なった）
 let _clusterMode=new URLSearchParams(location.search).get('cluster')==='dist'?'dist':'pref';
-// 11/6 AD MTG（姫島さん）：「もうちょっと拡大してからピンが出るぐらいでもいい」「地方レベルぐらいで開く」。
-// どちらの意味か決めるため、検証環境で 3 つを見比べる（URL の ?view=a / ?view=b、本番は「今」のまま）
-//   今 … 今までどおり（ズーム 13 で開く・ズーム 8 からピン）
-//   A  … ピンが出るのを遅らせる（ズーム 10 まで都道府県の札。情報量を減らす）
-//   B  … 開いたときの広さを地方レベルに（ズーム 7 で開く）
-const _VIEW_OPTS={now:{start:13,split:8},a:{start:13,split:10},b:{start:7,split:8}};
-let _viewMode=(function(){ const v=new URLSearchParams(location.search).get('view'); return _VIEW_OPTS[v]&&/^(app2\.|localhost$|127\.)/.test(location.hostname)?v:'now'; })();
-const REGION_MAX_ZOOM=6;
-let PREF_SPLIT_ZOOM=_VIEW_OPTS[_viewMode].split;
-function _startZoom(){ return _VIEW_OPTS[_viewMode].start; }
+// 11/6 AD MTG（姫島さん）：「もうちょっと拡大してからピンが出るぐらいでもいい」。app2 で 3 案を見比べ、眞野さんが A に決定（11/6）。
+// ピンが出始めるのをズーム 8 → 10 に遅らせ、9 までは都道府県の札にして情報量を減らす
+const REGION_MAX_ZOOM=6, PREF_SPLIT_ZOOM=10;
 function _prefLevel(z){ return z>=PREF_SPLIT_ZOOM?'dist':(z<=REGION_MAX_ZOOM?'region':'pref'); }
 // 地方の札を置く位置（地図で見たときの地方の真ん中あたり）
 const REGION_CENTER={'北海道':[43.3,142.8],'東北':[39.4,140.9],'関東':[36.1,139.7],'中部':[36.3,137.7],
@@ -1674,25 +1661,6 @@ function _makePrefAlgorithm(){
       return {clusters:clusters,changed:true};
     }
   };
-}
-// 地図の表示の切り替え（11/6・検証環境とローカルだけ）。姫島さん・市川さんが URL を変えずに 3 つを見比べられるように。本番には出さない
-// （11/4 の「まとめ方 距離／地方・県」の切り替えは、地方・県の採用が決まったので外した。距離は ?cluster=dist で今も見られる）
-function addMapViewToggle(){
-  if(!/^(app2\.|localhost$|127\.)/.test(location.hostname)||$('cl-mode')) return;
-  const d=document.createElement('div'); d.id='cl-mode';
-  d.innerHTML='<span>地図の表示</span>'+[['now','今'],['a','A ピン遅め'],['b','B 広く開く']].map(function(o){
-    return '<button data-k="'+o[0]+'"'+(o[0]===_viewMode?' class="on"':'')+'>'+o[1]+'</button>';
-  }).join('');
-  d.onclick=function(e){
-    const k=e.target.dataset&&e.target.dataset.k; if(!k||k===_viewMode) return;
-    _viewMode=k; PREF_SPLIT_ZOOM=_VIEW_OPTS[k].split;
-    d.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===k); });
-    const u=new URL(location.href); if(k==='now') u.searchParams.delete('view'); else u.searchParams.set('view',k);
-    history.replaceState(history.state,'',u);
-    putMarkers(_shownList||SG);
-    if(map&&k==='b') map.setZoom(_startZoom()); // B は開いたときの広さの案なので、その広さにして見せる（今・A は今のズームのまま見比べる）
-  };
-  document.body.appendChild(d);
 }
 // スマホアプリの案内（11/5 AD MTG）。メニューの「スマホアプリ」から、「アプリとして使う」と同じポップアップで出す。
 // PC は QR コード（iPhone／Android）、スマホはストアへのボタン。
