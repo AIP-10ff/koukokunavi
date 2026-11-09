@@ -100,6 +100,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .pp-body{padding:14px 16px}
 .pp-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:7px}
 .pp-price{font-size:16px;font-weight:700;color:var(--org);margin:10px 0 12px}
+.no-ad{color:#888;font-size:13px;font-weight:700}
 .btn-check{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:6px;padding:11px;font-size:15px;font-weight:700;cursor:pointer;text-align:center}
 .btn-check:hover{background:var(--org2)}
 #detail-panel{position:fixed;top:var(--hdr);left:0;right:0;bottom:0;background:#f0f0f0;z-index:2200;overflow:hidden;transform:translateY(100%);transition:transform .28s ease}
@@ -1674,6 +1675,10 @@ function _trfHtml(trf){
   const v=trf.replace(/[（(]推定値[）)]/,'').trim();
   return `<div class="row">🚗 交通量　<span>${v}</span></div><div class="row" style="font-size:11px;color:#888">${est?'※国土交通省による推定値<br>':''}${TRF_SOURCE}</div>`;
 }
+// 稼働中の FLASH は今は広告を募集していない（11/9 AD MTG：ピンはそのまま、広告欄に「現在募集しておりません」）。
+// 設置予定（PLAN）の FLASH は投資家向けなので対象外。募集を始めたらここを外す
+const NO_AD_MSG='現在募集しておりません';
+function _noAdRecruit(s){ return _pinShape(s)==='flash'&&s.status!=='PLAN'; }
 /** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・料金・詳細ボタン）*/
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
@@ -1682,7 +1687,7 @@ function popupHtml(s){
     <div class="pp-body">
       <div class="pp-row">🏠 ${s.addr||'—'}</div>
       <div class="pp-row">📐 ${fmtSize(s.size)}</div>
-      <div class="pp-price">${price}〜</div>
+      <div class="pp-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:price+'〜'}</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>
   </div>`;
@@ -1738,7 +1743,8 @@ function openDetail(id){
   if(mainUrl){$('dp-img').innerHTML=`<img src="${mainUrl}" style="width:100%;height:100%;object-fit:cover;">`;$('dp-img').style.background='#e8e0d4';}else{$('dp-img').textContent=s.e||'🏢';$('dp-img').style.background='#e8e0d4';}
   const strip=$('dp-photo-strip');
   if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
-  const _st=s.status||'';
+  const _noAd=_noAdRecruit(s);
+  const _st=_noAd?'':(s.status||''); // 稼働中 FLASH の「空き」は広告の空きと読まれるので出さない
   const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
   $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div>${_trfHtml(s.trf)}`;
   // 人流（滞在人口）は住んでいる人の数で、通る人の数ではないため出さない（10/14 AD MTG）。DB の ped 列は残す
@@ -1754,7 +1760,7 @@ function openDetail(id){
     // 掲載期間はプラン名から出す（提案書 p13：年間契約＝12か月、月次契約＝1か月）。
     // 回数は 15 秒枠が 5 分に 1 回 → 24 時間で 288 回（10/13 中井さん）。夜間に消灯する設置先もあるため表の下に注釈
     const term=p=>/年間/.test(p.n||'')?'12か月':'1か月';
-    if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>${term(p)}</td><td>1日288回※</td><td class="price">${p.p}</td></tr>`).join('');}
+    if(tbl){const tb=tbl.querySelector('tbody');if(tb)tb.innerHTML=_noAd?`<tr><td colspan="4" class="no-ad">${NO_AD_MSG}</td></tr>`:(s.plans||[]).map(p=>`<tr><td>${p.n}</td><td>${term(p)}</td><td>1日288回※</td><td class="price">${p.p}</td></tr>`).join('');}
   },60);
   $('detail-panel').classList.add('open');_updListBack(); // 詳細の上に「一覧に戻る」を出さない
   document.querySelectorAll('.dp-left-col,.dp-right-col,.dp-page-body').forEach(el=>el.scrollTop=0);
@@ -2296,7 +2302,7 @@ function showList(items,label){
     const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
     const mpUrl=mp?photoCache[mp.id]||'':'';
     const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:(s.e||'🏢');
-    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}</div><div class="li-price">${s.plans&&s.plans[0]?s.plans[0].p:'—'}〜</div></div></div>`;
+    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}</div><div class="li-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:(s.plans&&s.plans[0]?s.plans[0].p:'—')+'〜'}</div></div></div>`;
   }).join('');
   $('list-panel').classList.add('open');
   $('lp-items').scrollTop=0;
