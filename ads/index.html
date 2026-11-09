@@ -842,7 +842,6 @@ function _loadSgFromServer(showToast){
   if(typeof knFetchSignages !== 'function'){ if(!_sgFromServer) _sgStatus('error'); return; }
   knFetchSignages().then(function(list){
     if(!list.length){ if(!_sgFromServer) _sgStatus('error'); return; }
-    _sgStatus(null);
     if(typeof knApplyMediaUrls === 'function') knApplyMediaUrls(list); // 写真の一時 URL は毎回入れ直す（変更が無くても）
     const sig = JSON.stringify(list.map(s => [s.id, s.updated_at]));
     if(sig === _sgServerSig) return; // 変更なし
@@ -1492,6 +1491,7 @@ function putMarkers(list){
   });
   _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:_onClusterClick,
     algorithm:_clusterMode==='pref'?_makePrefAlgorithm():undefined});
+  if(_sgFromServer) _sgStatus(null); // 「読み込んでいます…」は、サーバーの掲載情報を地図に置いた時点で消す（11/9 眞野さん：ピンが出るまで出しておく）
   _tryDeepOpen(); // 個別ページの「地図で見る」から来たときは、ピンがそろった時点でそのピンの詳細を開く
 }
 
