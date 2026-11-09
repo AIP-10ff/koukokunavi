@@ -1082,6 +1082,7 @@ function closeAdmin(){
 // ===== SAVE =====
 function saveSign(){
   if(editingId===null) return;
+  if(_srvBlocked()) return;
   // 写真・資料をサーバー（S3）に上げている途中なら、終わるまで待ってもらう（key が付く前に保存すると他の人に見えない）
   if(tmpPhotos.concat(tmpDocs).some(function(x){return x._uploading;})){toast('写真・資料をサーバーに上げています。数秒後にもう一度保存してください');return;}
   var s=find(editingId); if(!s) return;
@@ -1144,6 +1145,7 @@ function closeDelModal(){
 }
 function deleteSign(){
   if(editingId===null) return;
+  if(_srvBlocked()) return;
   var s=find(editingId); if(!s) return;
   var name=s.name;
   // Step 1
@@ -2248,15 +2250,23 @@ function _srvUploadMedia(item, blob, filename, kind){
     toast('⚠ '+(kind==='doc'?'資料':'写真')+'をサーバーに上げられませんでした：'+_srvErr(e)+'（この端末には保存済み）');
   });
 }
+// サーバー接続中なのに一覧を読み込めなかったら true。このまま保存すると、画面に残っている古い一覧で
+// サーバーの内容を上書きしてしまうため、保存・削除・取り込みを止める（11/9。W共有 Q3）
+var _srvLoadFailed=false;
+function _srvBlocked(){
+  if(_srvToken()&&_srvLoadFailed){ toast('⚠ サーバーの一覧を読み込めていないため保存できません。ページを再読み込みしてください'); return true; }
+  return false;
+}
 function _srvLoadFromServer(showToast){
   return knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){
+    _srvLoadFailed=false;
     if(typeof knApplyMediaUrls==='function') knApplyMediaUrls(list);
     if(!list.length){ if(showToast) toast('サーバーにはまだピンがありません。「この端末のピンを取り込み」で送れます'); return; }
     var prev={}; SG.forEach(function(s){prev[s.id]=s;});
     SG=list.map(function(s){ var o=prev[s.id]||{}; s.e=o.e||'📺'; s.favCount=o.favCount||0; return s; });
     render(); renderList(SG); try{updateStats();}catch(e){}
     if(showToast) toast('サーバーのピン '+list.length+' 件を表示しています');
-  });
+  }).catch(function(e){ _srvLoadFailed=true; throw e; });
 }
 function _srvSaveOne(s){
   var t=_srvToken(); if(!t) return;
@@ -2278,6 +2288,7 @@ function _srvDeleteOne(id,name){
 }
 function srvImportLocal(){
   var t=_srvToken(); if(!t) return;
+  if(_srvBlocked()) return;
   if(!SG.length){toast('この端末にピンがありません');return;}
   if(!confirm('この端末のピン '+SG.length+' 件をサーバーへ送ります。\n同じ ID のピンはこの端末の内容で上書きされます。よろしいですか？')) return;
   var err=document.getElementById('srv-err'); err.textContent='取り込み中…';
