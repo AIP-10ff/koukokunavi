@@ -297,19 +297,16 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .tags{display:flex;flex-wrap:wrap;gap:5px}
 .tag{padding:3px 9px;border-radius:12px;border:1px solid #ddd;font-size:11px;cursor:pointer;color:#666;transition:all .15s;background:#fff}
 .tag.on{background:var(--org);color:#fff;border-color:var(--org)}
-.dual-range-wrap{position:relative;height:36px;margin:4px 0 2px}
-.dual-range-track{position:absolute;top:50%;left:8px;right:8px;height:4px;background:#e0e0e0;border-radius:2px;transform:translateY(-50%)}
-.dual-range-fill{position:absolute;height:4px;background:var(--org);border-radius:2px}
-.dual-range-wrap input[type=range]{position:absolute;width:calc(100% - 0px);top:50%;transform:translateY(-50%);left:0;appearance:none;-webkit-appearance:none;background:transparent;pointer-events:none;margin:0;padding:0;height:36px}
-.dual-range-wrap input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--org);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;pointer-events:all}
-.dual-range-wrap input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--org);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;pointer-events:all}
+/* 掲載情報の読み込み中・読み込めなかったときの表示（11/9）。地図の上の真ん中に出す */
+#sg-status{position:fixed;left:50%;top:calc(var(--hdr) + 12px);transform:translateX(-50%);z-index:850;display:flex;align-items:center;gap:10px;max-width:calc(100% - 24px);background:#fff;border:2px solid var(--org);border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.25);padding:6px 8px 6px 14px;font-size:13px;font-weight:700;color:#333}
+#sg-status[hidden]{display:none}
+#sg-status button{border:none;background:var(--org);color:#fff;border-radius:14px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .region-block{margin-bottom:8px}
 .region-head{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .region-label{font-size:10px;font-weight:700;color:#fff;background:var(--org);display:inline-block;padding:2px 8px;border-radius:10px}
 .btn-select-all{background:none;border:1px solid var(--org);color:var(--org);border-radius:10px;padding:2px 8px;font-size:10px;cursor:pointer;font-weight:600;white-space:nowrap;line-height:1.4}
 .btn-select-all:hover{background:var(--org);color:#fff}
 .fp-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
-.range-edge-labels{display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:2px}
 .btn-apply{display:block;width:calc(100% - 28px);margin:12px 14px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;font-weight:700;cursor:pointer}
 #hist-wrap{position:fixed;left:0;top:var(--hdr);width:260px;height:calc(100vh - var(--hdr));z-index:1800;transform:translateX(-100%);transition:transform .18s ease;overflow:visible}
 #hist-wrap.open{transform:translateX(0)}
@@ -488,6 +485,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 </div>
 
 <div id="map"></div>
+<div id="sg-status" role="status" hidden></div>
 <!-- 施設選択パネル -->
 <div id="facility-panel">
   <div class="fp-title">
@@ -707,12 +705,6 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
           <span class="tag" data-st="on" onclick="tt(this)">稼働中</span><span class="tag" data-st="plan" onclick="tt(this)">設置予定</span>
         </div>
       </div>
-      <div>
-        <h4 style="font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">予算</h4>
-        <div class="range-val-display" id="bgt-disp" style="font-size:11px;color:#888;margin-bottom:2px">下限なし 〜 上限なし</div>
-        <div class="dual-range-wrap"><div class="dual-range-track"><div class="dual-range-fill" id="bgt-fill" style="left:0%;width:100%"></div></div><input type="range" id="bgt-lo" min="0" max="10" value="0" step="1"><input type="range" id="bgt-hi" min="0" max="10" value="10" step="1"></div>
-        <div class="range-edge-labels"><span>下限なし</span><span>上限なし</span></div>
-      </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto">
         <button id="btn-all-toggle" onclick="toggleSelectAll()" style="width:100%;background:#fff;color:var(--org);border:1px solid var(--org);border-radius:4px;padding:9px 6px;font-size:11px;font-weight:700;cursor:pointer">デフォルトに戻す</button>
         <button class="btn-apply" style="margin:0;width:100%;font-size:11px;padding:9px 6px" onclick="applyFilter()">この条件で検索</button>
@@ -771,32 +763,12 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 
 <script>
 // ===== DATA =====
-const DEFAULT_SG = window.getKokokunaviDefaultSG();
-// 管理者画面で保存したデータを読み込む（なければデフォルト使用）
-function loadSG() {
-  try {
-    const saved = localStorage.getItem('kokoknavi_sg');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const defMap = {};
-        DEFAULT_SG.forEach(d => { defMap[d.id] = d; });
-        parsed.forEach(s => {
-          if (!s.yomi && defMap[s.id] && defMap[s.id].yomi) s.yomi = defMap[s.id].yomi;
-        });
-        return parsed;
-      }
-    }
-  } catch(e) {}
-  return DEFAULT_SG;
-}
-
 // normalizePlan は shared-data.js で定義
 
-let SG = loadSG().map(s => ({
-  ...s,
-  plans: (s.plans || []).map(normalizePlan)
-}));
+// 掲載情報はサーバー（/api/v1/signages/）からだけ読む。最初は空で「読み込み中」を出し、届いたら地図に出す。
+// 以前は端末内（kokoknavi_sg）か shared-data.js の見本 5 件を先に出していたが、通信に失敗すると
+// 古い見本のまま何も知らせずに残っていたため、見本は使わない（11/6 W共有 Q1〜Q5・11/9 眞野さん決定）
+let SG = [];
 
 
 // サーバー（/api/v1/signages/）の掲載情報を表示中なら true（_loadSgFromServer で設定）
@@ -855,11 +827,21 @@ document.addEventListener('visibilitychange', function(){
 
 // ===== サーバーの掲載情報（Phase2 管理系 API） =====
 // 管理者画面でサーバーに保存したピンを、全利用者の画面に出す。
-// サーバーに 1 件以上あればそれを正とし、取得失敗・0 件のときは従来どおり（localStorage → shared-data.js の既定データ）のまま。
+// 一度も取れていないときに失敗・0 件なら、地図の上に「読み込めませんでした」と「再読み込み」を出す。
+// 一度取れたあとの定期更新で失敗したときは、表示中の掲載情報はそのまま残し、短いメッセージだけ出す。
+function _sgStatus(mode){
+  const el=document.getElementById('sg-status'); if(!el) return; // 読み込み直後に呼ぶので $() ではなく直接取る
+  if(!mode){ el.hidden=true; return; }
+  el.hidden=false;
+  el.innerHTML=mode==='loading'
+    ?'<span>サイネージの情報を読み込んでいます…</span>'
+    :'<span>サイネージの情報を読み込めませんでした</span><button type="button" onclick="_sgRetry()">再読み込み</button>';
+}
+function _sgRetry(){ _sgStatus('loading'); _loadSgFromServer(false); }
 function _loadSgFromServer(showToast){
-  if(typeof knFetchSignages !== 'function') return;
+  if(typeof knFetchSignages !== 'function'){ if(!_sgFromServer) _sgStatus('error'); return; }
   knFetchSignages().then(function(list){
-    if(!list.length) return;
+    if(!list.length){ if(!_sgFromServer) _sgStatus('error'); return; }
     if(typeof knApplyMediaUrls === 'function') knApplyMediaUrls(list); // 写真の一時 URL は毎回入れ直す（変更が無くても）
     const sig = JSON.stringify(list.map(s => [s.id, s.updated_at]));
     if(sig === _sgServerSig) return; // 変更なし
@@ -883,8 +865,12 @@ function _loadSgFromServer(showToast){
       }
     });
     if(showToast && !first) toast('掲載情報を更新しました');
-  }).catch(function(){ /* API 未設置・通信失敗は静かに従来表示のまま */ });
+  }).catch(function(){
+    if(!_sgFromServer) _sgStatus('error');           // まだ一度も取れていない
+    else if(showToast) toast('最新の情報を取得できませんでした'); // 表示中の掲載情報はそのまま
+  });
 }
+_sgStatus('loading');
 _loadSgFromServer(false);
 // 開いたまま放置されている画面にも反映する（5 分ごと＋タブに戻ったとき）
 // お気に入りも同じタイミングで読み直す（別の端末で付け外ししたものを反映する）
@@ -1122,36 +1108,6 @@ async function smsVerify(){
 
 // お気に入りIDのSet。localStorageから起動時に読み込む
 let favs=(()=>{try{return new Set(JSON.parse(localStorage.getItem('kokoknavi_favs')||'[]'));}catch(e){return new Set();}})();
-
-// ===== デュアルレンジスライダー =====
-// 絞り込みフィルターの「予算」に使う範囲指定UI。
-// 「通行者数」は人流を外したため 10/14 に削除（AD MTG：滞在人口は通る人の数ではない）。
-// 2本のinput[type=range]を重ね、lower/upper の値で塗りつぶし幅を制御する。
-const RC={
-  bgt:{steps:['下限なし','30万円','40万円','50万円','60万円','70万円','80万円','90万円','100万円','120万円','上限なし']}
-};
-
-/**
- * レンジスライダーの表示を更新する（塗りつぶし位置・ラベルテキスト）。
- * lo > hi になった場合は互いを入れ替えて逆転を防ぐ。
- * @param {string} key - 'bgt'
- */
-function updateRange(key){
-  const lo=document.getElementById(key+'-lo'),hi=document.getElementById(key+'-hi');
-  const fill=document.getElementById(key+'-fill'),disp=document.getElementById(key+'-disp');
-  let lv=parseInt(lo.value),hv=parseInt(hi.value);
-  if(hv<=lv){hi.value=lv+1;hv=lv+1;}if(lv>=hv){lo.value=hv-1;lv=hv-1;}
-  const pct=100/10;fill.style.left=(lv*pct)+'%';fill.style.width=((hv-lv)*pct)+'%';
-  disp.textContent=(lv===0?'下限なし':RC[key].steps[lv])+' 〜 '+(hv===10?'上限なし':RC[key].steps[hv]);
-}
-
-/** レンジスライダーにイベントリスナーを設定し初期表示を行う（ページロード時に1回呼ぶ） */
-function initRanges(){
-  ['bgt'].forEach(k=>{
-    const lo=document.getElementById(k+'-lo'),hi=document.getElementById(k+'-hi');
-    lo.addEventListener('input',()=>updateRange(k));hi.addEventListener('input',()=>updateRange(k));updateRange(k);
-  });
-}
 
 // ===== MAP 初期化（Google Maps JavaScript API）=====
 // ・Google標準タイルを使用（mapId + AdvancedMarker のため DEMO_MAP_ID を指定）
@@ -1535,6 +1491,7 @@ function putMarkers(list){
   });
   _cluster=new markerClusterer.MarkerClusterer({map:map,markers:markers,renderer:_clusterRenderer,onClusterClick:_onClusterClick,
     algorithm:_clusterMode==='pref'?_makePrefAlgorithm():undefined});
+  if(_sgFromServer) _sgStatus(null); // 「読み込んでいます…」は、サーバーの掲載情報を地図に置いた時点で消す（11/9 眞野さん：ピンが出るまで出しておく）
   _tryDeepOpen(); // 個別ページの「地図で見る」から来たときは、ピンがそろった時点でそのピンの詳細を開く
 }
 
@@ -1736,7 +1693,7 @@ function popupHtml(s){
 // ・'allow' → 現在地を取得して地図を初期化
 // ・'deny'  → 東京（35.67, 139.65）にフォールバック
 // ・未設定  → ブラウザに位置情報を要求し、結果をクッキーに記録
-// initRanges() でレンジスライダーを初期化し、preloadMediaCache() で写真・資料をIDBからロード
+// preloadMediaCache() で写真・資料をIDBからロード（絞り込みの「予算」は 11/9 に外した）
 // _setCookie / _getCookie は shared-data.js で定義
 window.onload=()=>{
   restoreSession();
@@ -1758,7 +1715,6 @@ window.onload=()=>{
       );
     }else _geoFallback();
   }
-  initRanges();
 };
 
 // ===== 詳細パネル =====
@@ -1938,7 +1894,6 @@ function pie(id,data,colors){
 }
 function clearFilter(){
   document.querySelectorAll('#filter-panel .tag.on').forEach(t=>t.classList.remove('on'));
-  ['bgt'].forEach(k=>{document.getElementById(k+'-lo').value=0;document.getElementById(k+'-hi').value=10;updateRange(k);});
   const areaAllBtn=document.querySelector('#filter-panel .btn-select-all[onclick*="selectAllArea"]');
   if(areaAllBtn)areaAllBtn.textContent='全都道府県を選択';
   document.querySelectorAll('#area-grid .btn-select-all').forEach(b=>b.textContent='すべて選択');
