@@ -1679,6 +1679,8 @@ function _trfHtml(trf){
 // 設置予定（PLAN）の FLASH は投資家向けなので対象外。募集を始めたらここを外す
 const NO_AD_MSG='現在募集しておりません';
 function _noAdRecruit(s){ return _pinShape(s)==='flash'&&s.status!=='PLAN'; }
+// 利用者向け画面に出す状態の札。「空き」は広告が入っていないと読まれるので出さない（10/22 C-3・11/12 眞野さん判断）。管理画面は STATUS_LBL のまま
+function _pubStatus(s){ return (_noAdRecruit(s)||s.status==='EMPTY')?'':(s.status||''); }
 /** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・料金・詳細ボタン）*/
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
@@ -1744,7 +1746,7 @@ function openDetail(id){
   const strip=$('dp-photo-strip');
   if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
   const _noAd=_noAdRecruit(s);
-  const _st=_noAd?'':(s.status||''); // 稼働中 FLASH の「空き」は広告の空きと読まれるので出さない
+  const _st=_pubStatus(s);
   const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
   $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div>${_trfHtml(s.trf)}`;
   // 人流（滞在人口）は住んでいる人の数で、通る人の数ではないため出さない（10/14 AD MTG）。DB の ped 列は残す
@@ -2492,8 +2494,8 @@ function _buildSignageOptions(){
   let opts='<option value="">指定なし</option>';
   SG.forEach(function(s){
     const sel=(cur&&cur.id===s.id)?' selected':'';
-    const stLbl=STATUS_LBL[s.status]||s.status;
-    opts+='<option value="'+s.id+'"'+sel+'>'+s.name+' ['+stLbl+']</option>';
+    const st=_pubStatus(s);
+    opts+='<option value="'+s.id+'"'+sel+'>'+s.name+(st?' ['+(STATUS_LBL[st]||st)+']':'')+'</option>';
   });
   return opts;
 }
@@ -2541,11 +2543,11 @@ function _onInqSignageChange(){
   const id=parseInt(sel.value);
   const s=id?find(id):null;
   if(s){
-    const stLbl=STATUS_LBL[s.status]||s.status;
+    const st=_pubStatus(s);
     const planTxt=s.plans&&s.plans[0]&&s.plans[0].p?'¥'+s.plans[0].p+'/月〜':'';
     info.innerHTML='📍 '+s.place+(s.addr?' ・ '+s.addr:'')
       +(planTxt?' ・ '+planTxt:'')
-      +' ・ <span style="color:'+(STATUS_COLOR[s.status]||'#888')+'">● '+stLbl+'</span>';
+      +(st?' ・ <span style="color:'+(STATUS_COLOR[st]||'#888')+'">● '+(STATUS_LBL[st]||st)+'</span>':'');
   }else{
     info.textContent='';
   }
