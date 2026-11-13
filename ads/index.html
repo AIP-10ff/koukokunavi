@@ -1737,7 +1737,7 @@ function openDetail(id){
   const s=SG.find(x=>x.id===id);if(!s)return;cur=s;
   $('dp-bc').textContent=[s.area,s.target].filter(Boolean).join(' / '); // ターゲットが空の拠点で「大阪府 /」と末尾に / が残らないように
   $('dp-nm').textContent=s.name;
-  document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('large',_pinShape(s)==='large')); // 「広告掲載について」を大型用の文章に
+  document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>{g.classList.toggle('large',_pinShape(s)==='large'); g.hidden=_noAdRecruit(s);}); // 「広告掲載について」を大型用の文章に。広告を募集していない FLASH には出さない（11/13 眞野さん）
   $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
   const photos=s.photos||[];
   const mainPhoto=photos.find(p=>p.isMain)||photos[0];
