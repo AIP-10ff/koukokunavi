@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>広告ナビ｜デジタルサイネージ広告の掲載枠を地図で探す</title>
-<!-- 検索結果・共有用（10/28 AD MTG：SEO）。サイネージごとのページ /s/<ID>/ はサーバー（koukokunavi-backend の pages.py）が作る。
+<!-- 検索結果・共有用（10/28 AD MTG：SEO）。サイネージごとのページ /s/<ID>/ は 11/13 から出さない（サーバーが 410）。
      canonical は本番に固定（検証 app2 は robots.txt で検索から外している）。?s=<ID> で開いても同じトップとして扱わせる -->
 <meta name="description" content="広告ナビは、全国のデジタルサイネージ（店頭スタンド型・大型ビジョン・EV充電器一体型FLASH）の広告枠を地図で探せるサービスです。設置場所・サイズ・交通量・料金プランを確認して、そのままお問い合わせできます。">
 <link rel="canonical" href="https://app.signage-ad.com/">
@@ -1791,13 +1791,13 @@ function _tryDeepOpen(){
   openDetail(s.id);
   if(_deepInq) showInq(); // 問い合わせ欄はこのサイネージを選んだ状態で開く（_buildSignageOptions が cur を選ぶ）
 }
-// 詳細を開いたら /s/<ID>/ に。開くと同時に「戻る」用の履歴が積まれる（_navPush）ので、その後に今の履歴の URL を書き換える
+// 詳細を開いたら /?s=<ID> に（11/13 市川さんの判断で個別ページ /s/ は出さない。サーバーは /s/ に 410 を返す）。開くと同時に「戻る」用の履歴が積まれる（_navPush）ので、その後に今の履歴の URL を書き換える
 function _setDetailUrl(id){
   setTimeout(function(){
-    if(cur&&cur.id===id&&$('detail-panel').classList.contains('open')) history.replaceState(history.state,'','/s/'+id+'/');
+    if(cur&&cur.id===id&&$('detail-panel').classList.contains('open')) history.replaceState(history.state,'','/?s='+id);
   },0);
 }
-function _clearDetailUrl(){ if(/^\/s\//.test(location.pathname)) history.replaceState(history.state,'',_homeUrl); }
+function _clearDetailUrl(){ if(/^\/s\//.test(location.pathname)||new URLSearchParams(location.search).has('s')) history.replaceState(history.state,'',_homeUrl); }
 function showTop(){
   closeDetail();
   closeList();
