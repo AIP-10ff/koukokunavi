@@ -1870,9 +1870,26 @@ function closePV(e){if(e&&e.target!==$('photo-viewer'))return;$('photo-viewer').
 // openStreetView : Google マップのストリートビューURLをモーダルで案内
 // dlDoc          : 資料（PDF等）をダウンロード。未ログインなら login 画面へ誘導。
 //                  複数資料ある場合はリスト選択モーダルを表示。
+// ストリートビューを「サイネージの方を向いた状態」で開く（11/18 AD MTG：向きは Google 標準の URL 指定で対応）。
+// 近くの撮影地点（50m 以内）を探し、そこからサイネージへの方角を heading に入れる。
+// 撮影地点が無い・調べられないときは、今までどおり座標だけで開く（向きは Google 任せ）
+function _svFallbackUrl(s){ return 'https://www.google.com/maps?layer=c&cbll='+s.lat+','+s.lng; }
+async function _svUrl(s){
+  try{
+    const [{StreetViewService},{spherical}]=await Promise.all([google.maps.importLibrary('streetView'),google.maps.importLibrary('geometry')]);
+    const target={lat:+s.lat,lng:+s.lng};
+    const {data}=await new StreetViewService().getPanorama({location:target,radius:50,preference:'nearest',source:'outdoor'});
+    const pos=data.location.latLng;
+    const heading=Math.round((spherical.computeHeading(pos,target)+360)%360);
+    return 'https://www.google.com/maps/@?api=1&map_action=pano&pano='+encodeURIComponent(data.location.pano)
+      +'&viewpoint='+pos.lat()+','+pos.lng()+'&heading='+heading+'&pitch=5&fov=80';
+  }catch(e){ return _svFallbackUrl(s); }
+}
 function openStreetView(){
   if(!cur)return;
-  openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a href="https://www.google.com/maps?layer=c&cbll=${cur.lat},${cur.lng}" target="_blank" class="btn-m-primary">🌐 Google マップで開く</a></div>`,null,true,false);
+  openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a id="sv-link" href="${_svFallbackUrl(cur)}" target="_blank" rel="noopener" class="btn-m-primary">🌐 Google マップで開く</a></div>`,null,true,false);
+  const s=cur;
+  _svUrl(s).then(u=>{const a=$('sv-link');if(a&&cur===s)a.href=u;});
 }
 function dlDoc(){
   if(!loggedIn){toast("資料ダウンロードにはログインが必要です");showAuth('login');return;}
