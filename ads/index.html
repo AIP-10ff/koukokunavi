@@ -1888,14 +1888,28 @@ function closePV(e){if(e&&e.target!==$('photo-viewer'))return;$('photo-viewer').
 // dlDoc          : 資料（PDF等）をダウンロード。未ログインなら login 画面へ誘導。
 //                  複数資料ある場合はリスト選択モーダルを表示。
 // ストリートビューを「サイネージの方を向いた状態」で開く（11/18 AD MTG：向きは Google 標準の URL 指定で対応）。
-// 近くの撮影地点（50m 以内）を探し、そこからサイネージへの方角を heading に入れる。
+// 近くの撮影地点（50m 以内・Google の撮影車などの画像だけ。お店の投稿写真だと建物の中に入るため）を探し、そこからサイネージへの方角を heading に入れる。
 // 撮影地点が無い・調べられないときは、今までどおり座標だけで開く（向きは Google 任せ）
+// 向きを手で決めたサイネージ（11/18〜 眞野さんが実物で確認。確認リストはアーティファクト「ストリートビュー確認リスト」）。
+// Google マップでちょうどよい向きにした画面のアドレス「@緯度,経度,…,〇〇h,〇〇t」から写す：heading＝h、pitch＝t−90、fov＝y。
+// none:true はストリートビューの画像が無い場所（押すと「画像がありません」と出す）
+const SV_VIEWS={
+  1790521200028:{pano:'CIHM0ogKEICAgIDqxfnnGQ',lat:34.7398544,lng:135.4999258,heading:171.82,pitch:-9.87,fov:75}, // cafe&bar Swell（お店の 360° 写真）
+  1789570800007:{lat:34.5981338,lng:135.7026294,heading:302.55,pitch:-12.33,fov:75}, // 重心道鍼灸指圧整骨院 王寺駅前院
+  1789570800026:{lat:34.603895,lng:135.7017633,heading:335.39,pitch:-7.19,fov:75},  // 重心道柔整鍼灸指圧院 本院
+  1700100000137:{none:true},1700100000139:{none:true},1700100000142:{none:true},     // カケン八尾温泉 喜多の湯
+};
+function _svViewUrl(v){
+  return 'https://www.google.com/maps/@?api=1&map_action=pano'+(v.pano?'&pano='+encodeURIComponent(v.pano):'')
+    +'&viewpoint='+v.lat+','+v.lng+'&heading='+v.heading+'&pitch='+v.pitch+'&fov='+v.fov;
+}
 function _svFallbackUrl(s){ return 'https://www.google.com/maps?layer=c&cbll='+s.lat+','+s.lng; }
 async function _svUrl(s){
+  if(SV_VIEWS[s.id])return _svViewUrl(SV_VIEWS[s.id]);
   try{
     const [{StreetViewService},{spherical}]=await Promise.all([google.maps.importLibrary('streetView'),google.maps.importLibrary('geometry')]);
     const target={lat:+s.lat,lng:+s.lng};
-    const {data}=await new StreetViewService().getPanorama({location:target,radius:50,preference:'nearest',source:'outdoor'});
+    const {data}=await new StreetViewService().getPanorama({location:target,radius:50,preference:'nearest',sources:['google']});
     const pos=data.location.latLng;
     const heading=Math.round((spherical.computeHeading(pos,target)+360)%360);
     return 'https://www.google.com/maps/@?api=1&map_action=pano&pano='+encodeURIComponent(data.location.pano)
@@ -1904,6 +1918,10 @@ async function _svUrl(s){
 }
 function openStreetView(){
   if(!cur)return;
+  if(SV_VIEWS[cur.id]&&SV_VIEWS[cur.id].none){
+    openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} の周りには、ストリートビューの画像がありません。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button></div>`,null,true,false);
+    return;
+  }
   openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a id="sv-link" href="${_svFallbackUrl(cur)}" target="_blank" rel="noopener" class="btn-m-primary">🌐 Google マップで開く</a></div>`,null,true,false);
   const s=cur;
   _svUrl(s).then(u=>{const a=$('sv-link');if(a&&cur===s)a.href=u;});
