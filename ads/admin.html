@@ -806,6 +806,14 @@ function openAdmin(id){
     })(),
   ]));
 
+  // 掲載申請で載せたサイネージだけ：「広告掲載について」に出す掲載者の文（空なら「お問い合わせください」だけ出る）
+  if(s.source==='request'){
+    var adTa=document.createElement('textarea');adTa.id='a-adinfo';adTa.maxLength=1000;adTa.value=s.ad_info||'';
+    adTa.style.cssText='width:100%;min-height:90px;resize:vertical;box-sizing:border-box';
+    adTa.placeholder='空なら「広告の掲載条件・料金については、お問い合わせください。」だけ出ます';
+    body.appendChild(section('📮 広告掲載について（掲載申請のサイネージ）',[fg('掲載者からのご案内（1000 文字まで）',adTa)]));
+  }
+
   // ── 写真管理セクション ──
   body.appendChild(section('📷 写真管理',[buildPhotoSection()]));
 
@@ -1117,6 +1125,7 @@ function saveSign(){
   s.lng    =parseFloat(gv('a-lng'))||s.lng;
   s.target =gv('a-target');
   s.trf    =gv('a-trf');
+  if(document.getElementById('a-adinfo')) s.ad_info=document.getElementById('a-adinfo').value.trim();
   s.e      =s.e||'🏢'; // 絵文字はphotoに置き換わるが後方互換で保持
 
   var activeBtn=document.querySelector('.status-btn.on');
@@ -2320,7 +2329,7 @@ function renderReqs(){
       +'種類・大きさ：'+E(r.type||'—')+'／'+E(r.size||'—')+'　設置場所：'+E(r.place||'—')+'<br>'
       +'住所：'+E(r.addr)+'　<a href="'+map+'" target="_blank" rel="noopener" style="color:var(--org)">位置を地図で確認</a><br>'
       +'担当：'+E(r.contact_name)+'（'+E(r.company||'会社名なし')+'）　📞 '+E(r.phone_number)+(r.email?'　✉ '+E(r.email):'')+'<br>'
-      +'プラン：<br>'+plans+(r.note?'<br>メモ：'+E(r.note):'')+'</div>'
+      +'プラン：<br>'+plans+(r.ad_info?'<br>広告掲載についてのご案内（地図に載ります）：<div style="white-space:pre-wrap;color:#cbd5e1;margin:2px 0 0 1em">'+E(r.ad_info)+'</div>':'')+(r.note?'<br>メモ：'+E(r.note):'')+'</div>'
       +(photos?'<div style="margin-top:6px">'+photos+'</div>':'')
       +act+'</div>';
   }).join('');

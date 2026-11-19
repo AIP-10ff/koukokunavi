@@ -249,6 +249,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .dp-guide-tel{margin-top:12px!important;font-weight:700;color:#333}
 /* 大型（明和町）は提案書の内容が違う部分だけ文章を切り替える（10/27 眞野さん） */
 .dp-guide.large .g-std,.dp-guide:not(.large) .g-large{display:none}
+.dp-guide:not(.owner) .g-owner,.dp-guide.owner .g-body>:not(.g-owner){display:none}
 .dp-body{padding:12px 14px}
 .dp-breadcrumb{font-size:14px;color:#aaa;margin-bottom:4px}
 .dp-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -378,6 +379,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .fg label .req{color:var(--org);font-size:10px;margin-left:2px}
 .fi{width:100%;border:1px solid #ddd;border-radius:4px;padding:8px 10px;font-size:13px;outline:none;font-family:inherit}
 .fi:focus{border-color:var(--org)}
+/* スマホ（指で操作する端末）は入力欄を 16px にする。16px 未満だと iPhone が入力のたびに画面を拡大し、そのはずみで 1 文字目が入らないことがある（11/19 申請フォームで発生） */
+@media (hover:none) and (pointer:coarse){.fi{font-size:16px}}
 .btn-org{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:4px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px}
 .btn-org:hover{background:var(--org2)}
 /* パスワード表示切替ボタン（👁）共通スタイル */
@@ -580,7 +583,12 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
              全サイネージ共通の内容。料金は拠点ごとに上の「広告出稿データ」に出ているので、ここには載せない -->
         <div class="dp-data-card dp-guide" style="margin-bottom:6px">
           <div class="dp-data-head">📺 広告掲載について</div>
-          <div style="padding:8px 12px">
+          <div class="g-body" style="padding:8px 12px">
+            <!-- 社外からの掲載申請で載せたサイネージ（source=request）は、下の 10FF の文章ではなくこちらを出す（11/19 眞野さん） -->
+            <div class="g-owner">
+              <p>広告の掲載条件・料金については、お問い合わせください。</p>
+              <div id="dp-guide-owner-wrap"><h4>掲載者からのご案内</h4><p id="dp-guide-owner" style="white-space:pre-wrap"></p></div>
+            </div>
             <h4>配信の仕組み</h4>
             <ul>
               <li class="g-std">1 枠 15 秒 × 1 台あたり最大 20 社で、5 分で 1 周します</li>
@@ -752,6 +760,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="menu-row" onclick="showFavList()"><span class="mi">❤️</span>お気に入り登録一覧</div>
   <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
   <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
+  <div class="menu-row" id="menu-keisai" onclick="location.href='./keisai.html'" style="display:none"><span class="mi">📢</span>サイネージをお持ちの方へ（テスト）</div>
   <div class="menu-row" id="menu-register" onclick="showRegister()" style="display:none"><span class="mi">📮</span>サイネージの掲載申請（テスト）</div>
   <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
   <div class="menu-row" id="menu-appdl" onclick="showAppDl()" style="display:none"><span class="mi">📱</span>スマホアプリ（QR コード）</div>
@@ -1740,6 +1749,12 @@ function openDetail(id){
   $('dp-bc').textContent=[s.area,s.target].filter(Boolean).join(' / '); // ターゲットが空の拠点で「大阪府 /」と末尾に / が残らないように
   $('dp-nm').textContent=s.name;
   document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('large',_pinShape(s)==='large')); // 「広告掲載について」を大型用の文章に
+  { // 掲載申請で載せたサイネージは 10FF の文章を出さず、「お問い合わせください」＋掲載者の文（任意）にする
+    const own=s.source==='request', info=String(s.ad_info||'').trim();
+    document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('owner',own));
+    const t=$('dp-guide-owner'); if(t) t.textContent=info;
+    const w=$('dp-guide-owner-wrap'); if(w) w.style.display=(own&&info)?'':'none';
+  }
   $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
   const photos=s.photos||[];
   const mainPhoto=photos.find(p=>p.isMain)||photos[0];
@@ -2803,7 +2818,8 @@ function showRegister(){
     <div class="fg"><label>掲載プラン（任意）</label>
       <div id="reg-plans"></div>
       <button class="btn-m-close" onclick="_regAddPlan()">＋ プランを追加</button></div>
-    <div class="fg"><label>メモ（400 文字まで）</label><textarea class="fi" id="reg-note" maxlength="400" style="min-height:60px;resize:vertical" placeholder="電話に出られる時間帯など"></textarea></div>
+    <div class="fg"><label>広告掲載についてのご案内（任意・1000 文字まで）</label><textarea class="fi" id="reg-adinfo" maxlength="1000" style="min-height:80px;resize:vertical" placeholder="例：1 枠 15 秒・1 時間に 4 回放映。動画はお持ち込み、または制作のご相談も可。&#10;地図の詳細画面の「広告掲載について」に載ります。書かなければ「お問い合わせください」とだけ出ます"></textarea><div id="reg-adinfo-err" class="input-err"></div></div>
+    <div class="fg"><label>メモ（400 文字まで・地図には載りません）</label><textarea class="fi" id="reg-note" maxlength="400" style="min-height:60px;resize:vertical" placeholder="電話に出られる時間帯など"></textarea></div>
     <div style="font-size:11px;color:#999;margin:8px 0 6px;line-height:1.7">送信いただいた内容は、<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に従って取り扱います。</div>
     <button class="btn-org" id="reg-submit" onclick="submitRegister()">この内容で申請する</button>`,_regInitMap);
   _regAddPlan();
@@ -2901,7 +2917,7 @@ async function submitRegister(){
   if(!_reg||_reg.busy) return;
   const v=id=>($(id)?.value||'').trim();
   const body={contact_name:v('reg-contact'),company:v('reg-company'),email:v('reg-email'),name:v('reg-name'),
-    type:v('reg-type'),size:v('reg-size'),place:v('reg-place'),addr:v('reg-addr'),lat:_reg.lat,lng:_reg.lng,note:v('reg-note'),
+    type:v('reg-type'),size:v('reg-size'),place:v('reg-place'),addr:v('reg-addr'),lat:_reg.lat,lng:_reg.lng,note:v('reg-note'),ad_info:v('reg-adinfo'),
     plans:[...document.querySelectorAll('#reg-plans .reg-plan')].map(r=>{const i=r.querySelectorAll('input');return {n:i[0].value.trim(),p:i[1].value.trim()};}).filter(p=>p.n||p.p),
     photos:_reg.photos.map(p=>p.key)};
   let err=false;
@@ -2917,7 +2933,7 @@ async function submitRegister(){
     _reg=null; closeModal();
     openModal(`<h3>📮 申請を受け付けました</h3><p style="font-size:13px;color:#555;line-height:1.8">ありがとうございます。内容を確認し、承認後に広告ナビの地図へ掲載します。確認のため、登録の電話番号にご連絡することがあります。<br>申請の状況は「これまでの申請を見る」から確認できます。</p>`);
   }catch(e){
-    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos'};
+    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo'};
     let shown=false;
     if(e&&e.status===400&&d) Object.keys(d).forEach(k=>{ if(map_[k]){_setFieldErr(map_[k],true,[].concat(d[k])[0]);shown=true;} });
     toast(shown?'入力内容を確認してください':(e&&e.status===404?'この環境では、まだ申請を受け付けていません':_knApiErr(e)));
@@ -2999,7 +3015,7 @@ window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
 // スマホアプリの行は、ストア URL が入るか、検証環境・ローカルのときだけ出す
 if(_appDlReady()||/^(app2\.|localhost$|127\.)/.test(location.hostname)){const r=document.getElementById('menu-appdl');if(r)r.style.display='';}
 // 掲載申請（11/19 AD MTG）はテスト中のため、入口は app2・手元だけ。/?register=1 で開いたときも申請画面から始める
-if(/^(app2\.|localhost$|127\.)/.test(location.hostname)){const r=document.getElementById('menu-register');if(r)r.style.display='';}
+if(/^(app2\.|localhost$|127\.)/.test(location.hostname)){['menu-register','menu-keisai'].forEach(id=>{const r=document.getElementById(id);if(r)r.style.display='';});}
 if(new URLSearchParams(location.search).get('register')==='1') setTimeout(showRegister,600);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
