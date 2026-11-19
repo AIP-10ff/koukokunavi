@@ -25,6 +25,8 @@ h2:has(+.sub){margin-bottom:6px}
 .hero{background:linear-gradient(135deg,var(--org) 0%,var(--org2) 100%);color:#fff;padding:52px 0 44px}
 .hero .eyebrow{font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.9}
 .hero h1{font-size:30px;line-height:1.45;margin:8px 0 14px;text-wrap:balance}
+/* 見出しは文節の切れ目でだけ折り返す（スマホで「う。」だけが次の行に落ちないように） */
+.hero h1 .nb{display:inline-block}
 .hero p{font-size:15px;max-width:560px;opacity:.95}
 .cta .ic{width:18px;height:18px}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:52px;padding:0 30px;border-radius:26px;font-size:16px;font-weight:800;text-decoration:none;cursor:pointer;border:none}
@@ -108,7 +110,7 @@ footer{max-width:880px;margin:0 auto;padding:16px;border-top:1px solid var(--bor
 
 <div class="hero"><div class="wrap">
   <div class="eyebrow">デジタルサイネージをお持ちの方へ</div>
-  <h1>空いている広告枠を、<br>広告を出したい人に見つけてもらう。</h1>
+  <h1>空いている広告枠を、<br><span class="nb">広告を出したい人に</span><span class="nb">見つけてもらう。</span></h1>
   <p>広告ナビは、全国のデジタルサイネージの広告枠を地図で探せるサービスです。お持ちのサイネージを、無料で地図に掲載できます。</p>
   <div class="cta-row">
     <a class="cta white" href="./?register=1">掲載を申請する（無料）<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
