@@ -735,7 +735,7 @@ var KN_FIREBASE_CONFIG = {
   appId: '1:465232241609:web:29020d80c7810106c8be18'
 };
 window.KN_FIREBASE_CONFIG = KN_FIREBASE_CONFIG;
-var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs'];
+var KN_SIGNAGE_KEYS = ['id','name','yomi','lat','lng','area','place','target','addr','size','type','ped','trf','status','plans','photos','docs','source','ad_info'];
 
 function knApi(method, path, body, token){
   var h = {'Accept':'application/json'};

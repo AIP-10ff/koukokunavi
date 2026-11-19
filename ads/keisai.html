@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 掲載募集（サイネージをお持ちの方へ）。11/19 AD MTG ＋ 眞野さん「アドクロを参考に別ページを」。
+     テスト中のため検索に出さず、本番（app2・手元以外）では地図へ戻す。公開は市川さんの許可が出てから -->
+<meta name="robots" content="noindex">
+<title>サイネージをお持ちの方へ｜広告ナビ</title>
+<script>if(!/^(app2\.|localhost$|127\.)/.test(location.hostname)) location.replace('./');</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--org:#e8650a;--org2:#ff8c2a;--org-bg:#fff4ec;--dark:#333;--gray:#777;--border:#e0e0e0;--light:#f8f8f8}
+body{font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Hiragino Sans',Meiryo,sans-serif;color:var(--dark);background:#fff;line-height:1.85;font-size:15px}
+header{display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;border-bottom:3px solid var(--org);position:sticky;top:0;background:#fff;z-index:10}
+header a.logo{font-weight:900;font-size:18px;color:var(--org);text-decoration:none}
+header a.back{margin-left:auto;font-size:13px;color:var(--org);text-decoration:none;font-weight:700}
+a{color:var(--org)}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px}
+section{padding:44px 0}
+section.alt{background:var(--light)}
+h2{font-size:21px;text-align:center;margin-bottom:20px;text-wrap:balance}
+h2:has(+.sub){margin-bottom:6px}
+.sub{text-align:center;color:var(--gray);font-size:13px;margin-bottom:24px}
+
+/* ヒーロー */
+.hero{background:linear-gradient(135deg,var(--org) 0%,var(--org2) 100%);color:#fff;padding:52px 0 44px}
+.hero .eyebrow{font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.9}
+.hero h1{font-size:30px;line-height:1.45;margin:8px 0 14px;text-wrap:balance}
+.hero p{font-size:15px;max-width:560px;opacity:.95}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:52px;padding:0 30px;border-radius:26px;font-size:16px;font-weight:800;text-decoration:none;cursor:pointer;border:none}
+.cta.white{background:#fff;color:var(--org);box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.cta.org{background:var(--org);color:#fff;box-shadow:0 4px 14px rgba(232,101,10,.3)}
+.cta-row{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.cta-note{font-size:12px;opacity:.9}
+
+/* 数字の帯 */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:-26px;position:relative}
+.stat{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 10px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.stat .num{font-size:30px;font-weight:900;color:var(--org);line-height:1.2;font-variant-numeric:tabular-nums}
+.stat .num small{font-size:14px;margin-left:2px}
+.stat .lbl{font-size:12px;color:var(--gray)}
+
+/* お悩み → 解決 */
+.worries{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.worry{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;font-weight:700;font-size:14px;text-align:center}
+.worry::before{content:"💭";display:block;font-size:22px;margin-bottom:4px}
+.answer{margin-top:20px;text-align:center;font-size:17px;font-weight:800;text-wrap:balance}
+.answer em{font-style:normal;color:var(--org)}
+
+/* 理由 */
+.reasons{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.reason{border:1px solid var(--border);border-top:4px solid var(--org);border-radius:8px;padding:18px 16px;background:#fff}
+.reason .no{font-size:12px;font-weight:800;color:var(--org);letter-spacing:.08em}
+.reason h3{font-size:16px;margin:4px 0 6px}
+.reason p{font-size:13.5px;color:#555}
+
+/* 載せられる情報 */
+.items{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.item{background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px 8px;text-align:center;font-size:13px;font-weight:700}
+.item span{display:block;font-size:22px}
+
+/* 料金 */
+.price{max-width:520px;margin:0 auto;border:2px solid var(--org);border-radius:12px;background:#fff;text-align:center;padding:24px 16px}
+.price .big{font-size:40px;font-weight:900;color:var(--org);line-height:1.2}
+.price .big small{font-size:16px;color:var(--dark);margin-right:6px}
+.price p{font-size:13.5px;color:#555;margin-top:8px}
+
+/* 流れ */
+.steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;counter-reset:st}
+.steps li{position:relative;background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px 12px 14px;text-align:center;counter-increment:st}
+.steps li::before{content:"STEP " counter(st);display:inline-block;font-size:11px;font-weight:800;color:#fff;background:var(--org);border-radius:10px;padding:0 10px;letter-spacing:.06em}
+.steps h3{font-size:15px;margin:8px 0 4px}
+.steps p{font-size:12.5px;color:#555;text-align:left}
+
+/* よくある質問 */
+.faq{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.faq details{border:1px solid var(--border);border-radius:8px;background:#fff}
+.faq summary{cursor:pointer;padding:12px 16px;font-weight:700;font-size:14.5px;list-style:none;display:flex;gap:8px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::before{content:"Q";color:var(--org);font-weight:900}
+.faq details p{padding:0 16px 14px 34px;font-size:13.5px;color:#555}
+
+/* 最後の帯 */
+.final{background:var(--org-bg);text-align:center}
+.final h2{margin-bottom:8px}
+.final p{font-size:14px;color:#555;margin-bottom:20px}
+
+footer{max-width:880px;margin:0 auto;padding:16px;border-top:1px solid var(--border);font-size:12px;color:var(--gray);display:flex;gap:16px;flex-wrap:wrap}
+
+@media(max-width:699px){
+  .hero h1{font-size:23px}
+  .stats,.worries,.reasons{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{padding:12px 4px}
+  .stat .num{font-size:22px}
+  .items{grid-template-columns:repeat(2,1fr)}
+  .steps{grid-template-columns:1fr 1fr}
+  h2{font-size:18px}
+  section{padding:36px 0}
+}
+@media(max-width:379px){ .steps{grid-template-columns:1fr} }
+</style></head><body>
+<header><a class="logo" href="./">広告ナビ</a><a class="back" href="./">◀ 地図にもどる</a></header>
+
+<div class="hero"><div class="wrap">
+  <div class="eyebrow">デジタルサイネージをお持ちの方へ</div>
+  <h1>空いている広告枠を、<br>広告を出したい人に見つけてもらう。</h1>
+  <p>広告ナビは、全国のデジタルサイネージの広告枠を地図で探せるサービスです。お持ちのサイネージを、無料で地図に掲載できます。</p>
+  <div class="cta-row">
+    <a class="cta white" href="./?register=1">掲載を申請する（無料）</a>
+    <span class="cta-note">電話番号でログインして、5 分ほどで申請できます</span>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <div class="stats" aria-label="広告ナビの掲載状況">
+    <div class="stat"><div class="num"><span id="st-count">—</span><small>基</small></div><div class="lbl">掲載中のサイネージ</div></div>
+    <div class="stat"><div class="num"><span id="st-pref">—</span><small>都道府県</small></div><div class="lbl">掲載エリア</div></div>
+    <div class="stat"><div class="num">0<small>円</small></div><div class="lbl">掲載料</div></div>
+  </div>
+</div>
+
+<section><div class="wrap">
+  <h2>こんなお悩みはありませんか？</h2>
+  <p class="sub">サイネージの広告枠をお持ちの方から、よくお聞きすることです</p>
+  <div class="worries">
+    <div class="worry">広告枠が埋まらない</div>
+    <div class="worry">営業に回る手が足りない</div>
+    <div class="worry">広告を出したい人に<br>存在を知ってもらえない</div>
+  </div>
+  <p class="answer">広告ナビの地図に載せれば、<em>場所から広告枠を探している人</em>に見つけてもらえます。</p>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <h2>広告ナビに掲載する 3 つの理由</h2>
+  <div class="reasons">
+    <div class="reason"><div class="no">REASON 01</div><h3>地図で探してもらえる</h3><p>広告を出したい人は、地域や場所から広告枠を探します。お持ちのサイネージが、周りの広告枠と並んで地図に表示されます。</p></div>
+    <div class="reason"><div class="no">REASON 02</div><h3>掲載は無料</h3><p>申請も掲載も無料です。写真やプラン、広告掲載についてのご案内まで、まとめて載せられます。</p></div>
+    <div class="reason"><div class="no">REASON 03</div><h3>確認してから掲載</h3><p>申請の内容は広告ナビ（テンフィールズファクトリー）が確認してから掲載します。探す人が安心して問い合わせられる地図にしています。</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>掲載できる情報</h2>
+  <p class="sub">地図の詳細画面に、次の内容が載ります</p>
+  <div class="items">
+    <div class="item"><span>📍</span>設置場所（地図のピン）</div>
+    <div class="item"><span>📷</span>写真（5 枚まで）</div>
+    <div class="item"><span>📺</span>種類・大きさ</div>
+    <div class="item"><span>💴</span>掲載プラン・料金</div>
+    <div class="item"><span>🏪</span>設置場所の種類</div>
+    <div class="item"><span>🏠</span>住所</div>
+    <div class="item"><span>📝</span>広告掲載についてのご案内</div>
+    <div class="item"><span>🔎</span>サイネージの名前</div>
+  </div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <h2>料金</h2>
+  <div class="price">
+    <div class="big"><small>掲載料</small>無料</div>
+    <p>申請・掲載に費用はかかりません。</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>掲載までの流れ</h2>
+  <p class="sub">すべて Web で完結します</p>
+  <ol class="steps">
+    <li><h3>ログイン</h3><p>携帯電話番号に届く SMS の確認コードでログインします。</p></li>
+    <li><h3>申請</h3><p>サイネージの情報・写真・地図の位置を入力して送信します。</p></li>
+    <li><h3>内容の確認</h3><p>広告ナビが内容を確認します。確認のため、お電話することがあります。</p></li>
+    <li><h3>地図に掲載</h3><p>承認後、地図に掲載されます。状況は「これまでの申請」で確認できます。</p></li>
+  </ol>
+  <div style="text-align:center;margin-top:28px"><a class="cta org" href="./?register=1">掲載を申請する（無料）</a></div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <h2>よくあるご質問</h2>
+  <div class="faq">
+    <details><summary>本当に無料ですか？</summary><p>はい。申請・掲載に費用はかかりません。</p></details>
+    <details><summary>申請に必要なものは何ですか？</summary><p>SMS を受け取れる携帯電話番号と、サイネージの設置場所がわかる情報（住所・地図の位置）です。写真があると、探している人に伝わりやすくなります。</p></details>
+    <details><summary>どんなサイネージでも掲載できますか？</summary><p>内容を確認したうえで掲載します。設置場所や内容によっては掲載を見送ることがあり、その場合は理由を「これまでの申請」でお知らせします。</p></details>
+    <details><summary>申請の状況はどこで確認できますか？</summary><p>申請フォームの「これまでの申請を見る」から、承認待ち・承認済み・見送りの状況を確認できます。</p></details>
+    <details><summary>掲載後に内容を変えたい・掲載をやめたいときは？</summary><p>地図画面の「お問い合わせ」からご連絡ください。</p></details>
+  </div>
+</div></section>
+
+<section class="final"><div class="wrap">
+  <h2>お持ちのサイネージを、地図に載せませんか？</h2>
+  <p>電話番号でログインして、そのまま申請できます。</p>
+  <a class="cta org" href="./?register=1">掲載を申請する（無料）</a>
+</div></section>
+
+<footer><span>© テンフィールズファクトリー株式会社</span><a href="./privacy.html">プライバシーポリシー</a><a href="./terms.html">利用規約</a></footer>
+
+<script>
+// 掲載中の数と都道府県の数は、地図と同じ公開 API から数える（数字を手で書くと古くなるため）
+(function(){
+  fetch('/api/v1/signages/',{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(list){
+    if(!Array.isArray(list)||!list.length) return;
+    var prefs={};
+    list.forEach(function(s){ var a=String(s.area||'').trim(); if(a) prefs[a]=1; });
+    document.getElementById('st-count').textContent=list.length.toLocaleString('ja-JP');
+    var n=Object.keys(prefs).length; if(n) document.getElementById('st-pref').textContent=n;
+  }).catch(function(){});
+})();
+</script>
+</body></html>
