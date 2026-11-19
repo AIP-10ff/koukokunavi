@@ -2794,7 +2794,7 @@ function showRegister(){
     <div class="fg"><label>住所<span class="req">必須</span></label>
       <div style="display:flex;gap:6px"><input class="fi" id="reg-addr" maxlength="300" placeholder="例：三重県津市栄町1-1"><button class="btn-m-close" style="flex-shrink:0" onclick="_regGeocode()">地図で探す</button></div>
       <div id="reg-addr-err" class="input-err"></div></div>
-    <div class="fg"><label>設置場所（地図をタップ、またはピンを動かして合わせてください）<span class="req">必須</span></label>
+    <div class="fg"><label>設置場所（地図をタップ、またはピンを動かして合わせてください。住所が空なら自動で入ります）<span class="req">必須</span></label>
       <div id="reg-map" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px;background:#f3f3f3"></div>
       <div id="reg-pos" style="font-size:11px;color:#888;margin-top:4px">まだ選ばれていません</div><div id="reg-pos-err" class="input-err"></div></div>
     <div class="fg"><label>写真（${REG_PHOTO_MAX} 枚まで・任意）</label>
@@ -2817,8 +2817,8 @@ async function _regInitMap(){
     _reg.map=new Map(el,{center:c,zoom:map?Math.max(map.getZoom(),12):12,mapId:"4ef6e0c1e3644c4183545b90",
       mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false,gestureHandling:'greedy'});
     _reg.marker=new AdvancedMarkerElement({map:null,gmpDraggable:true});
-    _reg.marker.addListener('dragend',()=>{const p=_reg.marker.position;_regSetPos(p.lat,p.lng,false);});
-    _reg.map.addListener('click',e=>_regSetPos(e.latLng.lat(),e.latLng.lng(),false));
+    _reg.marker.addListener('dragend',()=>{const p=_reg.marker.position;_regSetPos(p.lat,p.lng,false);_regReverse();});
+    _reg.map.addListener('click',e=>{_regSetPos(e.latLng.lat(),e.latLng.lng(),false);_regReverse();});
   }catch(e){ el.textContent='地図を読み込めませんでした。住所だけでも申請できます。'; }
 }
 function _regSetPos(lat,lng,pan){
@@ -2839,6 +2839,25 @@ async function _regGeocode(){
     const p=results[0].geometry.location; _regSetPos(p.lat(),p.lng(),true);
     toast('近くの位置にピンを置きました。ずれていれば動かしてください');
   }catch(e){ toast('住所から位置を見つけられませんでした。地図をタップして選んでください'); }
+}
+// ピンの位置から住所を入れる。住所欄が空か、前に自動で入れたままのときだけ書き換える（手で直した住所は消さない）
+async function _regReverse(){
+  if(!_reg||_reg.lat==null) return;
+  const seq=(_reg.revSeq=(_reg.revSeq||0)+1);
+  try{
+    const {Geocoder}=await google.maps.importLibrary('geocoding');
+    const {results}=await new Geocoder().geocode({location:{lat:_reg.lat,lng:_reg.lng},language:'ja',region:'jp'});
+    if(seq!==_reg.revSeq) return; // 続けて動かしたときは最後の位置だけ使う
+    if(!results||!results.length) throw 0;
+    const addr=(results[0].formatted_address||'').replace(/^日本、\s*/,'').replace(/^〒\d{3}-\d{4}\s*/,'').trim();
+    if(!addr) throw 0;
+    const el=$('reg-addr'); if(!el) return;
+    const cur=(el.value||'').trim();
+    if(!cur||cur===_reg.autoAddr){ el.value=addr; _reg.autoAddr=addr; _setFieldErr('reg-addr',false); }
+    else toast('住所欄は手で入力した内容のままにしています');
+  }catch(e){
+    if(seq===_reg.revSeq) toast('この位置の住所を見つけられませんでした。住所は手で入力してください');
+  }
 }
 function _regAddPlan(n,p){
   const box=$('reg-plans'); if(!box||box.children.length>=20) return;
