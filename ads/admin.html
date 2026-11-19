@@ -325,6 +325,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <button class="hdr-btn active" id="add-mode-btn" onclick="toggleAddModal()">＋ 新規追加</button>
   <button class="hdr-btn" onclick="confirmClearAll()" style="border-color:#ef4444;color:#ef4444">🗑 全削除</button>
   <button class="hdr-btn" id="srv-btn" onclick="openSrvModal()" style="border-color:#64748b;color:#cbd5e1" title="サーバーに接続すると、保存・削除が利用者の画面にも反映されます">☁ サーバー未接続</button>
+  <button class="hdr-btn" id="req-btn" onclick="openReqModal()" title="社外からのサイネージ掲載申請（承認すると地図に載ります）">📮 掲載申請</button>
   <button class="hdr-btn" id="inq-toggle-btn" onclick="toggleInqPanel()">📩 問い合わせ<span id="inq-hdr-badge" class="iq-count-badge" style="display:none">0</span></button>
   <span id="admin-name" style="margin-left:auto;color:#94a3b8;font-size:12px;white-space:nowrap">👤 <span id="admin-id-display"></span></span>
   <button class="hdr-btn" onclick="showChangePwModal()" style="flex-shrink:0">🔑 PW変更</button>
@@ -530,6 +531,20 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="iq-footer">
     <span style="font-size:11px;color:#475569;flex:1" id="iq-footer-count">0件</span>
     <button onclick="confirmClearInquiries()" style="background:#7f1d1d;border:none;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:11px;padding:5px 10px">🗑 全削除</button>
+  </div>
+</div>
+<!-- 掲載申請（社外から・11/19 AD MTG） -->
+<div id="req-modal" style="display:none" class="m-overlay" onclick="closeReqModal()">
+  <div class="m-box" style="max-width:640px" onclick="event.stopPropagation()">
+    <h3>📮 掲載申請</h3>
+    <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;line-height:1.7">社外の会員（電話番号を SMS で確認済み）からの申請です。内容と位置を確かめ、<b>承認するとサイネージとして登録</b>されます。連絡は電話が基本です。</p>
+    <div class="iq-filter-row" id="req-filter-row" style="margin-bottom:10px">
+      <button class="iq-filter-btn on" data-f="pending" onclick="setReqFilter('pending')">承認待ち</button>
+      <button class="iq-filter-btn" data-f="approved" onclick="setReqFilter('approved')">承認済み</button>
+      <button class="iq-filter-btn" data-f="rejected" onclick="setReqFilter('rejected')">見送り</button>
+    </div>
+    <div id="req-body" style="font-size:12px;color:#cbd5e1">読み込み中…</div>
+    <div style="text-align:right;margin-top:12px"><button class="hdr-btn" onclick="closeReqModal()">閉じる</button></div>
   </div>
 </div>
 <div id="mc"></div>
@@ -2256,6 +2271,82 @@ var _srvLoadFailed=false;
 function _srvBlocked(){
   if(_srvToken()&&_srvLoadFailed){ toast('⚠ サーバーの一覧を読み込めていないため保存できません。ページを再読み込みしてください'); return true; }
   return false;
+}
+// ===== 掲載申請（社外から・11/19 AD MTG） =====
+// 会員が送った申請（admin/signage-requests/）を見て、承認（＝サイネージを作る）か見送り（理由つき）を決める。
+// 承認・掲載は利用者の画面に出るため、ボタンは 2 回押し（1 回目で確認の文言に変わる）
+var _reqFilter='pending', _reqs=[];
+function openReqModal(){
+  if(!_srvToken()){ toast('⚠ 先に「☁ サーバー」に接続してください'); openSrvModal(); return; }
+  document.getElementById('req-modal').style.display='flex';
+  loadReqs();
+}
+function closeReqModal(){ document.getElementById('req-modal').style.display='none'; }
+function setReqFilter(f){
+  _reqFilter=f;
+  document.querySelectorAll('#req-filter-row .iq-filter-btn').forEach(function(b){ b.classList.toggle('on',b.dataset.f===f); });
+  loadReqs();
+}
+function loadReqs(){
+  var box=document.getElementById('req-body'); box.textContent='読み込み中…';
+  knApi('GET','/admin/signage-requests/?status='+_reqFilter,undefined,_srvToken()).then(function(list){
+    _reqs=list||[]; renderReqs();
+  }).catch(function(e){
+    box.textContent=(e&&e.status===404)?'このサーバーでは掲載申請を受け付けていません（SIGNAGE_REQUESTS が 0）':'読み込めませんでした：'+_srvErr(e);
+  });
+}
+function renderReqs(){
+  var box=document.getElementById('req-body'), E=_inqEsc;
+  if(!_reqs.length){ box.innerHTML='<div class="iq-empty">📭<br>該当する申請はありません</div>'; return; }
+  box.innerHTML=_reqs.map(function(r){
+    var photos=(r.photos||[]).map(function(p){ return p.url?'<a href="'+E(p.url)+'" target="_blank" rel="noopener"><img src="'+E(p.url)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:4px;border:1px solid #334155"></a>':''; }).join(' ');
+    var plans=(r.plans||[]).map(function(p){ return '・'+E(p.n)+'　'+E(p.p); }).join('<br>')||'（なし）';
+    var map='https://www.google.com/maps/search/?api=1&query='+Number(r.lat)+','+Number(r.lng);
+    var act='';
+    if(r.status==='pending'){
+      act='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'
+        +'<button class="hdr-btn" style="border-color:#22c55e;color:#86efac" onclick="reqApprove('+r.id+',true,this)">✅ 承認して地図に掲載</button>'
+        +'<button class="hdr-btn" onclick="reqApprove('+r.id+',false,this)">承認（非公開で登録）</button></div>'
+        +'<div style="display:flex;gap:6px;margin-top:6px"><input class="fi" id="req-note-'+r.id+'" placeholder="見送りの理由（申請者にも見えます）" style="flex:1">'
+        +'<button class="hdr-btn" style="border-color:#ef4444;color:#fca5a5" onclick="reqReject('+r.id+',this)">見送る</button></div>';
+    }else{
+      act='<div style="margin-top:6px;color:#94a3b8">'+E(r.status_label)+(r.reviewed_at?'（'+E(String(r.reviewed_at).slice(0,16).replace('T',' '))+'）':'')
+        +(r.signage_id?'　サイネージ ID '+Number(r.signage_id):'')+(r.review_note?'<br>メモ：'+E(r.review_note):'')+'</div>';
+    }
+    return '<div style="border:1px solid #334155;border-radius:6px;padding:10px 12px;margin-bottom:10px">'
+      +'<div style="font-size:14px;font-weight:700;color:#e2e8f0">'+E(r.name)+'</div>'
+      +'<div style="color:#94a3b8;margin:2px 0 6px">受付 '+E(String(r.created_at).slice(0,16).replace('T',' '))+'　No.'+Number(r.id)+'</div>'
+      +'<div style="line-height:1.8">'
+      +'種類・大きさ：'+E(r.type||'—')+'／'+E(r.size||'—')+'　設置場所：'+E(r.place||'—')+'<br>'
+      +'住所：'+E(r.addr)+'　<a href="'+map+'" target="_blank" rel="noopener" style="color:var(--org)">位置を地図で確認</a><br>'
+      +'担当：'+E(r.contact_name)+'（'+E(r.company||'会社名なし')+'）　📞 '+E(r.phone_number)+(r.email?'　✉ '+E(r.email):'')+'<br>'
+      +'プラン：<br>'+plans+(r.note?'<br>メモ：'+E(r.note):'')+'</div>'
+      +(photos?'<div style="margin-top:6px">'+photos+'</div>':'')
+      +act+'</div>';
+  }).join('');
+}
+function _reqArmed(btn,msg){
+  if(btn.dataset.armed==='1') return true;
+  btn.dataset.armed='1'; btn.dataset.label=btn.textContent; btn.textContent=msg;
+  setTimeout(function(){ if(btn.isConnected){ btn.dataset.armed=''; btn.textContent=btn.dataset.label; } },5000);
+  return false;
+}
+function reqApprove(id,publish,btn){
+  if(!_reqArmed(btn,publish?'もう一度押すと地図に掲載します':'もう一度押すと非公開で登録します')) return;
+  btn.disabled=true;
+  knApi('POST','/admin/signage-requests/'+id+'/approve/',{is_published:publish},_srvToken()).then(function(r){
+    toast(publish?'✅ 承認し、地図に掲載しました（ID '+r.signage_id+'）':'✅ 承認し、非公開で登録しました（ID '+r.signage_id+'）');
+    loadReqs(); _srvLoadFromServer(false).catch(function(){});
+  }).catch(function(e){ btn.disabled=false; toast('⚠ 承認できませんでした：'+_srvErr(e)); });
+}
+function reqReject(id,btn){
+  var note=(document.getElementById('req-note-'+id).value||'').trim();
+  if(!note){ toast('見送りの理由を入力してください'); return; }
+  if(!_reqArmed(btn,'もう一度押すと見送ります')) return;
+  btn.disabled=true;
+  knApi('POST','/admin/signage-requests/'+id+'/reject/',{review_note:note},_srvToken()).then(function(){
+    toast('見送りにしました'); loadReqs();
+  }).catch(function(e){ btn.disabled=false; toast('⚠ 見送りにできませんでした：'+_srvErr(e)); });
 }
 function _srvLoadFromServer(showToast){
   return knApi('GET','/admin/signages/',undefined,_srvToken()).then(function(list){

@@ -793,7 +793,21 @@ function knUploadMedia(blob, filename, kind, token){
   var fd = new FormData();
   fd.append('kind', kind || 'photo');
   fd.append('file', blob, filename || 'file');
-  return fetch(KN_API_BASE + '/admin/media/', {
+  return _knPostForm('/admin/media/', fd, token);
+}
+window.knUploadMedia = knUploadMedia;
+
+// 会員用：掲載申請に付ける写真を上げて {key, url, name} を受け取る（POST /signage-requests/media/、11/19 AD MTG）
+function knUploadRequestPhoto(blob, filename, token){
+  var fd = new FormData();
+  fd.append('file', blob, filename || 'photo.jpg');
+  return _knPostForm('/signage-requests/media/', fd, token);
+}
+window.knUploadRequestPhoto = knUploadRequestPhoto;
+
+// ファイルを multipart で送る（エラーの形は knApi とそろえる）
+function _knPostForm(path, fd, token){
+  return fetch(KN_API_BASE + path, {
     method: 'POST', headers: {'Accept': 'application/json', 'Authorization': 'Token ' + token}, body: fd
   }).then(function(r){
     return r.json().catch(function(){ return null; }).then(function(d){
@@ -802,7 +816,6 @@ function knUploadMedia(blob, filename, kind, token){
     });
   });
 }
-window.knUploadMedia = knUploadMedia;
 
 // dataURL（圧縮後の写真）を、アップロード用の Blob にする
 function knDataUrlToBlob(dataUrl){
