@@ -666,15 +666,15 @@ function ic(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 2
 <div id="filter-panel">
   <div class="fp-header"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> 絞り込み検索</h3><span id="fp-hit"></span><button class="fp-close" onclick="toggleFilter()" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
   <div class="fp-tab-bar">
-    <button class="fp-tab-btn active" onclick="fpTab(0)">ターゲット・設置場所</button>
+    <button class="fp-tab-btn active" id="fp-tab-place" onclick="fpTab(0)">設置場所</button>
     <button class="fp-tab-btn" onclick="fpTab(1)">エリア</button>
     <button class="fp-tab-btn" onclick="fpTab(2)">条件・検索</button>
   </div>
   <div id="fp-grid">
 
-    <!-- 左列：ターゲット・設置場所 -->
+    <!-- 左列：ターゲット・設置場所（ターゲットはデータが揃うまで隠す。SHOW_TARGET_FILTER） -->
     <div class="fp-col active" style="border-right:1px solid #f0f0f0;padding:10px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
-      <div>
+      <div id="fp-target-sec">
         <div class="fp-sec-head"><h4 style="margin-bottom:0;font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px">ターゲット</h4><button class="btn-select-all" onclick="selectAll(document.getElementById('t-target'))">すべて選択</button></div>
         <div class="tags" id="t-target" style="margin-top:6px">
           <span class="tag" onclick="tt(this)">10代</span><span class="tag" onclick="tt(this)">20代</span>
@@ -687,7 +687,7 @@ function ic(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 2
       <div>
         <div class="fp-sec-head"><h4 style="margin-bottom:0;font-size:11px;color:var(--org);font-weight:700;text-transform:uppercase;letter-spacing:.5px">設置場所</h4><button class="btn-select-all" onclick="selectAll(document.getElementById('t-place'))">すべて選択</button></div>
         <div class="tags" id="t-place" style="margin-top:6px">
-          <span class="tag" onclick="tt(this)">カラオケ</span><span class="tag" onclick="tt(this)">廊外</span>
+          <span class="tag" onclick="tt(this)">カラオケ</span><span class="tag" onclick="tt(this)">屋外</span>
           <span class="tag" onclick="tt(this)">サロン</span><span class="tag" onclick="tt(this)">駅</span>
           <span class="tag" onclick="tt(this)">飲食店</span><span class="tag" onclick="tt(this)">学校</span>
           <span class="tag" onclick="tt(this)">ビル・オフィス</span><span class="tag" onclick="tt(this)">商業施設</span>
@@ -2320,22 +2320,48 @@ function _sgKind(s){
   if(k!=='stand') return k;
   return /FLASH/i.test([s.name||'',s.place||'',s.type||''].join(' '))?'flash':'stand';
 }
-// 今選んでいる条件に合うサイネージ。件数の表示（_updFilterCount）と検索（applyFilter）で同じ判定を使う
+// 絞り込みの「ターゲット」を出すか。データがほぼ「ドライバー」か空で、選ぶと必ず 0 件になるため当面 false（11/24 W共有 Q22・アプリと同じ）
+const SHOW_TARGET_FILTER=false;
+if(!SHOW_TARGET_FILTER){const t=$('fp-target-sec');if(t)t.style.display='none';}
+// 設置場所の種類ごとの手がかりの言葉。名前か設置場所の言葉に入っていればその種類に入れる（1 件が複数に入ることもある）。
+// データの設置場所は「EV 充電スポット（FLASH）」「店舗前（スタンド型）」などで選択肢の言葉が入っていないため。
+// アプリ（koukokunavi-app の lib/logic/filter.dart の placeKeywords）と同じ言葉にしておく。増やすときは両方に足す
+const PLACE_KEYWORDS={
+  'カラオケ':['カラオケ'],
+  '屋外':['EV 充電','EV充電','沿い','道の駅','駐車場','大型','公園','屋外'],
+  'サロン':['サロン','Salon','salon','エステ','美容','ヘア','ネイル'],
+  '駅':['駅前','駅近','駅ナカ','駅構内','駅'],
+  '飲食店':['飲食','料理','焼肉','肉','スシロー','寿司','鮨','鰻','うなぎ','さわやか','とりだん','だるま','ラーメン','そば','うどん','食堂','レストラン','居酒屋','cafe','Cafe','カフェ','Bar','bar','バー','Pizz','ピザ','中華','グリル'],
+  '学校':['学校','大学','学習塾','塾','キャンパス','campus','cumpus','ACADEMY','アカデミー'],
+  'ビル・オフィス':['ビル（','ビル ','ビル2','ビル3','タワーズ','オフィス','株式会社','合同会社','有限会社','役所','庁舎','支所','営業所','本社','エンジニアリング'],
+  '商業施設':['ダイエー','ウオロク','ノジマ','スーパー','ストア','グラントマト','シャトレーゼ','プラザ','ビーンズ','LAVANO','コインランドリー','TERRAS','ビルド','BIG NOW','道の駅','ファーム','100万ドル','ショッピング','モール','販売','Honda Cars','ENEOS','レンタカー'],
+  '病院・薬局':['病院','医院','クリニック','薬局','ドラッグ','整骨','鍼灸','指圧','接骨'],
+  '宿泊施設':['ホテル','旅館','宿','リゾート','民宿','ペンション'],
+  'スポーツ施設':['ゴルフ','ジム','GYM','SPORTS','スポーツ','フィットネス','FITNESS','テニス','プール'],
+};
+function _placeMatches(s,cat){
+  let text=(s.name||'')+' '+(s.place||'');
+  if(cat==='駅') text=text.split('道の駅').join(''); // 道の駅は駅ではない
+  return (PLACE_KEYWORDS[cat]||[cat]).some(w=>text.includes(w));
+}
+function _wordHit(s,t){
+  return (s.area||'').includes(t)||(s.target||'').includes(t)||(s.place||'').includes(t)||(s.name||'').includes(t)||(s.addr||'').includes(t);
+}
+// 今選んでいる条件に合うサイネージ。件数の表示（_updFilterCount）と検索（applyFilter）で同じ判定を使う。
+// 同じ見出しの中は「どれか」、見出しどうし（ターゲット・設置場所・エリア・種類・稼働状況）は「すべて」を満たすもの
+// （11/24 アプリに合わせて変更。以前はターゲット・設置場所・エリアが 1 つのまとまりで、「福岡県」と「カラオケ」で両方の全部が出ていた）
 function _filterResult(){
-  const on=[...$('filter-panel').querySelectorAll('.tag.on')];
+  const on=[...$('filter-panel').querySelectorAll('.tag.on')].filter(t=>SHOW_TARGET_FILTER||!t.closest('#t-target'));
   const active=on.map(t=>t.textContent);
-  // 種類・稼働状況は文字の一致ではなく判定で絞る。同じ見出しの中はどれか、見出しどうしは両方を満たすもの
-  const words=on.filter(t=>!t.dataset.kind&&!t.dataset.st).map(t=>t.textContent);
+  const targets=on.filter(t=>t.closest('#t-target')).map(t=>t.textContent);
+  const places=on.filter(t=>t.closest('#t-place')).map(t=>t.textContent);
+  const areas=on.filter(t=>t.closest('#area-grid')).map(t=>t.textContent);
   const kinds=on.filter(t=>t.dataset.kind).map(t=>t.dataset.kind);
   const sts=on.filter(t=>t.dataset.st).map(t=>t.dataset.st);
   const res=active.length?SG.filter(s=>
-    (!words.length||words.some(t=>
-      (s.area||'').includes(t)||
-      (s.target||'').includes(t)||
-      (s.place||'').includes(t)||
-      (s.name||'').includes(t)||
-      (s.addr||'').includes(t)
-    ))&&
+    (!targets.length||targets.some(t=>_wordHit(s,t)))&&
+    (!places.length||places.some(c=>_placeMatches(s,c)))&&
+    (!areas.length||areas.some(t=>_wordHit(s,t)))&&
     (!kinds.length||kinds.includes(_sgKind(s)))&&
     (!sts.length||sts.includes(_pinIsPlan(s)?'plan':'on'))
   ):SG;
