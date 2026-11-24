@@ -267,6 +267,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .btn-data-check{background:var(--org);color:#fff;border:none;border-radius:12px;padding:5px 14px;font-size:13px;cursor:pointer;font-weight:600}
 .dp-card-body{padding:10px 16px;font-size:16px;color:#555;line-height:1.8}
 .dp-card-body .row{display:flex;align-items:flex-start;gap:6px}
+/* 行の高さ 1.8 に対して 1 行目の真ん中にそろえる（上ぞろえのままだとアイコンが上に寄る。11/24 表示形式で発生） */
+.dp-card-body .row>.ic{margin-top:.4em}
 .plan-list{list-style:none}
 .plan-list li{padding:8px 16px;border-bottom:1px solid #f2f2f2;font-size:16px;color:#333;display:flex;align-items:center;gap:6px}
 .plan-list li:last-child{border-bottom:none}
