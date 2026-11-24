@@ -36,6 +36,12 @@
 <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
 <script src="shared-data.js"></script>
 <style>
+/* アイコンは Lucide（ISC ライセンス、https://lucide.dev）の線画を SVG で埋め込み。外部読み込みなし（11/24 眞野さん：絵文字をやめる） */
+.ic{width:1em;height:1em;vertical-align:-.14em;flex-shrink:0;display:inline-block}
+.fav-btn .ic{color:#9a9a9a}.fav-btn .ic.on{color:#e53935;fill:#e53935}
+.ph-ic{color:#a89f95}
+#search-wrap button .ic{width:1.3em;height:1.3em;vertical-align:-.25em}
+
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Hiragino Sans',Meiryo,sans-serif}
 :root{--org:#e8650a;--org2:#ff8c2a;--dark:#333;--gray:#888;--light:#f8f8f8;--white:#fff;--border:#e0e0e0;--hdr:48px}
 body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:#f5f5f5}
@@ -405,7 +411,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .pie-legend{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px 10px}
 .pie-leg-item{display:flex;align-items:center;gap:5px;font-size:13px;color:#555;white-space:nowrap}
 .pie-leg-item span{display:inline-block;width:9px;height:9px;border-radius:2px;flex-shrink:0}
-.auth-note{font-size:11px;color:#aaa;margin-bottom:14px;background:#fff8f4;padding:8px 10px;border-radius:4px;border-left:3px solid var(--org)}
+.auth-note{font-size:11px;color:#aaa;margin-bottom:14px;background:#fff8f4;padding:8px 10px;border-radius:6px}
 .auth-switch{text-align:center;margin-top:10px;font-size:12px;color:#aaa}
 .auth-switch a{color:var(--org);cursor:pointer;text-decoration:underline}
 .ad-table{width:100%;border-collapse:collapse;font-size:16px;margin-top:10px}
@@ -466,6 +472,11 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 @keyframes kn-tap-pop{0%,100%{transform:translateY(0) scale(1)}45%{transform:translateY(-4px) scale(1.08)}}
 .kn-tap-badge{display:inline-block;background:#e8650a;color:#fff;font-size:10px;font-weight:800;border-radius:20px;padding:3px 10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);letter-spacing:.4px;line-height:1.4;margin-bottom:4px;animation:kn-tap-pop 1.8s ease-in-out infinite}
 </style>
+<script>
+// 絵文字の代わりの線画アイコン（Lucide・ISC）。ic('search') で <svg> の文字列を返す
+const KN_ICONS={'search':'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>','heart':'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>','monitor':'<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>','chart-column':'<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>','japanese-yen':'<path d="M12 9.5V21m0-11.5L6 3m6 6.5L18 3"/><path d="M6 15h12"/><path d="M6 11h12"/>','tv':'<rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>','car':'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>','mail':'<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>','x':'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>','chevron-left':'<path d="m15 18-6-6 6-6"/>','chevron-right':'<path d="m9 18 6-6-6-6"/>','history':'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>','trash-2':'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>','map':'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>','clipboard-list':'<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>','megaphone':'<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>','send':'<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>','user':'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>','smartphone':'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>','file-text':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>','lock':'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>','triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>','locate-fixed':'<line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/>','loader-circle':'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>','map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>','house':'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>','ruler':'<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>','info':'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>','external-link':'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>','pencil':'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>','inbox':'<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'};
+function ic(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(KN_ICONS[n]||'')+'</svg>';}
+</script>
 </head>
 <body>
 <div id="header">
@@ -475,7 +486,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   </div>
   <div id="search-wrap">
     <input type="text" id="q" placeholder="検索" onkeydown="handleSuggestKey(event)" oninput="updateSuggest()" onfocus="updateSuggest()" onblur="setTimeout(hideSuggest,180)">
-    <button onclick="doSearch()">🔍</button>
+    <button onclick="doSearch()" aria-label="検索"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
   </div>
   <button id="filter-icon" onclick="toggleFilter()" title="絞り込み" style="display:flex;align-items:center;justify-content:center;height:20px">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -514,17 +525,17 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
   <div class="dp-topbar">
     <button class="dp-back-btn" onclick="closeDetail()">◀ 戻る</button>
     <div class="dp-topbar-name" id="dp-nm">サイネージ名</div>
-    <button class="fav-btn" id="fav-btn" onclick="toggleFav()">🤍</button>
+    <button class="fav-btn" id="fav-btn" onclick="toggleFav()" aria-label="お気に入り"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></button>
   </div>
   <div class="dp-page-body">
     <div class="dp-left-col">
-      <div class="dp-img-wrap" id="dp-img" onclick="openPV(0)">🏢</div>
+      <div class="dp-img-wrap" id="dp-img" onclick="openPV(0)"><svg class="ic ph-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></div>
       <div id="dp-photo-strip" style="display:none;flex-wrap:wrap;gap:4px;padding:0 2px;margin-top:4px"></div>
       <div class="dp-breadcrumb" id="dp-bc" style="padding:0 2px">名古屋 / 女性</div>
       <!-- 通行者データ（時間別・男女比・年代別）は全サイネージ共通の仮の値なので、動画と AI の計測で実データが入るまで出さない（10/13 眞野判断）。
            出し直すときは display:none を外す（描画処理 openDetail 内はそのまま残してある） -->
       <div class="dp-data-card" style="flex-shrink:0;display:none">
-        <div class="dp-data-head">📊 通行者データ</div>
+        <div class="dp-data-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> 通行者データ</div>
         <div style="padding:8px 12px">
           <div class="chart-title">1日の通行者数（時間別 / 先月比）</div>
           <div class="bar-chart" id="inline-bc"></div>
@@ -569,7 +580,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
           </div>
         </div>
         <div class="dp-data-card" style="margin-bottom:6px">
-          <div class="dp-data-head">💰 広告出稿データ</div>
+          <div class="dp-data-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9.5V21m0-11.5L6 3m6 6.5L18 3"/><path d="M6 15h12"/><path d="M6 11h12"/></svg> 広告出稿データ</div>
           <div style="padding:8px 12px">
             <table class="ad-table" id="inline-ad-table">
               <thead><tr><th>プラン</th><th>掲載期間</th><th>回数/O-A</th><th>料金</th></tr></thead>
@@ -582,7 +593,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
         <!-- 10/22 社長の指示：資料ダウンロードの代わりに、資料（広告掲載のご提案書）の内容をページに載せる。
              全サイネージ共通の内容。料金は拠点ごとに上の「広告出稿データ」に出ているので、ここには載せない -->
         <div class="dp-data-card dp-guide" style="margin-bottom:6px">
-          <div class="dp-data-head">📺 広告掲載について</div>
+          <div class="dp-data-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg> 広告掲載について</div>
           <div class="g-body" style="padding:8px 12px">
             <!-- 社外からの掲載申請で載せたサイネージ（source=request）は、下の 10FF の文章ではなくこちらを出す（11/19 眞野さん） -->
             <div class="g-owner">
@@ -633,9 +644,9 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
       <div style="flex:0 0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-top:6px">
         <div style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:2px">アクション</div>
         <div style="display:flex;gap:8px">
-          <button class="btn-dl" style="flex:1" onclick="openStreetView()">🚗 ストリートビュー</button>
+          <button class="btn-dl" style="flex:1" onclick="openStreetView()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg> ストリートビュー</button>
           <!-- 資料ダウンロードは 10/22 社長の指示で外した（dlDoc は残してある。戻すときはこの行を戻す） -->
-          <button class="btn-inq" style="flex:1" onclick="showInq()">✉ お問い合わせ</button>
+          <button class="btn-inq" style="flex:1" onclick="showInq()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> お問い合わせ</button>
         </div>
       </div>
     </div>
@@ -643,15 +654,15 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 </div>
 
 <div id="photo-viewer" onclick="closePV(event)">
-  <button class="pv-close" onclick="closePV()">✕</button>
-  <button class="pv-nav pv-prev" id="pv-prev" onclick="pvNav(-1,event)">❮</button>
+  <button class="pv-close" onclick="closePV()" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+  <button class="pv-nav pv-prev" id="pv-prev" onclick="pvNav(-1,event)" aria-label="前の写真"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
   <img class="pv-img" id="pv-img" src="" alt="">
   <div class="pv-counter" id="pv-counter"></div>
-  <button class="pv-nav pv-next" id="pv-next" onclick="pvNav(1,event)">❯</button>
+  <button class="pv-nav pv-next" id="pv-next" onclick="pvNav(1,event)" aria-label="次の写真"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
 </div>
 
 <div id="filter-panel">
-  <div class="fp-header"><h3>🔍 絞り込み検索</h3><span id="fp-hit"></span><button class="fp-close" onclick="toggleFilter()">✕</button></div>
+  <div class="fp-header"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> 絞り込み検索</h3><span id="fp-hit"></span><button class="fp-close" onclick="toggleFilter()" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
   <div class="fp-tab-bar">
     <button class="fp-tab-btn active" onclick="fpTab(0)">ターゲット・設置場所</button>
     <button class="fp-tab-btn" onclick="fpTab(1)">エリア</button>
@@ -726,12 +737,12 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 <div id="hist-wrap">
   <div id="hist-panel">
     <div class="hist-header">
-      <span>🕐 検索履歴</span>
+      <span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg> 検索履歴</span>
     </div>
     <div id="hist-items"></div>
-    <button id="hist-clear" onclick="confirmClearHistory()">🗑️ 履歴を全て削除</button>
+    <button id="hist-clear" onclick="confirmClearHistory()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 履歴を全て削除</button>
   </div>
-  <div id="hist-tab" onclick="toggleHistPanel()" title="検索履歴">🕐</div>
+  <div id="hist-tab" onclick="toggleHistPanel()" title="検索履歴"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg></div>
 </div>
 
 <div id="suggest-box"></div>
@@ -756,16 +767,16 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 
 <div id="menu-drawer">
   <div class="menu-head"><span>メニュー</span></div>
-  <div class="menu-row" onclick="gotoTop()"><span class="mi">📍</span>MAPトップ</div>
-  <div class="menu-row" onclick="showFavList()"><span class="mi">❤️</span>お気に入り登録一覧</div>
-  <div class="menu-row" onclick="showInq()"><span class="mi">✉️</span>お問い合わせ</div>
-  <div class="menu-row" onclick="showInqHistory()"><span class="mi">📋</span>お問い合わせ履歴</div>
-  <div class="menu-row" id="menu-keisai" onclick="location.href='./keisai.html'" style="display:none"><span class="mi">📢</span>サイネージをお持ちの方へ（テスト）</div>
-  <div class="menu-row" id="menu-register" onclick="showRegister()" style="display:none"><span class="mi">📮</span>サイネージの掲載申請（テスト）</div>
-  <div class="menu-row" onclick="showAccSettings()"><span class="mi">👤</span>アカウント設定</div>
-  <div class="menu-row" id="menu-appdl" onclick="showAppDl()" style="display:none"><span class="mi">📱</span>スマホアプリ（QR コード）</div>
-  <div class="menu-row" onclick="window.open('./terms.html','_blank','noopener')"><span class="mi">📄</span>利用規約</div>
-  <div class="menu-row" onclick="window.open('./privacy.html','_blank','noopener')"><span class="mi">🔒</span>プライバシーポリシー</div>
+  <div class="menu-row" onclick="gotoTop()"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>MAPトップ</div>
+  <div class="menu-row" onclick="showFavList()"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>お気に入り登録一覧</div>
+  <div class="menu-row" onclick="showInq()"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>お問い合わせ</div>
+  <div class="menu-row" onclick="showInqHistory()"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>お問い合わせ履歴</div>
+  <div class="menu-row" id="menu-keisai" onclick="location.href='./keisai.html'" style="display:none"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>サイネージをお持ちの方へ（テスト）</div>
+  <div class="menu-row" id="menu-register" onclick="showRegister()" style="display:none"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></span>サイネージの掲載申請（テスト）</div>
+  <div class="menu-row" onclick="showAccSettings()"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>アカウント設定</div>
+  <div class="menu-row" id="menu-appdl" onclick="showAppDl()" style="display:none"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span>スマホアプリ（QR コード）</div>
+  <div class="menu-row" onclick="window.open('./terms.html','_blank','noopener')"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>利用規約</div>
+  <div class="menu-row" onclick="window.open('./privacy.html','_blank','noopener')"><span class="mi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>プライバシーポリシー</div>
   <div class="menu-foot">広告ナビ © テンフィールズファクトリー</div>
 </div>
 
@@ -1006,7 +1017,7 @@ async function _knReloadFavs(){
 }
 function _knSyncFavs(){
   if(!loggedIn||!_knToken) return;
-  _knReloadFavs().then(()=>{ if(cur&&$('detail-panel').classList.contains('open')) $('fav-btn').textContent=favs.has(cur.id)?'❤️':'🤍'; });
+  _knReloadFavs().then(()=>{ if(cur&&$('detail-panel').classList.contains('open')) $('fav-btn').innerHTML=_favIcon(favs.has(cur.id)); });
 }
 function endSession(){
   const t=_knToken;
@@ -1020,7 +1031,7 @@ function endSession(){
 // purpose: 'login' | 'delete' | 'change'
 function showAuth(){ _smsDialog('login'); }
 function _smsDialog(purpose){
-  const titles={login:'📱 ログイン／新規登録',delete:'⚠️ 退会の前に本人確認',change:'📱 電話番号の変更'};
+  const titles={login:ic('smartphone')+' ログイン／新規登録',delete:ic('triangle-alert')+' 退会の前に本人確認',change:ic('smartphone')+' 電話番号の変更'};
   const fixed=purpose==='delete'&&_knProfile?knPhoneLabel(_knProfile.phone_number):'';
   const lead={
     login:'電話番号に届く 6 桁のコードでログインします。初めての方はそのまま登録になります（パスワードは不要です）。',
@@ -1037,7 +1048,7 @@ function _smsDialog(purpose){
       ${purpose==='login'?'<div style="font-size:11px;color:#999;margin-top:10px;line-height:1.7">SMS の受信に通信料がかかる場合があります。メールアドレスとパスワードで登録していた方は、電話番号で新しく登録してください。この端末のお気に入り・メモは引き継がれます。<br>確認コードを送信すると、<a href="./terms.html" target="_blank" rel="noopener" style="color:var(--org)">利用規約</a>と<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に同意したものとみなします。</div>':''}
     </div>
     <div id="sms-step2" style="display:none">
-      <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:4px;border-left:3px solid #2196F3">📱 <span id="sms-sent-to"></span> に届いた 6 桁のコードを入力してください</p>
+      <p style="font-size:12px;color:#555;margin-bottom:12px;background:#f0f7ff;padding:8px 10px;border-radius:6px">${ic('smartphone')} <span id="sms-sent-to"></span> に届いた 6 桁のコードを入力してください</p>
       <div class="fg"><label>確認コード<span class="req">必須</span></label>
         <input class="fi code-input" id="sms-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="6" oninput="if(this.value.replace(/\\D/g,'').length===6){this.value=this.value.replace(/\\D/g,'');smsVerify()}" onkeydown="if(event.key==='Enter'){event.preventDefault();smsVerify()}">
       </div>
@@ -1445,11 +1456,11 @@ function addLocateControl(){
   if(btn)return;
   btn=document.createElement('div');
   btn.className='gmap-ctrl-btn';
-  btn.id='btn-locate';btn.title='現在地へ移動';btn.textContent='📍';
+  btn.id='btn-locate';btn.title='現在地へ移動';btn.innerHTML=ic('locate-fixed');
   btn.addEventListener('click',function(e){
     e.stopPropagation();
-    btn.classList.add('locating');btn.textContent='⏳';
-    if(!navigator.geolocation){btn.classList.remove('locating');btn.textContent='📍';toast("現在地を取得できませんでした");return;}
+    btn.classList.add('locating');btn.innerHTML=ic('loader-circle');
+    if(!navigator.geolocation){btn.classList.remove('locating');btn.innerHTML=ic('locate-fixed');toast("現在地を取得できませんでした");return;}
     navigator.geolocation.getCurrentPosition(
       function(p){
         const pos={lat:p.coords.latitude,lng:p.coords.longitude};
@@ -1458,11 +1469,11 @@ function addLocateControl(){
         const wrap=document.createElement('div');
         wrap.innerHTML='<div style="width:16px;height:16px;border-radius:50%;background:#1976d2;border:3px solid #fff;box-shadow:0 0 0 2px #1976d2,0 2px 6px rgba(0,0,0,.4)"></div>';
         _locMarker=new _GM.AdvancedMarkerElement({map:map,position:pos,content:wrap.firstElementChild});
-        btn.classList.remove('locating');btn.textContent='📍';
+        btn.classList.remove('locating');btn.innerHTML=ic('locate-fixed');
         toast("現在地に移動しました");
       },
       function(err){
-        btn.classList.remove('locating');btn.textContent='📍';
+        btn.classList.remove('locating');btn.innerHTML=ic('locate-fixed');
         var msg="現在地を取得できませんでした";
         if(err&&err.code===1)msg="位置情報がブロックされています（ブラウザ/PCの設定で許可してください）";
         else if(err&&err.code===3)msg="現在地の取得がタイムアウトしました。もう一度お試しください";
@@ -1641,7 +1652,7 @@ function showAppDl(){
   const stores=[['iPhone','App Store',KN_APP_IOS_URL||(ready?'':tmp)],['Android','Google Play',KN_APP_ANDROID_URL||(ready?'':tmp)]].filter(x=>x[2]);
   const ua=navigator.userAgent, os=/iPhone|iPad|iPod/.test(ua)?'iPhone':/Android/.test(ua)?'Android':'';
   const mine=stores.filter(x=>x[0]===os), btns=mine.length?mine:stores;
-  openModal('<h3>📱 スマホアプリ'+(ready?'':'<span class="ad-note">公開前の見本</span>')+'</h3>'
+  openModal('<h3>'+ic('smartphone')+' スマホアプリ'+(ready?'':'<span class="ad-note">公開前の見本</span>')+'</h3>'
     +'<p style="font-size:13px;color:#555;margin:8px 0">'+(sp?'ストアからアプリを入れられます。':'スマートフォンのカメラで読み取ると、ストアのページが開きます。')+'</p>'
     +'<div class="ad-qrs">'+stores.map((x,i)=>'<div class="ad-qr"><div id="ad-qr'+i+'"></div>'+x[0]+'（'+x[1]+'）</div>').join('')+'</div>'
     +'<div class="ad-btns" id="ad-btns">'+btns.map(x=>'<a href="'+x[2]+'" target="_blank" rel="noopener">'+x[1]+' で開く</a>').join('')+'</div>');
@@ -1684,7 +1695,7 @@ function _trfHtml(trf){
   if(!trf||!/\d/.test(trf)) return '';
   const est=/推定/.test(trf);
   const v=trf.replace(/[（(]推定値[）)]/,'').trim();
-  return `<div class="row">🚗 交通量　<span>${v}</span></div><div class="row" style="font-size:11px;color:#888">${est?'※国土交通省による推定値<br>':''}${TRF_SOURCE}</div>`;
+  return `<div class="row">${ic('car')} 交通量　<span>${v}</span></div><div class="row" style="font-size:11px;color:#888">${est?'※国土交通省による推定値<br>':''}${TRF_SOURCE}</div>`;
 }
 // 稼働中の FLASH は今は広告を募集していない（11/9 AD MTG：ピンはそのまま、広告欄に「現在募集しておりません」）。
 // 設置予定（PLAN）の FLASH は投資家向けなので対象外。募集を始めたらここを外す
@@ -1696,10 +1707,10 @@ function _pubStatus(s){ return (_noAdRecruit(s)||s.status==='EMPTY')?'':(s.statu
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
   return `<div>
-    <div class="pp-head">📍 ${s.name}</div>
+    <div class="pp-head">${ic('map-pin')} ${s.name}</div>
     <div class="pp-body">
-      <div class="pp-row">🏠 ${s.addr||'—'}</div>
-      <div class="pp-row">📐 ${fmtSize(s.size)}</div>
+      <div class="pp-row">${ic('house')} ${s.addr||'—'}</div>
+      <div class="pp-row">${ic('ruler')} ${fmtSize(s.size)}</div>
       <div class="pp-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:price+'〜'}</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>
@@ -1755,17 +1766,17 @@ function openDetail(id){
     const t=$('dp-guide-owner'); if(t) t.textContent=info;
     const w=$('dp-guide-owner-wrap'); if(w) w.style.display=(own&&info)?'':'none';
   }
-  $('fav-btn').textContent=(loggedIn&&favs.has(s.id))?'❤️':'🤍';
+  $('fav-btn').innerHTML=_favIcon(loggedIn&&favs.has(s.id));
   const photos=s.photos||[];
   const mainPhoto=photos.find(p=>p.isMain)||photos[0];
   const mainUrl=mainPhoto?photoCache[mainPhoto.id]||'':'';
-  if(mainUrl){$('dp-img').innerHTML=`<img src="${mainUrl}" style="width:100%;height:100%;object-fit:cover;">`;$('dp-img').style.background='#e8e0d4';}else{$('dp-img').textContent=s.e||'🏢';$('dp-img').style.background='#e8e0d4';}
+  if(mainUrl){$('dp-img').innerHTML=`<img src="${mainUrl}" style="width:100%;height:100%;object-fit:cover;">`;$('dp-img').style.background='#e8e0d4';}else{$('dp-img').innerHTML=ic('monitor','ph-ic');$('dp-img').style.background='#e8e0d4';}
   const strip=$('dp-photo-strip');
   if(strip){if(photos.length>1){strip.style.display='flex';strip.innerHTML=photos.map((p,i)=>{const pu=photoCache[p.id]||'';return`<div onclick="openPV(${i})" style="width:48px;height:40px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid ${p.isMain?'var(--org)':'#ddd'};flex-shrink:0;transition:border-color .15s" onmouseover="this.style.borderColor='var(--org)'" onmouseout="this.style.borderColor='${p.isMain?'var(--org)':'#ddd'}'"><img src="${pu}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('');}else{strip.style.display='none';strip.innerHTML='';} }
   const _noAd=_noAdRecruit(s);
   const _st=_pubStatus(s);
-  const _stHtml=_st?`<div class="row">🔹 <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
-  $('dp-info').innerHTML=`${_stHtml}<div class="row">📍 住所　<span>${s.addr||'—'}</span></div><div class="row">📐 サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">🖥️ 表示形式　<span>${s.type||'—'}</span></div>${_trfHtml(s.trf)}`;
+  const _stHtml=_st?`<div class="row">${ic('info')} <span><span style="background:${STATUS_BG[_st]};color:${STATUS_TC[_st]};border:1px solid ${STATUS_COLOR[_st]};border-radius:4px;padding:2px 10px;font-weight:700;font-size:11px">${STATUS_LBL[_st]||_st}</span></span></div>`:'';
+  $('dp-info').innerHTML=`${_stHtml}<div class="row">${ic('map-pin')} 住所　<span>${s.addr||'—'}</span></div><div class="row">${ic('ruler')} サイズ　<span>${fmtSize(s.size)}</span></div><div class="row">${ic('monitor')} 表示形式　<span>${s.type||'—'}</span></div>${_trfHtml(s.trf)}`;
   // 人流（滞在人口）は住んでいる人の数で、通る人の数ではないため出さない（10/14 AD MTG）。DB の ped 列は残す
   $('memo-wrap').style.display=loggedIn?'flex':'none';$('memo-wrap').style.flexDirection='column';
   _knLoadMemo(s.id);
@@ -1828,14 +1839,14 @@ async function toggleFav(){
   // サーバー（favorites/）に保存。別の端末でも同じお気に入りが見える。失敗したら表示を元に戻す
   const id=cur.id, on=!favs.has(id);
   on?favs.add(id):favs.delete(id);
-  $('fav-btn').textContent=on?'❤️':'🤍';
+  $('fav-btn').innerHTML=_favIcon(on);
   try{
     if(on) await knApi('POST','/favorites/',{signage_id:String(id)},_knToken);
     else await knApi('DELETE','/favorites/'+id+'/',undefined,_knToken);
     toast(on?'お気に入りに追加しました':'お気に入りを解除しました');
   }catch(e){
     on?favs.delete(id):favs.add(id);
-    if(cur&&cur.id===id) $('fav-btn').textContent=favs.has(id)?'❤️':'🤍';
+    if(cur&&cur.id===id) $('fav-btn').innerHTML=_favIcon(favs.has(id));
     toast('保存できませんでした：'+_knApiErr(e));
     if(e&&e.status===401){_knSetToken('');_knApplyLogin(null);}
   }
@@ -1919,10 +1930,10 @@ async function _svUrl(s){
 function openStreetView(){
   if(!cur)return;
   if(SV_VIEWS[cur.id]&&SV_VIEWS[cur.id].none){
-    openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} の周りには、ストリートビューの画像がありません。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button></div>`,null,true,false);
+    openModal(`<h3>${ic('car')} ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} の周りには、ストリートビューの画像がありません。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button></div>`,null,true,false);
     return;
   }
-  openModal(`<h3>🚗 ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a id="sv-link" href="${_svFallbackUrl(cur)}" target="_blank" rel="noopener" class="btn-m-primary">🌐 Google マップで開く</a></div>`,null,true,false);
+  openModal(`<h3>${ic('car')} ストリートビュー</h3><p style="font-size:13px;color:#666;margin-bottom:8px">${cur.name} のストリートビューを開きます。</p><div class="m-close-row"><button class="btn-m-close" onclick="closeModal()">閉じる</button><a id="sv-link" href="${_svFallbackUrl(cur)}" target="_blank" rel="noopener" class="btn-m-primary">${ic('external-link')} Google マップで開く</a></div>`,null,true,false);
   const s=cur;
   _svUrl(s).then(u=>{const a=$('sv-link');if(a&&cur===s)a.href=u;});
 }
@@ -1933,7 +1944,7 @@ function dlDoc(){
   if(!docs.length){toast("この物件の資料はまだ登録されていません");return;}
   // 注意書きHTML（件数問わず常に表示）
   const notice=`<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#795548;line-height:1.7">
-    <div style="font-weight:700;margin-bottom:4px">⚠️ ダウンロードに関する注意事項</div>
+    <div style="font-weight:700;margin-bottom:4px">${ic('triangle-alert')} ダウンロードに関する注意事項</div>
     <ul style="margin:0;padding-left:16px">
       <li>本資料はお客様への情報提供を目的としております。</li>
       <li>内容の無断転用・転載・第三者への提供はご遠慮ください。</li>
@@ -1944,7 +1955,7 @@ function dlDoc(){
     <span style="font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${d.name}</span>
     <button onclick="(function(){var u=docCache['${d.id}']||'';if(!u){toast('データが見つかりません');return;}var a=document.createElement('a');a.href=u;a.download='${d.name.replace(/'/g,"\\'")}';a.click();toast('ダウンロードを開始しました');})()" style="flex-shrink:0;margin-left:10px;background:var(--org);color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700">⬇ DL</button>
   </div>`).join('');
-  openModal(`<h3 style="margin-bottom:8px">📄 資料ダウンロード</h3><p style="font-size:12px;color:#888;margin-bottom:12px">${cur.name}</p>${notice}${items}`,null,false,true);
+  openModal(`<h3 style="margin-bottom:8px">${ic('file-text')} 資料ダウンロード</h3><p style="font-size:12px;color:#888;margin-bottom:12px">${cur.name}</p>${notice}${items}`,null,false,true);
 }
 function pie(id,data,colors){
   const c=$(id);if(!c)return;
@@ -1995,9 +2006,9 @@ function renderHistory(){
   el.innerHTML=h.map((item,i)=>{
     if(typeof item==='string'){
       const kw=item;
-      return `<div class="hist-item" onclick="runHistSearch('${kw.replace(/'/g,"\\'")}')"><span class="hist-kw">🔍 ${kw}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})">✕</button></div>`;
+      return `<div class="hist-item" onclick="runHistSearch('${kw.replace(/'/g,"\\'")}')"><span class="hist-kw">${ic('search')} ${kw}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})" aria-label="削除">${ic('x')}</button></div>`;
     }else if(item&&item.type==='filter'){
-      return `<div class="hist-item" onclick="runFilterFromHistory(${i})"><span class="hist-kw"><span style="font-size:10px;background:var(--org);color:#fff;border-radius:3px;padding:1px 5px;margin-right:5px;flex-shrink:0">絞込</span>${item.label}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})">✕</button></div>`;
+      return `<div class="hist-item" onclick="runFilterFromHistory(${i})"><span class="hist-kw"><span style="font-size:10px;background:var(--org);color:#fff;border-radius:3px;padding:1px 5px;margin-right:5px;flex-shrink:0">絞込</span>${item.label}</span><button class="hist-del" onclick="event.stopPropagation();confirmDeleteHistory(${i})" aria-label="削除">${ic('x')}</button></div>`;
     }
     return '';
   }).join('');
@@ -2061,8 +2072,8 @@ function updateSuggest(){
   const hist=getHistory().filter(k=>typeof k==='string'&&nqs.some(nq=>_nrmS(k).includes(nq))&&k!==q).slice(0,5);
   const names=SG.filter(s=>nqs.some(nq=>_nrmS(s.name).includes(nq)||_nrmS(s.yomi||'').includes(nq))).map(s=>s.name).slice(0,5);
   const items=[
-    ...hist.map(k=>`<div class="sug-item" onmousedown="pickSuggest('${k.replace(/'/g,"\\'")}')"><span>🕐</span><span style="flex:1">${k}</span><span class="sug-label">履歴</span></div>`),
-    ...names.map(n=>`<div class="sug-item" onmousedown="pickSuggest('${n.replace(/'/g,"\\'")}')"><span>🔍</span><span style="flex:1">${n}</span><span class="sug-label">スポット</span></div>`)
+    ...hist.map(k=>`<div class="sug-item" onmousedown="pickSuggest('${k.replace(/'/g,"\\'")}')"><span>${ic('history')}</span><span style="flex:1">${k}</span><span class="sug-label">履歴</span></div>`),
+    ...names.map(n=>`<div class="sug-item" onmousedown="pickSuggest('${n.replace(/'/g,"\\'")}')"><span>${ic('search')}</span><span style="flex:1">${n}</span><span class="sug-label">スポット</span></div>`)
   ];
   if(!items.length){hideSuggest();return;}
   box.innerHTML=items.join('');
@@ -2109,7 +2120,7 @@ function doSearch(){
   const raw=$('q').value.trim();if(!raw){closeList();return;}
   // 詳細画面が開いていたら確認ポップアップを表示
   if($('detail-panel').classList.contains('open')){
-    openModal(`<h3 style="margin-bottom:12px">🔍 検索結果を表示</h3>
+    openModal(`<h3 style="margin-bottom:12px">${ic('search')} 検索結果を表示</h3>
       <p style="font-size:13px;color:#555;margin-bottom:16px">詳細画面を閉じて検索結果を閲覧しますか？</p>
       <div style="display:flex;gap:10px">
         <button onclick="closeModal()" style="flex:1;background:#f0f0f0;color:#555;border:none;border-radius:4px;padding:10px;font-size:13px;cursor:pointer;font-weight:700">いいえ</button>
@@ -2355,8 +2366,8 @@ function showList(items,label){
   $('lp-items').innerHTML=items.map(s=>{
     const mp=(s.photos||[]).find(p=>p.isMain)||(s.photos||[])[0];
     const mpUrl=mp?photoCache[mp.id]||'':'';
-    const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:(s.e||'🏢');
-    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">📍 ${s.place||s.area||''}</div><div class="li-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:(s.plans&&s.plans[0]?s.plans[0].p:'—')+'〜'}</div></div></div>`;
+    const thumb=mpUrl?`<img src="${mpUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`:ic('monitor','ph-ic');
+    return `<div class="list-item" onclick="focusPin(${s.id})"><div class="li-thumb">${thumb}</div><div class="li-body"><div class="li-name">${s.name}</div><div class="li-meta">${ic('map-pin')} ${s.place||s.area||''}</div><div class="li-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:(s.plans&&s.plans[0]?s.plans[0].p:'—')+'〜'}</div></div></div>`;
   }).join('');
   $('list-panel').classList.add('open');
   $('lp-items').scrollTop=0;
@@ -2371,7 +2382,7 @@ function _restoreList(){ if(_listHidden){ $('list-panel').classList.add('open');
 function _updListBack(){
   let b=$('btn-listback');
   if(!b){ b=document.createElement('button'); b.id='btn-listback'; b.onclick=_restoreList; document.body.appendChild(b); }
-  b.textContent='📋 一覧に戻る（'+($('lp-count').textContent.replace(/\s+/g,' ').trim())+'）';
+  b.innerHTML=ic('clipboard-list')+' 一覧に戻る（'+_esc($('lp-count').textContent.replace(/\s+/g,' ').trim())+'）';
   b.style.display=(_listHidden&&!$('detail-panel').classList.contains('open'))?'flex':'none';
 }
 
@@ -2381,7 +2392,7 @@ function _updListBack(){
 let _areaPoly=null, _drawing=false;
 function addAreaSelectControl(){
   if($('btn-area'))return;
-  const b=document.createElement('button'); b.id='btn-area'; b.innerHTML='✏️ 囲んで探す'; b.title='地図をなぞって範囲を囲むと、その中のサイネージを一覧で出します';
+  const b=document.createElement('button'); b.id='btn-area'; b.innerHTML=ic('pencil')+' 囲んで探す'; b.title='地図をなぞって範囲を囲むと、その中のサイネージを一覧で出します';
   b.onclick=e=>{e.stopPropagation(); _drawing?_endDraw():_startDraw();};
   document.body.appendChild(b);
 }
@@ -2416,7 +2427,7 @@ function _inPoly(pt,poly){ // 点が多角形の中か（辺との交差の数�
 function _startDraw(){
   if(!map||!map.getProjection())return;
   if(mOpen)toggleMenu(); if(fpOpen)closeFilter(); if(_infoWin)_infoWin.close();
-  _drawing=true; $('btn-area').classList.add('active'); $('btn-area').innerHTML='✕ やめる';
+  _drawing=true; $('btn-area').classList.add('active'); $('btn-area').innerHTML=ic('x')+' やめる';
   const r=map.getDiv().getBoundingClientRect();
   const layer=document.createElement('div'); layer.id='draw-layer';
   Object.assign(layer.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'});
@@ -2431,7 +2442,7 @@ function _startDraw(){
   layer.addEventListener('pointerup',()=>{ if(pts.length) _finishDraw(pts); });
 }
 function _endDraw(){
-  _drawing=false; const b=$('btn-area'); if(b){b.classList.remove('active');b.innerHTML='✏️ 囲んで探す';}
+  _drawing=false; const b=$('btn-area'); if(b){b.classList.remove('active');b.innerHTML=ic('pencil')+' 囲んで探す';}
   ['draw-layer','draw-hint'].forEach(id=>{const el=$(id);if(el)el.remove();});
 }
 function _finishDraw(pts){
@@ -2478,7 +2489,7 @@ function showFavList(){if(mOpen)toggleMenu();if(!loggedIn){showAuth('login');ret
 function showAccSettings(){
   toggleMenu();if(!loggedIn){showAuth();return;}
   const p=_knProfile||{};
-  openModal(`<h3>👤 アカウント設定</h3>
+  openModal(`<h3>${ic('user')} アカウント設定</h3>
     <div class="fg"><label>電話番号（ログインに使います）</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="fi" value="${knPhoneLabel(p.phone_number)}" disabled style="color:#555;background:#f8f8f8;flex:1">
@@ -2509,7 +2520,7 @@ async function saveAccSettings(){
 }
 function logout(){endSession();toast("ログアウトしました");}
 function confirmDeleteAccount(){
-  openModal(`<h3 style="color:#c0392b">⚠️ 退会（アカウント削除）</h3>
+  openModal(`<h3 style="color:#c0392b">${ic('triangle-alert')} 退会（アカウント削除）</h3>
     <p style="font-size:13px;color:#555;margin:12px 0 4px">退会すると、お気に入り・メモなどのデータがすべて削除されます。</p>
     <p style="font-size:12px;color:#e74c3c;margin-bottom:16px;font-weight:700">この操作は元に戻せません。次の画面で、登録中の電話番号に届くコードで本人確認をします。</p>
     <div style="display:flex;gap:10px">
@@ -2554,12 +2565,12 @@ function _buildSignageOptions(){
 function showInq(){
   if(mOpen)toggleMenu();
   const signageOpts=_buildSignageOptions();
-  openModal(`<h3>✉ お問い合わせ</h3>
+  openModal(`<h3>${ic('mail')} お問い合わせ</h3>
     <div class="inq-type-row">
       <button class="inq-type-btn on" id="ib-s" onclick="setInqMode('signage')">サイネージに関する</button>
       <button class="inq-type-btn" id="ib-a" onclick="setInqMode('ad')">広告に関する</button>
     </div>
-    <div class="fg" id="inq-signage-wrap"><label>📍 サイネージ選択</label>
+    <div class="fg" id="inq-signage-wrap"><label>${ic('map-pin')} サイネージ選択</label>
       <select class="fi" id="inq-signage" onchange="_onInqSignageChange()">${signageOpts}</select>
       <div id="inq-signage-info" style="font-size:11px;color:#888;margin-top:4px"></div>
     </div>
@@ -2597,7 +2608,7 @@ function _onInqSignageChange(){
   if(s){
     const st=_pubStatus(s);
     const planTxt=s.plans&&s.plans[0]&&s.plans[0].p?'¥'+s.plans[0].p+'/月〜':'';
-    info.innerHTML='📍 '+s.place+(s.addr?' ・ '+s.addr:'')
+    info.innerHTML=ic('map-pin')+' '+s.place+(s.addr?' ・ '+s.addr:'')
       +(planTxt?' ・ '+planTxt:'')
       +(st?' ・ <span style="color:'+(STATUS_COLOR[st]||'#888')+'">● '+(STATUS_LBL[st]||st)+'</span>':'');
   }else{
@@ -2732,9 +2743,9 @@ const INQ_STATUS_CLS={new:'new',read:'read',replied:'replied'};
 function showInqHistory(){
   if(mOpen)toggleMenu();
   const inqs=_getInqs();
-  let html='<h3>📋 お問い合わせ履歴</h3>';
+  let html='<h3>'+ic('clipboard-list')+' お問い合わせ履歴</h3>';
   if(!inqs.length){
-    html+='<div class="inq-empty">📭<br>お問い合わせ履歴はまだありません</div>';
+    html+='<div class="inq-empty">'+ic('inbox')+'<br>お問い合わせ履歴はまだありません</div>';
   }else{
     html+=inqs.map((q,i)=>{
       const stLbl=INQ_STATUS_LBL[q.status]||'新着';
@@ -2761,7 +2772,7 @@ function showInqDetailUser(idx){
   const stLbl=INQ_STATUS_LBL[q.status]||'新着';
   const stCls=INQ_STATUS_CLS[q.status]||'new';
   const modeLabel=q.mode==='ad'?'広告に関する':'サイネージに関する';
-  let html=`<h3>✉ お問い合わせ詳細</h3>
+  let html=`<h3>${ic('mail')} お問い合わせ詳細</h3>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <span class="inq-status-badge ${stCls}" style="font-size:12px;padding:3px 12px">${stLbl}</span>
       <span style="font-size:12px;color:#aaa">${_fmtInqDate(q.ts)}</span>
@@ -2810,7 +2821,7 @@ function showRegister(){
   if(!loggedIn||!_knToken){ _regAfterLogin=true; toast('掲載の申請には会員ログイン（電話番号）が必要です'); showAuth(); return; }
   _reg={photos:[],lat:null,lng:null,map:null,marker:null,busy:false};
   const phone=_knProfile&&_knProfile.phone_number?knPhoneLabel(_knProfile.phone_number):'';
-  openModal(`<h3>📮 サイネージの掲載申請</h3>
+  openModal(`<h3>${ic('send')} サイネージの掲載申請</h3>
     <p style="font-size:12px;color:#666;line-height:1.7;margin-bottom:10px">お持ちのサイネージを広告ナビに載せたい方の申請フォームです。テンフィールズファクトリーが内容を確認し、<b>承認後に地図へ掲載</b>します。確認のため、登録の電話番号（${_regEsc(phone)}）にお電話することがあります。</p>
     <div style="text-align:right;margin-bottom:8px"><button class="btn-m-close" onclick="showMyRequests()">これまでの申請を見る</button></div>
     <div class="two-col">
@@ -2962,7 +2973,7 @@ async function submitRegister(){
   try{
     await knApi('POST','/signage-requests/',body,_knToken);
     _reg=null; closeModal();
-    openModal(`<h3>📮 申請を受け付けました</h3><p style="font-size:13px;color:#555;line-height:1.8">ありがとうございます。内容を確認し、承認後に広告ナビの地図へ掲載します。確認のため、登録の電話番号にご連絡することがあります。<br>申請の状況は「これまでの申請を見る」から確認できます。</p>`);
+    openModal(`<h3>${ic('send')} 申請を受け付けました</h3><p style="font-size:13px;color:#555;line-height:1.8">ありがとうございます。内容を確認し、承認後に広告ナビの地図へ掲載します。確認のため、登録の電話番号にご連絡することがあります。<br>申請の状況は「これまでの申請を見る」から確認できます。</p>`);
   }catch(e){
     const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo'};
     let shown=false;
@@ -2980,7 +2991,7 @@ async function showMyRequests(){
       <div class="inq-hist-bottom"><span class="inq-hist-cat">${_regEsc(r.addr)}</span><span class="inq-hist-date">${_regEsc(String(r.created_at||'').slice(0,10))}</span></div>
       ${r.status==='rejected'&&r.review_note?`<div style="font-size:12px;color:#991b1b;margin-top:6px">理由：${_regEsc(r.review_note)}</div>`:''}
       ${r.status==='approved'&&r.signage_id?`<div style="margin-top:6px"><a href="/?s=${Number(r.signage_id)}" style="font-size:12px;color:var(--org)">地図で見る</a></div>`:''}</div>`).join('');
-    openModal(`<h3>📮 これまでの申請</h3>${rows||'<div class="inq-empty">まだ申請はありません</div>'}
+    openModal(`<h3>${ic('send')} これまでの申請</h3>${rows||'<div class="inq-empty">まだ申請はありません</div>'}
       <div style="margin-top:10px"><button class="btn-org" onclick="showRegister()">新しく申請する</button></div>`);
   }catch(e){ toast(e&&e.status===404?'この環境では、まだ申請を受け付けていません':_knApiErr(e)); }
 }
@@ -3053,6 +3064,8 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 }
 
 function $(id){return document.getElementById(id);}
+function _favIcon(on){return ic('heart',on?'on':'');}
+function _esc(t){return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 // toast は shared-data.js で定義
 </script>
 </body>
