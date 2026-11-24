@@ -2406,36 +2406,6 @@ function srvImportLocal(){
 // 再読み込み後も同じタブなら接続を引き継ぎ、サーバーの一覧を表示する
 _srvRenderBtn();
 if(_srvToken()) _srvLoadFromServer(false).catch(function(e){ toast('⚠ '+_srvErr(e)); });
-
-// ===== ブラウザ／スマホの「戻る」で、いちばん上の画面だけを閉じる（11/24 眞野さん：利用者画面と同じ動きに） =====
-// 開いた時点で履歴を 1 つ積んでおき、「戻る」が来たら上にある画面（確認・ポップアップ→新規追加→問い合わせ詳細→パネル→一覧）を 1 つ閉じて積み直す。
-// 何も開いていないとき・ログイン画面のときは、そのままページを戻る
-(function(){
-  function vis(id){var e=document.getElementById(id);return !!e&&getComputedStyle(e).display!=='none';}
-  var LAYERS=[ // 上に重なるものから順に
-    {open:function(){return vis('del-modal');},      close:function(){closeDelModal();}},
-    {open:function(){return vis('logout-modal');},   close:function(){hideLogoutModal();}},
-    {open:function(){return vis('changepw-modal');}, close:function(){closeChangePwModal();}},
-    {open:function(){return vis('excel-modal');},    close:function(){closeExcelModal();}},
-    {open:function(){return vis('srv-modal');},      close:function(){closeSrvModal();}},
-    {open:function(){return vis('req-modal');},      close:function(){closeReqModal();}},
-    {open:function(){return vis('add-screen');},     close:function(){closeAddModal();}},
-    {open:function(){return _inqPanelOpen&&_inqDetailId!=null;}, close:function(){_inqDetailId=null;renderInqList();}},
-    {open:function(){return _inqPanelOpen;},         close:function(){toggleInqPanel();}},
-    {open:function(){var e=document.getElementById('admin-panel');return !!e&&e.classList.contains('open');}, close:function(){closeAdmin();}},
-    {open:function(){return addMode;},               close:function(){toggleAddMode();}},
-    {open:function(){return listOpen;},              close:function(){toggleList();}},
-  ];
-  function locked(){return vis('login-screen')||vis('locked-screen')||vis('logout-screen');}
-  if(!(history.state&&history.state.adm)) history.pushState({adm:1},'');
-  window.addEventListener('popstate',function(e){
-    if(e.state&&e.state.adm) return; // 「進む」で積んだ所に戻っただけ
-    var top=locked()?null:LAYERS.find(function(l){try{return l.open();}catch(_){return false;}});
-    if(!top){ history.back(); return; } // 閉じるものが無ければページを戻る
-    try{ top.close(); }catch(err){ console.warn('[戻る] 閉じられませんでした',err); }
-    history.pushState({adm:1},'');
-  });
-})();
 </script>
 </body>
 </html>
