@@ -256,6 +256,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 /* 大型（明和町）は提案書の内容が違う部分だけ文章を切り替える（10/27 眞野さん） */
 .dp-guide.large .g-std,.dp-guide:not(.large) .g-large{display:none}
 .dp-guide:not(.owner) .g-owner,.dp-guide.owner .g-body>:not(.g-owner){display:none}
+.dp-guide:not(.prep) .g-prep,.dp-guide.prep .g-body>:not(.g-prep){display:none}
 .dp-body{padding:12px 14px}
 .dp-breadcrumb{font-size:14px;color:#aaa;margin-bottom:4px}
 .dp-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -598,6 +599,8 @@ function ic(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 2
           <div class="dp-data-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg> 広告掲載について</div>
           <div class="g-body" style="padding:8px 12px">
             <!-- 社外からの掲載申請で載せたサイネージ（source=request）は、下の 10FF の文章ではなくこちらを出す（11/19 眞野さん） -->
+            <!-- 広告を募集していない FLASH（_noAdRecruit）は、10FF の文章の代わりに「準備中」とだけ出す（11/24 眞野さん。#92 の代わり・文言は他サイトを調べて見直す予定） -->
+            <div class="g-prep"><p>広告掲載のご案内は、現在準備中です。</p></div>
             <div class="g-owner">
               <p>広告の掲載条件・料金については、お問い合わせください。</p>
               <div id="dp-guide-owner-wrap"><h4>掲載者からのご案内</h4><p id="dp-guide-owner" style="white-space:pre-wrap"></p></div>
@@ -1763,8 +1766,8 @@ function openDetail(id){
   $('dp-nm').textContent=s.name;
   document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('large',_pinShape(s)==='large')); // 「広告掲載について」を大型用の文章に
   { // 掲載申請で載せたサイネージは 10FF の文章を出さず、「お問い合わせください」＋掲載者の文（任意）にする
-    const own=s.source==='request', info=String(s.ad_info||'').trim();
-    document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>g.classList.toggle('owner',own));
+    const prep=_noAdRecruit(s), own=!prep&&s.source==='request', info=String(s.ad_info||'').trim();
+    document.querySelectorAll('#detail-panel .dp-guide').forEach(g=>{g.classList.toggle('prep',prep);g.classList.toggle('owner',own);});
     const t=$('dp-guide-owner'); if(t) t.textContent=info;
     const w=$('dp-guide-owner-wrap'); if(w) w.style.display=(own&&info)?'':'none';
   }
