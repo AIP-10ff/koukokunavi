@@ -2807,7 +2807,7 @@ function showRegister(){
     </div>
     <div class="fg"><label>設置場所の種類</label><input class="fi" id="reg-place" maxlength="100" placeholder="例：店頭・駐車場・ビルの壁面"></div>
     <div class="fg"><label>住所<span class="req">必須</span></label>
-      <div style="display:flex;gap:6px"><input class="fi" id="reg-addr" maxlength="300" placeholder="例：三重県津市栄町1-1"><button class="btn-m-close" style="flex-shrink:0" onclick="_regGeocode()">地図で探す</button></div>
+      <div style="display:flex;gap:6px"><input class="fi" id="reg-addr" maxlength="300" placeholder="例：三重県津市栄町1-1" onchange="_regAutoGeocode()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.blur();}"><button class="btn-m-close" style="flex-shrink:0" onclick="_regGeocode()">地図で探す</button></div>
       <div id="reg-addr-err" class="input-err"></div></div>
     <div class="fg"><label>設置場所（地図をタップ、またはピンを動かして合わせてください。住所が空なら自動で入ります）<span class="req">必須</span></label>
       <div id="reg-map" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px;background:#f3f3f3"></div>
@@ -2821,7 +2821,7 @@ function showRegister(){
     <div class="fg"><label>広告掲載についてのご案内（任意・1000 文字まで）</label><textarea class="fi" id="reg-adinfo" maxlength="1000" style="min-height:80px;resize:vertical" placeholder="例：1 枠 15 秒・1 時間に 4 回放映。動画はお持ち込み、または制作のご相談も可。&#10;地図の詳細画面の「広告掲載について」に載ります。書かなければ「お問い合わせください」とだけ出ます"></textarea><div id="reg-adinfo-err" class="input-err"></div></div>
     <div class="fg"><label>メモ（400 文字まで・地図には載りません）</label><textarea class="fi" id="reg-note" maxlength="400" style="min-height:60px;resize:vertical" placeholder="電話に出られる時間帯など"></textarea></div>
     <div style="font-size:11px;color:#999;margin:8px 0 6px;line-height:1.7">送信いただいた内容は、<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に従って取り扱います。</div>
-    <button class="btn-org" id="reg-submit" onclick="submitRegister()">この内容で申請する</button>`,_regInitMap);
+    <button class="btn-org" id="reg-submit" onclick="submitRegister()">この内容で申請する</button>`,_regInitMap,false,true);
   _regAddPlan();
 }
 async function _regInitMap(){
@@ -2845,16 +2845,29 @@ function _regSetPos(lat,lng,pan){
   const t=$('reg-pos'); if(t) t.textContent=`選んだ位置：${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   _setFieldErr('reg-pos',false);
 }
-async function _regGeocode(){
+// 住所欄を入れ終わったら自動で位置を探す。ピンから自動で入れた住所のとき（同じ場所）と、前回探した住所と同じときは探さない
+function _regAutoGeocode(){
+  if(!_reg) return;
+  const addr=($('reg-addr').value||'').trim();
+  if(!addr||addr===_reg.autoAddr||addr===_reg.lastGeo) return;
+  _regGeocode(true);
+}
+async function _regGeocode(auto){
   const addr=($('reg-addr').value||'').trim();
   if(!addr){_setFieldErr('reg-addr',true,'住所を入力してください');return;}
+  if(_reg) _reg.lastGeo=addr;
   try{
     const {Geocoder}=await google.maps.importLibrary('geocoding');
     const {results}=await new Geocoder().geocode({address:addr,region:'jp'});
     if(!results||!results.length) throw 0;
     const p=results[0].geometry.location; _regSetPos(p.lat(),p.lng(),true);
-    toast('近くの位置にピンを置きました。ずれていれば動かしてください');
-  }catch(e){ toast('住所から位置を見つけられませんでした。地図をタップして選んでください'); }
+    toast('住所の位置にピンを置きました。ずれていれば動かしてください');
+  }catch(e){
+    // REQUEST_DENIED＝キーで住所検索（Geocoding）が許可されていない。原因を見分けられるよう残す
+    console.warn('[掲載申請] 住所から位置を探せませんでした',e&&(e.code||e.message||e));
+    toast(auto?'住所から位置を見つけられませんでした。地図をタップしてピンを置いてください'
+              :'住所から位置を見つけられませんでした。地図をタップして選んでください');
+  }
 }
 // ピンの位置から住所を入れる。住所欄が空か、前に自動で入れたままのときだけ書き換える（手で直した住所は消さない）
 async function _regReverse(){
