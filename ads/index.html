@@ -600,7 +600,7 @@ function ic(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 2
           <div class="g-body" style="padding:8px 12px">
             <!-- 社外からの掲載申請で載せたサイネージ（source=request）は、下の 10FF の文章ではなくこちらを出す（11/19 眞野さん） -->
             <!-- 広告を募集していない FLASH（_noAdRecruit）は、10FF の文章の代わりに「準備中」とだけ出す（11/24 眞野さん。#92 の代わり・文言は他サイトを調べて見直す予定） -->
-            <div class="g-prep"><p>広告掲載のご案内は、現在準備中です。</p></div>
+            <div class="g-prep"><p>このサイネージの広告枠は現在準備中です。掲載をご希望の方は、お問い合わせください。</p></div>
             <div class="g-owner">
               <p>広告の掲載条件・料金については、お問い合わせください。</p>
               <div id="dp-guide-owner-wrap"><h4>掲載者からのご案内</h4><p id="dp-guide-owner" style="white-space:pre-wrap"></p></div>
@@ -2847,6 +2847,25 @@ const REG_PHOTO_MAX=5;
 let _reg=null;            // 入力中の申請 {photos:[{key,url,name}], lat, lng, map, marker, busy}
 let _regAfterLogin=false; // ログインが済んだら申請画面を開き直す
 function _regEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// サイネージの形（11/24 AD MTG：ピンのアイコンを決めるために聞く）。地図のピンは「種類（表示形式）」に「大型」が入っていれば大型、
+// それ以外はスタンド型になる（shared-data.js の _pinShape）。サーバーは変えず、送るときに表示形式の文字で形を表す。
+// FLASH は 10FF の自社サイネージなので選択肢に入れない。分からないときはスタンド型のピンで受け、写真を見て管理画面で直す
+const REG_SHAPES=[
+  {v:'stand',t:'お店の前や中に立てる・柱に付ける（スタンド型）'},
+  {v:'large',t:'建物の壁・道路沿いの大きな画面や看板（大型）'},
+  {v:'unknown',t:'分からない・その他（写真を見て広告ナビが決めます）'},
+];
+const REG_SIZE_BANDS=['32インチ以下','33〜55インチ','56〜100インチ','それより大きい（数メートル以上）','分からない'];
+// 形に合わせて表示形式の文字をそろえる（大型なのに「大型」が無い → 先頭に足す／スタンド型なのに「大型」がある → 外す）
+function _regTypeForShape(type,shape){
+  if(shape==='large') return /大型/.test(type)?type:('大型'+(type?'・'+type:''));
+  if(shape==='stand') return type.replace(/^大型・?/,'');
+  return type;
+}
+function _regSizeText(band,detail){
+  if(!band||band==='分からない') return detail;
+  return detail?band+'・'+detail:band;
+}
 function showRegister(){
   if(mOpen)toggleMenu();
   if(!loggedIn||!_knToken){ _regAfterLogin=true; toast('掲載の申請には会員ログイン（電話番号）が必要です'); showAuth(); return; }
@@ -2861,18 +2880,22 @@ function showRegister(){
     </div>
     <div class="fg"><label>メールアドレス（任意）</label><input class="fi" id="reg-email" type="email" maxlength="254" placeholder="連絡は電話が基本です"><div id="reg-email-err" class="input-err"></div></div>
     <div class="fg"><label>サイネージの名前<span class="req">必須</span></label><input class="fi" id="reg-name" maxlength="200" placeholder="例：〇〇店 店頭サイネージ"><div id="reg-name-err" class="input-err"></div></div>
+    <div class="fg"><label>サイネージの形<span class="req">必須</span></label><select class="fi" id="reg-shape" onchange="_setFieldErr('reg-shape',false)"><option value="">選択してください</option>${REG_SHAPES.map(o=>`<option value="${o.v}">${o.t}</option>`).join('')}</select><div id="reg-shape-err" class="input-err"></div></div>
     <div class="two-col">
-      <div class="fg"><label>種類</label><select class="fi" id="reg-type"><option value="">選択してください</option><option>LED</option><option>大型LED</option><option>液晶ディスプレイ</option><option>その他</option></select></div>
-      <div class="fg"><label>大きさ</label><input class="fi" id="reg-size" maxlength="100" placeholder="例：55インチ／640mm×2240mm"></div>
+      <div class="fg"><label>大きさ<span class="req">必須</span></label><select class="fi" id="reg-size-band" onchange="_setFieldErr('reg-size-band',false)"><option value="">選択してください</option>${REG_SIZE_BANDS.map(t=>`<option>${t}</option>`).join('')}</select><div id="reg-size-band-err" class="input-err"></div></div>
+      <div class="fg"><label>表示形式</label><select class="fi" id="reg-type"><option value="">選択してください</option><option>LED</option><option>大型LED</option><option>液晶ディスプレイ</option><option>その他</option></select></div>
     </div>
+    <div class="fg"><label>くわしい大きさ（任意）</label><input class="fi" id="reg-size" maxlength="80" placeholder="例：55インチ／640mm×2240mm"></div>
     <div class="fg"><label>設置場所の種類</label><input class="fi" id="reg-place" maxlength="100" placeholder="例：店頭・駐車場・ビルの壁面"></div>
     <div class="fg"><label>住所<span class="req">必須</span></label>
       <div style="display:flex;gap:6px"><input class="fi" id="reg-addr" maxlength="300" placeholder="例：三重県津市栄町1-1" onchange="_regAutoGeocode()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.blur();}"><button class="btn-m-close" style="flex-shrink:0" onclick="_regGeocode()">地図で探す</button></div>
       <div id="reg-addr-err" class="input-err"></div></div>
-    <div class="fg"><label>設置場所（地図をタップ、またはピンを動かして合わせてください。住所が空なら自動で入ります）<span class="req">必須</span></label>
+    <div class="fg"><label>設置場所（地図をタップ、またはピンを動かして合わせてください。住所が空なら町名まで自動で入ります）<span class="req">必須</span></label>
       <div id="reg-map" style="width:100%;height:220px;border:1px solid #ddd;border-radius:6px;background:#f3f3f3"></div>
-      <div id="reg-pos" style="font-size:11px;color:#888;margin-top:4px">まだ選ばれていません</div><div id="reg-pos-err" class="input-err"></div></div>
+      <div id="reg-pos" style="font-size:11px;color:#888;margin-top:4px">まだ選ばれていません</div><div id="reg-pos-err" class="input-err"></div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">住所の検索：国土地理院</div></div>
     <div class="fg"><label>写真（${REG_PHOTO_MAX} 枚まで・任意）</label>
+      <div style="font-size:11px;color:#888;margin-bottom:4px">1 枚以上あると、確認が早く進みます</div>
       <input type="file" id="reg-file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onchange="_regAddPhotos(this)" style="font-size:12px">
       <div id="reg-photos" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div></div>
     <div class="fg"><label>掲載プラン（任意）</label>
@@ -2912,19 +2935,27 @@ function _regAutoGeocode(){
   if(!addr||addr===_reg.autoAddr||addr===_reg.lastGeo) return;
   _regGeocode(true);
 }
+// 住所 ⇔ 位置は国土地理院の住所検索・逆引きを使う（無料・API キー不要。11/25 眞野さん：Google の Geocoding API は使わない）。
+// 地理院地図のための機能で、仕様が予告なく変わることがある（国土地理院の回答 github.com/gsi-cyberjapan/gsimaps/issues/29）。
+// 使えないときは、これまでどおり地図をタップしてピンを置けば申請できる
+const GSI_ADDR_URL='https://msearch.gsi.go.jp/address-search/AddressSearch?q=';
+const GSI_REV_URL='https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress';
+let _gsiMuniP=null; // 市区町村コード → 「都道府県＋市区町村」（gsi-muni.json。国土地理院 muni.js から作成）
+function _gsiMuni(){ return _gsiMuniP||(_gsiMuniP=fetch('./gsi-muni.json').then(r=>{if(!r.ok)throw r.status;return r.json();}).catch(e=>{_gsiMuniP=null;throw e;})); }
 async function _regGeocode(auto){
   const addr=($('reg-addr').value||'').trim();
   if(!addr){_setFieldErr('reg-addr',true,'住所を入力してください');return;}
   if(_reg) _reg.lastGeo=addr;
   try{
-    const {Geocoder}=await google.maps.importLibrary('geocoding');
-    const {results}=await new Geocoder().geocode({address:addr,region:'jp'});
-    if(!results||!results.length) throw 0;
-    const p=results[0].geometry.location; _regSetPos(p.lat(),p.lng(),true);
-    toast('住所の位置にピンを置きました。ずれていれば動かしてください');
+    const r=await fetch(GSI_ADDR_URL+encodeURIComponent(addr));
+    if(!r.ok) throw 'HTTP '+r.status;
+    const js=await r.json();
+    const c=Array.isArray(js)&&js.length&&js[0].geometry&&js[0].geometry.coordinates;
+    if(!c) throw 'no result';
+    _regSetPos(c[1],c[0],true); // 国土地理院は [経度, 緯度] の順
+    toast('住所のおおよその位置にピンを置きました。ずれていれば動かしてください');
   }catch(e){
-    // REQUEST_DENIED＝キーで住所検索（Geocoding）が許可されていない。原因を見分けられるよう残す
-    console.warn('[掲載申請] 住所から位置を探せませんでした',e&&(e.code||e.message||e));
+    console.warn('[掲載申請] 住所から位置を探せませんでした',e&&(e.message||e));
     toast(auto?'住所から位置を見つけられませんでした。地図をタップしてピンを置いてください'
               :'住所から位置を見つけられませんでした。地図をタップして選んでください');
   }
@@ -2934,15 +2965,19 @@ async function _regReverse(){
   if(!_reg||_reg.lat==null) return;
   const seq=(_reg.revSeq=(_reg.revSeq||0)+1);
   try{
-    const {Geocoder}=await google.maps.importLibrary('geocoding');
-    const {results}=await new Geocoder().geocode({location:{lat:_reg.lat,lng:_reg.lng},language:'ja',region:'jp'});
+    const r=await fetch(`${GSI_REV_URL}?lat=${_reg.lat}&lon=${_reg.lng}`);
+    if(!r.ok) throw 0;
+    const m=(await r.json()).results; // {muniCd:'24201', lv01Nm:'栄町一丁目'}。海の上などは空
+    if(!m||!m.muniCd) throw 0;
+    const city=(await _gsiMuni())[String(m.muniCd).padStart(5,'0')];
     if(seq!==_reg.revSeq) return; // 続けて動かしたときは最後の位置だけ使う
-    if(!results||!results.length) throw 0;
-    const addr=(results[0].formatted_address||'').replace(/^日本、\s*/,'').replace(/^〒\d{3}-\d{4}\s*/,'').trim();
+    if(!city) throw 0;
+    const town=/^[-－ー]?$/.test(m.lv01Nm||'')?'':m.lv01Nm;
+    const addr=city+town; // 国土地理院の逆引きは町名・丁目まで。番地は申請者が足す
     if(!addr) throw 0;
     const el=$('reg-addr'); if(!el) return;
     const cur=(el.value||'').trim();
-    if(!cur||cur===_reg.autoAddr){ el.value=addr; _reg.autoAddr=addr; _setFieldErr('reg-addr',false); }
+    if(!cur||cur===_reg.autoAddr){ el.value=addr; _reg.autoAddr=addr; _setFieldErr('reg-addr',false); toast('町名まで入れました。番地があれば足してください'); }
     else toast('住所欄は手で入力した内容のままにしています');
   }catch(e){
     if(seq===_reg.revSeq) toast('この位置の住所を見つけられませんでした。住所は手で入力してください');
@@ -2989,13 +3024,18 @@ function _regRenderPhotos(){
 async function submitRegister(){
   if(!_reg||_reg.busy) return;
   const v=id=>($(id)?.value||'').trim();
+  const shape=v('reg-shape'), band=v('reg-size-band'), shapeTxt=(REG_SHAPES.find(o=>o.v===shape)||{}).t||'';
   const body={contact_name:v('reg-contact'),company:v('reg-company'),email:v('reg-email'),name:v('reg-name'),
-    type:v('reg-type'),size:v('reg-size'),place:v('reg-place'),addr:v('reg-addr'),lat:_reg.lat,lng:_reg.lng,note:v('reg-note'),ad_info:v('reg-adinfo'),
+    type:_regTypeForShape(v('reg-type'),shape),size:_regSizeText(band,v('reg-size')),place:v('reg-place'),addr:v('reg-addr'),lat:_reg.lat,lng:_reg.lng,
+    // 管理画面で形を確かめられるよう、メモの先頭に残す（地図には載らない）
+    note:(shapeTxt?'サイネージの形：'+shapeTxt+'\n':'')+v('reg-note'),ad_info:v('reg-adinfo'),
     plans:[...document.querySelectorAll('#reg-plans .reg-plan')].map(r=>{const i=r.querySelectorAll('input');return {n:i[0].value.trim(),p:i[1].value.trim()};}).filter(p=>p.n||p.p),
     photos:_reg.photos.map(p=>p.key)};
   let err=false;
   if(!body.contact_name){_setFieldErr('reg-contact',true,'お名前を入力してください');err=true;}
   if(!body.name){_setFieldErr('reg-name',true,'サイネージの名前を入力してください');err=true;}
+  if(!shape){_setFieldErr('reg-shape',true,'サイネージの形を選んでください');err=true;}
+  if(!band){_setFieldErr('reg-size-band',true,'大きさを選んでください（分からなければ「分からない」）');err=true;}
   if(!body.addr){_setFieldErr('reg-addr',true,'住所を入力してください');err=true;}
   if(body.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(body.email)){_setFieldErr('reg-email',true,'メールアドレスの形式が正しくありません');err=true;}
   if(_reg.lat==null){_setFieldErr('reg-pos',true,'地図で設置場所を選んでください（「地図で探す」も使えます）');err=true;}
@@ -3006,7 +3046,7 @@ async function submitRegister(){
     _reg=null; closeModal();
     openModal(`<h3>${ic('send')} 申請を受け付けました</h3><p style="font-size:13px;color:#555;line-height:1.8">ありがとうございます。内容を確認し、承認後に広告ナビの地図へ掲載します。確認のため、登録の電話番号にご連絡することがあります。<br>申請の状況は「これまでの申請を見る」から確認できます。</p>`);
   }catch(e){
-    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo'};
+    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo',size:'reg-size-band',type:'reg-type',note:'reg-note'};
     let shown=false;
     if(e&&e.status===400&&d) Object.keys(d).forEach(k=>{ if(map_[k]){_setFieldErr(map_[k],true,[].concat(d[k])[0]);shown=true;} });
     toast(shown?'入力内容を確認してください':(e&&e.status===404?'この環境では、まだ申請を受け付けていません':_knApiErr(e)));
