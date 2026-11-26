@@ -2903,6 +2903,7 @@ function showRegister(){
       <div class="fg"><label>お名前<span class="req">必須</span></label><input class="fi" id="reg-contact" maxlength="100" placeholder="山田 太郎"><div id="reg-contact-err" class="input-err"></div></div>
       <div class="fg"><label>会社名・店名</label><input class="fi" id="reg-company" maxlength="200"></div>
     </div>
+    <div class="fg"><label>メールアドレス<span class="req">必須</span></label><input class="fi" id="reg-email" type="email" maxlength="254" placeholder="例：info@example.com" autocomplete="email"><div id="reg-email-err" class="input-err"></div></div>
     <div class="fg"><label>サイネージの名前<span class="req">必須</span></label><input class="fi" id="reg-name" maxlength="200" placeholder="例：〇〇店 店頭サイネージ"><div id="reg-name-err" class="input-err"></div></div>
     <div class="fg"><label>サイネージの形<span class="req">必須</span></label><select class="fi" id="reg-shape" onchange="_setFieldErr('reg-shape',false)"><option value="">選択してください</option>${REG_SHAPES.map(o=>`<option value="${o.v}">${o.t}</option>`).join('')}</select><div id="reg-shape-err" class="input-err"></div></div>
     <div class="fg"><label>設置の仕方</label><select class="fi" id="reg-mount" onchange="_regMountChanged()"><option value="">選択してください</option>${REG_MOUNTS.map((o,i)=>`<option value="${i}">${o.t}</option>`).join('')}</select></div>
@@ -3054,7 +3055,7 @@ async function submitRegister(){
   const v=id=>($(id)?.value||'').trim();
   const shape=v('reg-shape'), band=v('reg-size-band'), shapeTxt=(REG_SHAPES.find(o=>o.v===shape)||{}).t||'';
   const mountTxt=(REG_MOUNTS[v('reg-mount')]||{}).t||'';
-  const body={contact_name:v('reg-contact'),company:v('reg-company'),name:v('reg-name'),
+  const body={contact_name:v('reg-contact'),company:v('reg-company'),email:v('reg-email'),name:v('reg-name'),
     type:_regTypeForShape(v('reg-type'),shape),size:_regSizeText(band,v('reg-size')),place:_regPlaceText(v('reg-place-cat'),v('reg-place')),addr:v('reg-addr'),lat:_reg.lat,lng:_reg.lng,
     // 管理画面で形を確かめられるよう、メモの先頭に残す（地図には載らない）
     note:(shapeTxt?'サイネージの形：'+shapeTxt+'\n':'')+(mountTxt?'設置の仕方：'+mountTxt+'\n':'')+v('reg-note'),ad_info:v('reg-adinfo'),
@@ -3066,6 +3067,8 @@ async function submitRegister(){
   if(!shape){_setFieldErr('reg-shape',true,'サイネージの形を選んでください');err=true;}
   if(!band){_setFieldErr('reg-size-band',true,'大きさを選んでください（分からなければ「分からない」）');err=true;}
   if(!body.addr){_setFieldErr('reg-addr',true,'住所を入力してください');err=true;}
+  if(!body.email){_setFieldErr('reg-email',true,'メールアドレスを入力してください');err=true;}
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(body.email)){_setFieldErr('reg-email',true,'メールアドレスの形式が正しくありません');err=true;}
   if(_reg.lat==null){_setFieldErr('reg-pos',true,'地図で設置場所を選んでください（「地図で探す」も使えます）');err=true;}
   if(err){toast('入力内容を確認してください');return;}
   const btn=$('reg-submit'); _reg.busy=true; if(btn){btn.disabled=true;btn.textContent='送信中...';}
@@ -3074,7 +3077,7 @@ async function submitRegister(){
     _reg=null; closeModal();
     openModal(`<h3>${ic('send')} 申請を受け付けました</h3><p style="font-size:13px;color:#555;line-height:1.8">ありがとうございます。内容を確認し、承認後に広告ナビの地図へ掲載します。確認のため、登録の電話番号にご連絡することがあります。<br>申請の状況は「これまでの申請を見る」から確認できます。</p>`);
   }catch(e){
-    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo',size:'reg-size-band',type:'reg-type',note:'reg-note'};
+    const d=e&&e.data, map_={contact_name:'reg-contact',name:'reg-name',addr:'reg-addr',email:'reg-email',lat:'reg-pos',lng:'reg-pos',ad_info:'reg-adinfo',size:'reg-size-band',type:'reg-type',note:'reg-note'};
     let shown=false;
     if(e&&e.status===400&&d) Object.keys(d).forEach(k=>{ if(map_[k]){_setFieldErr(map_[k],true,[].concat(d[k])[0]);shown=true;} });
     toast(shown?'入力内容を確認してください':(e&&e.status===404?'この環境では、まだ申請を受け付けていません':_knApiErr(e)));
