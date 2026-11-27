@@ -2897,7 +2897,7 @@ function showRegister(){
   _reg={photos:[],lat:null,lng:null,map:null,marker:null,busy:false};
   const phone=_knProfile&&_knProfile.phone_number?knPhoneLabel(_knProfile.phone_number):'';
   openModal(`<h3>${ic('send')} サイネージの掲載申請</h3>
-    <p style="font-size:12px;color:#666;line-height:1.7;margin-bottom:10px">お持ちのサイネージを広告ナビに載せたい方の申請フォームです。テンフィールズファクトリーが内容を確認し、<b>承認後に地図へ掲載</b>します。確認のため、登録の電話番号（${_regEsc(phone)}）にお電話することがあります。<br>電車・バス・トラックの車内など、場所が動くサイネージは掲載できません。</p>
+    <p style="font-size:12px;color:#666;line-height:1.7;margin-bottom:10px">お持ちのサイネージを広告ナビに載せたい方の申請フォームです。申請いただいた内容は、テンフィールズファクトリーから登録の電話番号（${_regEsc(phone)}）に<b>お電話で確認したうえで、地図に掲載します</b>。確認が取れない場合や、内容によっては掲載を見送ることがあります。<br>電車・バス・トラックの車内など、場所が動くサイネージは掲載できません。</p>
     <div style="text-align:right;margin-bottom:8px"><button class="btn-m-close" onclick="showMyRequests()">これまでの申請を見る</button></div>
     <div class="two-col">
       <div class="fg"><label>お名前<span class="req">必須</span></label><input class="fi" id="reg-contact" maxlength="100" placeholder="山田 太郎"><div id="reg-contact-err" class="input-err"></div></div>
@@ -2932,6 +2932,7 @@ function showRegister(){
       <button class="btn-m-close" onclick="_regAddPlan()">＋ プランを追加</button></div>
     <div class="fg"><label>広告掲載についてのご案内（任意・1000 文字まで）</label><textarea class="fi" id="reg-adinfo" maxlength="1000" style="min-height:80px;resize:vertical" placeholder="例：1 枠 15 秒・1 時間に 4 回放映。動画はお持ち込み、または制作のご相談も可。&#10;地図の詳細画面の「広告掲載について」に載ります。書かなければ「お問い合わせください」とだけ出ます"></textarea><div id="reg-adinfo-err" class="input-err"></div></div>
     <div class="fg"><label>メモ（400 文字まで・地図には載りません）</label><textarea class="fi" id="reg-note" maxlength="400" style="min-height:60px;resize:vertical" placeholder="電話に出られる時間帯など"></textarea></div>
+    <div style="font-size:12px;color:#666;margin:8px 0 0;line-height:1.7">掲載後の広告のお申し込み・お取引は、申請者さまと広告主さまとの間で直接行っていただきます。テンフィールズファクトリーは、そのお取引やトラブルには関与いたしません。</div>
     <div style="font-size:11px;color:#999;margin:8px 0 6px;line-height:1.7">送信いただいた内容は、<a href="./privacy.html" target="_blank" rel="noopener" style="color:var(--org)">プライバシーポリシー</a>に従って取り扱います。</div>
     <button class="btn-org" id="reg-submit" onclick="submitRegister()">この内容で申請する</button>`,_regInitMap,false,true);
   _regAddPlan();

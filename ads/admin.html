@@ -2328,7 +2328,7 @@ function renderReqs(){
       +'<div style="line-height:1.8">'
       +'種類・大きさ：'+E(r.type||'—')+'／'+E(r.size||'—')+'　設置場所：'+E(r.place||'—')+'<br>'
       +'住所：'+E(r.addr)+'　<a href="'+map+'" target="_blank" rel="noopener" style="color:var(--org)">位置を地図で確認</a><br>'
-      +'担当：'+E(r.contact_name)+'（'+E(r.company||'会社名なし')+'）　📞 '+E(r.phone_number)+(r.email?'　✉ '+E(r.email):'')+'<br>'
+      +'申請者：'+E(r.contact_name)+'（'+E(r.company||'会社名なし')+'）　📞 '+E(r.phone_number)+(r.email?'　✉ '+E(r.email):'')+'<br>'
       +'プラン：<br>'+plans+(r.ad_info?'<br>広告掲載についてのご案内（地図に載ります）：<div style="white-space:pre-wrap;color:#cbd5e1;margin:2px 0 0 1em">'+E(r.ad_info)+'</div>':'')+(r.note?'<br>メモ：'+E(r.note):'')+'</div>'
       +(photos?'<div style="margin-top:6px">'+photos+'</div>':'')
       +act+'</div>';
