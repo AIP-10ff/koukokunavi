@@ -64,6 +64,8 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .fi-small{padding:5px 8px;font-size:12px}
 .plan-edit-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
 .plan-edit-row input{flex:1}
+.plan-edit-row{flex-wrap:wrap}
+.plan-edit-row textarea.plan-price{flex:1 1 100%;resize:none;overflow:hidden;line-height:1.5;font-family:inherit}
 .btn-remove-plan{background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;flex-shrink:0}
 .btn-add-plan{background:none;border:1px dashed #334155;color:#64748b;border-radius:4px;padding:5px 12px;font-size:12px;cursor:pointer;width:100%;margin-top:4px}
 .btn-add-plan:hover{border-color:var(--org);color:var(--org)}
@@ -736,7 +738,7 @@ function popupHtml(s){
     +'<span class="pp-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
     +'<div class="pp-row">🏠 '+s.addr+'</div>'
     +(s.trf?'<div class="pp-row">🚗 '+s.trf+'</div>':'')
-    +'<div class="pp-price">¥'+_planPrice+'/月〜</div>'
+    +'<div class="pp-price">'+(standPopupPrice(s)||'¥'+_planPrice+'/月〜')+'</div>'
     +'<button class="btn-edit-popup" onclick="openAdmin('+s.id+')">✏️ 編集する</button>'
     +'</div></div>';
 }
@@ -790,11 +792,12 @@ function openAdmin(id){
       return twoCol(fg('サイズ',sizeInput),fg('表示形式',inp('a-type',s.type)));
     })(),
     twoCol(fg('緯度',inp('a-lat',s.lat)),fg('経度',inp('a-lng',s.lng))),
-    fg('ターゲット',inp('a-target',s.target)),
+    // ターゲット・交通量はカメラを付けてから入れる。欄は残し、今は空欄でよいことを添える（A-2）
+    fg('ターゲット（今は空欄で大丈夫です・カメラ設置後に入れます）',inp('a-target',s.target)),
     (function(){
       var wrap=document.createElement('div');wrap.className='fg';
       // 人流（通行者数）は 10/14 AD MTG で廃止。国交省の交通量を「13,476 台／日」、推定値は「（推定値）」付きで入れる
-      var lbl=document.createElement('label');lbl.textContent='交通量（国交省・台／日。推定値は末尾に（推定値））';
+      var lbl=document.createElement('label');lbl.textContent='交通量（国交省・台／日。推定値は末尾に（推定値））※今は空欄で大丈夫です';
       var row=document.createElement('div');row.style.cssText='display:flex;gap:6px';
       var trfInp=inp('a-trf',s.trf);trfInp.style.flex='1';trfInp.placeholder='例：13,476 台／日　データなしは空欄';
       var xlBtn=document.createElement('button');xlBtn.type='button';xlBtn.className='btn-xl-import';
@@ -836,7 +839,8 @@ function openAdmin(id){
   // 掲載プラン
   var planWrap=document.createElement('div');
   planWrap.id='plan-rows';
-  s.plans.forEach(function(p,i){ planWrap.appendChild(planRow(p.n,p.p,i)); });
+  // 「〜相当」は外して出す。保存するとサーバーの値からも消える（A-2）
+  s.plans.forEach(function(p,i){ planWrap.appendChild(planRow(p.n,stripPlanSoutou(p.p),i)); });
   var addPlanBtn=document.createElement('button');
   addPlanBtn.className='btn-add-plan';
   addPlanBtn.textContent='＋ プランを追加';
@@ -847,8 +851,7 @@ function openAdmin(id){
   planWrap.appendChild(addPlanBtn);
   body.appendChild(section('掲載プラン（料金）',[planWrap]));
 
-  // ── 資料管理セクション ──
-  body.appendChild(section('📄 資料管理',[buildDocSection()]));
+  // 資料管理は使わなくなったので出さない（11/27 中井さん MTG A-2）。登録済みの資料は tmpDocs のまま保存時に残る
 
   // お気に入り
   var favEl=document.createElement('div');
@@ -1063,10 +1066,15 @@ function docIcon(name,type){
 function planRow(name,price,idx){
   var row=document.createElement('div'); row.className='plan-edit-row';
   var ni=document.createElement('input'); ni.className='fi fi-small'; ni.id='plan-name-'+idx; ni.name='plan-name-'+idx; ni.autocomplete='off'; ni.placeholder='プラン名'; ni.value=name; ni.dataset.pname=idx;
-  var pi=document.createElement('input'); pi.className='fi fi-small'; pi.id='plan-price-'+idx; pi.name='plan-price-'+idx; pi.autocomplete='off'; pi.placeholder='金額（例：65,000）'; pi.value=price; pi.dataset.pprice=idx;
+  // 料金は長い文（「月額5,000円（税別）／年額60,000円…」）が途中で切れないよう、折り返す入力欄にして高さを中身に合わせる（A-3）
+  var pi=document.createElement('textarea'); pi.className='fi fi-small plan-price'; pi.id='plan-price-'+idx; pi.name='plan-price-'+idx; pi.autocomplete='off'; pi.rows=1; pi.placeholder='金額（例：月額5,000円（税別））'; pi.value=price; pi.dataset.pprice=idx;
+  var fit=function(){ pi.style.height='auto'; pi.style.height=pi.scrollHeight+'px'; };
+  pi.addEventListener('input',fit);
+  pi.addEventListener('keydown',function(e){ if(e.key==='Enter') e.preventDefault(); }); // 1 行の値なので改行は入れない
   var rm=document.createElement('button'); rm.className='btn-remove-plan'; rm.textContent='✕';
   rm.onclick=function(){row.remove();};
-  row.appendChild(ni); row.appendChild(pi); row.appendChild(rm);
+  row.appendChild(ni); row.appendChild(rm); row.appendChild(pi);
+  requestAnimationFrame(fit); // 画面に入ってから高さを合わせる
   return row;
 }
 
@@ -1135,8 +1143,8 @@ function saveSign(){
   s.plans=[];
   rows.forEach(function(row){
     var ni=row.querySelector('input[data-pname]');
-    var pi=row.querySelector('input[data-pprice]');
-    if(ni&&pi&&ni.value) s.plans.push({n:ni.value,p:pi.value});
+    var pi=row.querySelector('[data-pprice]');
+    if(ni&&pi&&ni.value) s.plans.push({n:ni.value,p:pi.value.replace(/\s*\n\s*/g,' ')});
   });
 
   // 削除されたメディアをIDBから消去
@@ -1467,9 +1475,10 @@ function newSignage(lat,lng,addr){
   var id=Date.now();
   var _prefM=(addr||'').match(/^(.{2,4}[都道府県])/);
   SG.push({id:id,name:'新規サイネージ',lat:lat,lng:lng,
-    area:'',place:_prefM?_prefM[1]:'',target:'',addr:addr||'',size:'',type:'デジタル',
-    ped:'',trf:'',status:'EMPTY',favCount:0,
-    plans:[{n:'プランA',p:''}],e:'📺',photos:[],docs:[]});
+    // 初期値はスタンド型（11/27 中井さん MTG A-1）。大型のときは編集画面で書き換える
+    area:'',place:_prefM?_prefM[1]:'',target:'',addr:addr||'',size:STAND_DEFAULT.size,type:STAND_DEFAULT.type,
+    ped:'',trf:'',status:STAND_DEFAULT.status,favCount:0,
+    plans:STAND_DEFAULT.plans.map(function(p){return {n:p.n,p:p.p};}),e:'📺',photos:[],docs:[]});
   if(addMode) toggleAddMode();
   render(); renderList(SG); openAdmin(id);
   toast('地図にピンを追加しました。情報を入力してください。');
@@ -1499,7 +1508,7 @@ function renderList(items){
       +'<div class="li-meta">📍 '+s.place+(s.trf?' &nbsp; 🚗 '+s.trf:'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:6px;margin-top:2px">'
       +'<span class="li-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
-      +'<span class="li-price">¥'+_lPlanPrice+'/月〜</span>'
+      +'<span class="li-price">'+(standPopupPrice(s)||'¥'+_lPlanPrice+'/月〜')+'</span>'
       +'</div></div></div>';
   }).join('');
   document.getElementById('lp-items').innerHTML=html;

@@ -1710,7 +1710,8 @@ const NO_AD_MSG='現在募集しておりません';
 function _noAdRecruit(s){ return _pinShape(s)==='flash'&&s.status!=='PLAN'; }
 // 利用者向け画面に出す状態の札。「空き」は広告が入っていないと読まれるので出さない（10/22 C-3・11/12 眞野さん判断）。管理画面は STATUS_LBL のまま
 function _pubStatus(s){ return (_noAdRecruit(s)||s.status==='EMPTY')?'':(s.status||''); }
-/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・料金・詳細ボタン）*/
+/** ピンタップ時に表示されるポップアップのHTMLを生成する（名前・住所・料金・詳細ボタン）
+ *  スタンド型は「月額5,000円（税別）」だけ出し、月次契約などは詳細ページで見せる（11/27 中井さん MTG A-3）*/
 function popupHtml(s){
   const price = (s.plans && s.plans.length && s.plans[0]) ? (s.plans[0].p || '—') : '—';
   return `<div>
@@ -1718,7 +1719,7 @@ function popupHtml(s){
     <div class="pp-body">
       <div class="pp-row">${ic('house')} ${s.addr||'—'}</div>
       <div class="pp-row">${ic('ruler')} ${fmtSize(s.size)}</div>
-      <div class="pp-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:price+'〜'}</div>
+      <div class="pp-price">${_noAdRecruit(s)?`<span class="no-ad">${NO_AD_MSG}</span>`:(standPopupPrice(s)||price+'〜')}</div>
       <button class="btn-check" onclick="openDetail(${s.id})">詳細をCheck! →</button>
     </div>
   </div>`;
