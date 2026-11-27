@@ -148,6 +148,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 .pp-body{padding:12px 14px;background:#1e293b}
 .pp-row{display:flex;align-items:center;gap:7px;font-size:12px;color:#94a3b8;margin-bottom:6px}
 .pp-price{font-size:15px;font-weight:700;color:var(--org);margin:8px 0 10px}
+.pp-plans{font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
 .pp-status{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}
 .btn-edit-popup{display:block;width:100%;background:var(--org);color:#fff;border:none;border-radius:5px;padding:9px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-edit-popup:hover{background:var(--org2)}
@@ -338,7 +339,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:
 <div id="stats-bar">
   <div class="stat-item"><span class="stat-num" id="s-total" style="color:#e2e8f0">0</span><span class="stat-lbl">表示中のサイネージ</span></div>
   <div class="stat-item"><span class="stat-num" id="s-on" style="color:#10b981">0</span><span class="stat-lbl">稼働中</span></div>
-  <div class="stat-item"><span class="stat-num" id="s-empty" style="color:#f59e0b">0</span><span class="stat-lbl">空き</span></div>
+  <div class="stat-item"><span class="stat-num" id="s-empty" style="color:#f59e0b">0</span><span class="stat-lbl">満枠</span></div>
   <div class="stat-item"><span class="stat-num" id="s-maint" style="color:#ef4444">0</span><span class="stat-lbl">メンテ中</span></div>
   <div class="stat-item"><span class="stat-num" id="s-fav" style="color:#e91e63">0</span><span class="stat-lbl">お気に入り登録数</span></div>
   <div class="stat-item"><span class="stat-num" id="s-inq" style="color:#60a5fa">0</span><span class="stat-lbl">未読問い合わせ</span></div>
@@ -738,7 +739,7 @@ function popupHtml(s){
     +'<span class="pp-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
     +'<div class="pp-row">🏠 '+s.addr+'</div>'
     +(s.trf?'<div class="pp-row">🚗 '+s.trf+'</div>':'')
-    +'<div class="pp-price">'+(standPopupPrice(s)||'¥'+_planPrice+'/月〜')+'</div>'
+    +'<div class="pp-price">'+popupPriceHtml(s,'¥'+_planPrice+'/月〜')+'</div>'
     +'<button class="btn-edit-popup" onclick="openAdmin('+s.id+')">✏️ 編集する</button>'
     +'</div></div>';
 }
@@ -1508,7 +1509,7 @@ function renderList(items){
       +'<div class="li-meta">📍 '+s.place+(s.trf?' &nbsp; 🚗 '+s.trf:'')+'</div>'
       +'<div style="display:flex;align-items:center;gap:6px;margin-top:2px">'
       +'<span class="li-status" style="background:'+stBg+';color:'+stTc+'">● '+stLb+'</span>'
-      +'<span class="li-price">'+(standPopupPrice(s)||'¥'+_lPlanPrice+'/月〜')+'</span>'
+      +'<span class="li-price">'+(ownPopupPrice(s)||'¥'+_lPlanPrice+'/月〜')+'</span>'
       +'</div></div></div>';
   }).join('');
   document.getElementById('lp-items').innerHTML=html;
