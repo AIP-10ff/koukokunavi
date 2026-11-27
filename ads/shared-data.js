@@ -23,7 +23,8 @@
 var STATUS_COLOR = {ON:'#10b981', EMPTY:'#f59e0b', MAINT:'#ef4444', PLAN:'#2563eb'};
 var STATUS_BG    = {ON:'#d1fae5', EMPTY:'#fef3c7', MAINT:'#fee2e2', PLAN:'#dbeafe'};
 var STATUS_TC    = {ON:'#065f46', EMPTY:'#92400e', MAINT:'#991b1b', PLAN:'#1e40af'};
-var STATUS_LBL   = {ON:'稼働中',  EMPTY:'空き',    MAINT:'メンテ中', PLAN:'設置予定'};
+// EMPTY の表示名は「満枠」（11/27 眞野さん。値 EMPTY はサーバーと同じまま、名前だけ変える）。利用者画面には EMPTY の札を出さない（_pubStatus）
+var STATUS_LBL   = {ON:'稼働中',  EMPTY:'満枠',    MAINT:'メンテ中', PLAN:'設置予定'};
 
 // ===== トースト通知 =====
 function toast(msg){
@@ -684,11 +685,27 @@ var STAND_DEFAULT={
 };
 // プラン料金から「相当」を外す（A-2：「月額5,000円相当（税別）」→「月額5,000円（税別）」）
 function stripPlanSoutou(p){ return String(p||'').replace(/相当/g,''); }
-// スタンド型のポップアップに出す料金：1 つ目のプランの「／」より前だけ（例「月額5,000円（税別）」）。
-// 月次契約などの残りは詳細ページで見せる（A-3）。スタンド型以外・プランなしは null
-function standPopupPrice(s){
-  if(_pinShape(s)!=='stand'||!s.plans||!s.plans.length||!s.plans[0].p) return null;
+// ===== ポップアップの料金（11/27 中井さん MTG A-3・同日 眞野さん追加指示） =====
+// ・自社サイネージ（管理画面から追加＝source が request でない。スタンド型・大型とも）：1 つ目のプランの月額だけ。
+//   「／」より前・「相当」なし・「〜」なし（例「月額5,000円（税別）」）。月次契約などの残りは詳細ページで見せる
+// ・掲載申請のサイネージ（source=request）：プランを全部、長くても途中で切らずに出す
+// FLASH は「現在募集しておりません」を出すので対象外
+function _isRequestSignage(s){ return !!s&&s.source==='request'; }
+function ownPopupPrice(s){
+  if(!s||_isRequestSignage(s)||_pinShape(s)==='flash'||!s.plans||!s.plans.length||!s.plans[0].p) return null;
   return stripPlanSoutou(s.plans[0].p).split('／')[0].trim();
+}
+function _escHtml(t){ return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+// ポップアップの料金欄の HTML。自社は月額だけ、掲載申請はプランを全部（申請者の入力なのでエスケープ）。どちらでもなければ fallback をそのまま返す
+function popupPriceHtml(s,fallback){
+  var own=ownPopupPrice(s);
+  if(own) return _escHtml(own);
+  if(_isRequestSignage(s)){
+    var lines=(s.plans||[]).filter(function(p){return p&&(p.n||p.p);})
+      .map(function(p){return '<div>'+_escHtml((p.n?p.n+'：':'')+(p.p||''))+'</div>';});
+    if(lines.length) return '<div class="pp-plans">'+lines.join('')+'</div>';
+  }
+  return fallback;
 }
 
 // ===== 汎用ユーティリティ =====
