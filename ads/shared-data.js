@@ -671,6 +671,26 @@ function normalizePlan(p){
   return {n:p.n, p:'¥'+price+'/月'};
 }
 
+// ===== スタンド型サイネージの標準値（11/27 中井さん MTG A-1・A-3） =====
+// 管理画面の新規登録の初期値と、ポップアップの料金表示に使う。大型を登録するときは管理画面で書き換える
+var STAND_DEFAULT={
+  size:'640mm×2240mm',
+  type:'LED',
+  status:'ON',
+  plans:[
+    {n:'年間契約プラン（おすすめ）',p:'月額5,000円（税別）／年額60,000円（税別・年間一括）'},
+    {n:'月次契約',p:'月額10,000円（税別）／1か月単位'}
+  ]
+};
+// プラン料金から「相当」を外す（A-2：「月額5,000円相当（税別）」→「月額5,000円（税別）」）
+function stripPlanSoutou(p){ return String(p||'').replace(/相当/g,''); }
+// スタンド型のポップアップに出す料金：1 つ目のプランの「／」より前だけ（例「月額5,000円（税別）」）。
+// 月次契約などの残りは詳細ページで見せる（A-3）。スタンド型以外・プランなしは null
+function standPopupPrice(s){
+  if(_pinShape(s)!=='stand'||!s.plans||!s.plans.length||!s.plans[0].p) return null;
+  return stripPlanSoutou(s.plans[0].p).split('／')[0].trim();
+}
+
 // ===== 汎用ユーティリティ =====
 // SGからIDでサイネージを検索
 function find(id){for(var i=0;i<SG.length;i++) if(SG[i].id===id) return SG[i]; return null;}
